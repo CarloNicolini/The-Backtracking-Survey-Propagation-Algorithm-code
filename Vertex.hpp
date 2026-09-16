@@ -4,17 +4,17 @@
 /*
  Copyright 2018 Raffaele Marino
  This file is part of BSP.
- 
+
  BSP is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation; either version 2 of the License, or
  (at your option) any later version.
- 
+
  BSP is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
- 
+
  You should have received a copy of the GNU General Public License
  along with BSP; if not, write to the Free Software
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -62,12 +62,12 @@
 
 /*class vertex*/
 
-class Vertex{
+class Vertex {
 public:
-    
+
     /*public members*/
-    
-    Vertex(void){ /*default constructor*/
+
+    Vertex(void) { /*default constructor*/
         _vertex=0;/*vertex label*/
         _i=0;/*counter index vectors*/
         _degree_i=0;/*variable node degree*/
@@ -82,56 +82,56 @@ public:
         _sC=0.;/*certitude*/
         _I_am_white=false;/*white variable*/
     };
-    
-    
-    ~Vertex(){};/*default destructor*/
-    
+
+
+    ~Vertex() {}; /*default destructor*/
+
     void make_products(); /*update products and surveys*/
-    
+
     void compute_s(); /*compute surveys for each variable node*/
-    
+
     void fix_var_i(); /*fix variable i to true or false*/
-    
+
     void reset_value_default_var_i(); /*reset value default variable node*/
-    
+
     double * ptr_survey(); /*pointer of  vector _surveys_cl_to_i*/
-    
+
     double * ptr_survey(unsigned int &j); /*pointer of  vector _surveys_cl_to_i*/
-    
+
     double _Pr_U(bool &b); /* product of unsitisfied messages*/
-    
+
     double _Pr_S(bool &b, double &s); /* product of sitisfied messages*/
-    
+
     double _p_PLUS(); /*compute value p_plus*/
-    
+
     double _p_MINUS(); /*compute value p_minus*/
-    
+
     double _p_IND(); /*compute value p_indeterminate*/
-    
+
     double S(double &a, double &b, double &c); /*compute sT,sF*/
-    
+
     double S_C(); /*compute certitude*/
-    
-    long int _var_int(bool f){ /*variable node fixed and expressed as int */
+
+    long int _var_int(bool f) { /*variable node fixed and expressed as int */
         return (f==true) ? (_vertex_lli):(-1*_vertex_lli);
     }
-    
-    friend ostream& operator<<(ostream &out, Vertex V){ /*friend member for print object public variables*/
+
+    friend ostream& operator<<(ostream &out, Vertex V) { /*friend member for print object public variables*/
         out<<V._vertex<<" "<<V._degree_i<<" "<<V.prod_V_plus<<" "<<V.prod_V_minus<<" "<<endl;
         for (unsigned int i=0; i<V._surveys_cl_to_i.size(); ++i) {
             out<<V._surveys_cl_to_i[i]<<" "<<&(V._surveys_cl_to_i[i])<<" "<<*real(V._I_am_in_cl_at_init[i])<<endl;
         }
         return out;
     }
-    
-    friend ostream& operator<<(ostream &out, Vertex* V){ /*friend member for print object public variables*/
+
+    friend ostream& operator<<(ostream &out, Vertex* V) { /*friend member for print object public variables*/
         out<<V->_vertex<<" "<<V->_degree_i<<" "<<V->prod_V_plus<<" "<<V->prod_V_minus<<" "<<endl;
         for (unsigned int i=0; i<V->_surveys_cl_to_i.size(); ++i) {
             out<<V->_surveys_cl_to_i[i]<<" "<<&(V->_surveys_cl_to_i[i])<<" "<<*real(V->_I_am_in_cl_at_init[i])<<endl;
         }
         return out;
     }
-    
+
     /*public variables*/
     vector<list<Vertex * >::iterator> where_I_am; /*store where i is in _cl*/
     vector<list<double *>::iterator>  _where_surveys_are_in_cl;/*store position into a list*/
@@ -156,73 +156,73 @@ public:
     bool _I_am_a_fixed_variable; /*fixed variable during decimation*/
     bool _who_I_am; /*variable node value after fixing during deciamtion*/
     bool _I_am_white; /*I am a white variable*/
-    
+
 private:
-    
+
     /*private members*/
     double _one_minus(unsigned int &i);/*compute 1-survey stored into the class vector*/
 };
 
 /*private memeber  which returns the value  of 1-survey from the clause i to (this) variable*/
-inline double Vertex::_one_minus(unsigned int &i){/*compute 1-survey stored into the class vector*/
+inline double Vertex::_one_minus(unsigned int &i) { /*compute 1-survey stored into the class vector*/
     return (1.-_surveys_cl_to_i[i]);
 }
 
 /*public memeber which fixes the variable node to true or false, depending by surveys value _sT and _sF*/
-inline void Vertex::fix_var_i(){/*fix variable node to rue or false*/
+inline void Vertex::fix_var_i() { /*fix variable node to rue or false*/
     if(_sT>_sF) _who_I_am=true;
     else _who_I_am=false;
 }
 
 /*public memeber which resets the variable node*/
-inline void Vertex::reset_value_default_var_i(){
+inline void Vertex::reset_value_default_var_i() {
     _who_I_am=false;/*value of variable node*/
     _I_am_a_fixed_variable=false;/*tell if a variables has beeen fixed*/
 }
 
 
 /*public member which returns, depending by the literal into a clause, the right value of products of (1-message) for SP and BP equations*/
-inline double Vertex::_Pr_U(bool &b){/* product of unsitisfied messages*/
+inline double Vertex::_Pr_U(bool &b) { /* product of unsitisfied messages*/
     return (b)?(prod_V_minus):prod_V_plus;
 }
 
 /*public member which returns, depending by the literal into a clause, the right value of products of (1-message) for SP and BP equations*/
-inline double Vertex::_Pr_S(bool &b, double &s){ /*product of sitisfied messages*/
+inline double Vertex::_Pr_S(bool &b, double &s) { /*product of sitisfied messages*/
     return (b)?(prod_V_plus*s):(prod_V_minus*s);
 }
 
 /*public member which returns the pointer of a vector where surveys are stored*/
-inline double * Vertex::ptr_survey(){/*returns address vector surveys*/
+inline double * Vertex::ptr_survey() { /*returns address vector surveys*/
     return &_surveys_cl_to_i[_i];
 }
 
 /*public member which returns the pointer, given an index j, of a vector where surveys are stored*/
-inline double * Vertex::ptr_survey(unsigned int &j){/*returns address vector surveys*/
+inline double * Vertex::ptr_survey(unsigned int &j) { /*returns address vector surveys*/
     return &_surveys_cl_to_i[j];
 }
 
 /*public member which returns value pi_plus for computing surveys sI,sT,SF*/
-inline double Vertex::_p_PLUS(){/*compute  _p_plus variable node*/
+inline double Vertex::_p_PLUS() { /*compute  _p_plus variable node*/
     return ((1.-prod_V_plus)*prod_V_minus);
 }
 
 /*public member which returns value pi_minus for computing surveys sI,sT,SF*/
-inline double Vertex::_p_MINUS(){/*compute _p_minus variable node*/
+inline double Vertex::_p_MINUS() { /*compute _p_minus variable node*/
     return ((1.-prod_V_minus)*prod_V_plus);
 }
 
 /*public member which returns value pi_indeterminate for computing surveys sI,sT,SF*/
-inline double Vertex::_p_IND(){/*compute _p_indeterminate variable node*/
+inline double Vertex::_p_IND() { /*compute _p_indeterminate variable node*/
     return (prod_V_plus*prod_V_minus);
 }
 
 /*public member which returns the survey _sT or sF*/
-inline double Vertex::S(double &a, double &b, double &c){ /*compute sT,sF*/
+inline double Vertex::S(double &a, double &b, double &c) { /*compute sT,sF*/
     return (a/(a+b+c));
 }
 
 /*public member which describe how to compute the variable node certitude*/
-inline double Vertex::S_C(){/*compute certitude survey*/
+inline double Vertex::S_C() { /*compute certitude survey*/
     return __H(_sT, _sF, _sI);
 }
 

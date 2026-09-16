@@ -1,15 +1,92 @@
 # The-Backtracking-Survey-Propagation-Algorithm-code
 
-This code is able to solve random K-SAT instances by using Survey Inspired Decimation or by using
-Backtracking Survey Propagation. 
+This code solves random K-SAT instances using Survey Inspired Decimation (SID)
+or Backtracking Survey Propagation (BSP).
 
-If you want a faster version of this code please send an email to : raffaele.marino@unifi.it or marinoraffaele.nunziatella@gmail.com
+If you want a faster version of this code, email: raffaele.marino@unifi.it
+or marinoraffaele.nunziatella@gmail.com
 
-For any problem send an email : marinoraffaele.nunziatella@gmail.com
+For any problem, email: marinoraffaele.nunziatella@gmail.com
 
-# Compilation
+## Build (CMake)
 
-To compile the code:
+Requires CMake ≥ 3.16 and a C++11 compiler (g++ on Linux, AppleClang/Clang on
+macOS, or MSVC on Windows).
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
 ```
-g++ -Ofast *.cpp -o main.x
+
+The executable is `build/main`.
+
+### Options
+
+| CMake option | Default | Meaning |
+|---|---|---|
+| `CMAKE_BUILD_TYPE` | `Release` | `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel` |
+| `BSP_NATIVE_ARCH` | `ON` | Optimize for the host CPU (`-march=native` / MSVC `/arch:AVX2` on x64). Turn **off** for portable binaries. |
+
+Examples:
+
+```bash
+# Portable Release binary
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBSP_NATIVE_ARCH=OFF
+
+# Debug build (symbols; useful for Valgrind)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
+```
+
+Release builds enable strong optimization flags per toolchain (MSVC, AppleClang,
+Linux g++), including link-time optimization (IPO/LTO) when supported.
+
+Optional install:
+
+```bash
+cmake --install build --prefix /path/to/prefix
+```
+
+## Usage
+
+Generate a random instance and solve it:
+
+```bash
+./build/main -w <K> <alpha> <N>
+```
+
+Load a CNF file and solve it:
+
+```bash
+./build/main -l <formula.cnf>
+```
+
+Example (3-SAT, clause density 4.0, 50 variables):
+
+```bash
+./build/main -w 3 4.0 50
+```
+
+## Memory checking with Valgrind
+
+Valgrind runs on **Linux** only (not available as a native macOS/Homebrew bottle).
+Prefer a Debug build without native-arch tuning:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
+cmake --build build -j
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+  ./build/main -w 3 3.0 30
+```
+
+On macOS, the same check can be run in a Linux container, for example:
+
+```bash
+docker run --rm -v "$PWD":/src -w /src ubuntu:24.04 bash -lc '
+  apt-get update -qq && apt-get install -y -qq g++ cmake make valgrind
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
+  cmake --build build -j
+  valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+    ./build/main -w 3 3.0 30
+'
 ```

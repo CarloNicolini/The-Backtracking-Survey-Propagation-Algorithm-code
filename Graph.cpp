@@ -4,17 +4,17 @@
 /*
  Copyright 2018 Raffaele Marino
  This file is part of BSP.
- 
+
  BSP is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation; either version 2 of the License, or
  (at your option) any later version.
- 
+
  BSP is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
- 
+
  You should have received a copy of the GNU General Public License
  along with BSP; if not, write to the Free Software
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -41,13 +41,13 @@
  to the variable i, the one which has been fixed previously. The member store the survey in survey_cl_to_i_f
  and set in variable i the survey _surveys_cl_to_i[j] equl to 1. Then check if the clause is satisfied or not*/
 
-void Clause::clean(Vertex * &p_V, unsigned int &j){/*clean the clasue*/
+void Clause::clean(Vertex * &p_V, unsigned int &j) { /*clean the clasue*/
     bool flag_deg=true;
     survey_cl_to_i_f[*imag(p_V->_I_am_in_cl_at_init[j])]=p_V->_surveys_cl_to_i[j];/*store clause to variable survey in the clause*/
-    if(cp_lit[*imag(p_V->_I_am_in_cl_at_init[j])]){
+    if(cp_lit[*imag(p_V->_I_am_in_cl_at_init[j])]) {
         (p_V->_who_I_am)?p_V->_surveys_cl_to_i[j]=0.:p_V->_surveys_cl_to_i[j]=1.;/*set survey clause to variable  into a Vertex object to one*/
         _vb[*imag(p_V->_I_am_in_cl_at_init[j])]=p_V->_who_I_am;/*update bool vector  _vb*/
-    }else{
+    } else {
         (!p_V->_who_I_am)?p_V->_surveys_cl_to_i[j]=0.:p_V->_surveys_cl_to_i[j]=1.;/*set survey clause to variable  into a Vertex object to one*/
         _vb[*imag(p_V->_I_am_in_cl_at_init[j])]=(!(p_V->_who_I_am));/*update bool vector  _vb*/
     }
@@ -59,14 +59,14 @@ void Clause::clean(Vertex * &p_V, unsigned int &j){/*clean the clasue*/
     _size_cl--;
     survey_cl_to_i.erase(p_V->_where_surveys_are_in_cl[j]);/*erase the survey clause to i from the clause*/
     survey_begin=survey_cl_to_i.begin();
-    if(I_am_a_cl_true){
+    if(I_am_a_cl_true) {
         flag_deg=false;
     }
     I_am_a_cl_true=_logic_operator();/*check if the clause has been satisfied or not*/
-    if(flag_deg and I_am_a_cl_true){
+    if(flag_deg and I_am_a_cl_true) {
         /*if the clause has been satisfied then save surveys, set the other variables surveys to 0  and */
         for (unsigned int i=0; i<survey_cl_to_i_f.size(); ++i) {
-            if(survey_cl_to_i_f[i]==-1.){
+            if(survey_cl_to_i_f[i]==-1.) {
                 survey_cl_to_i_f[i]=*survey_cl_to_i_f_ptr[i];
                 *survey_cl_to_i_f_ptr[i]=0.;
             }
@@ -74,19 +74,19 @@ void Clause::clean(Vertex * &p_V, unsigned int &j){/*clean the clasue*/
         /*update the variable nodes degree of the other variables that have not been fixed yet.*/
         for (list<Vertex *>::iterator __it=V.begin(); __it!=V.end(); ++__it) {
             (*__it)->_degree_i--;
-            if((*__it)->_degree_i<0){
-                cout<<"Error degree node j less than 0"<<endl;
-                cout<<"Il grado e':"<<(*__it)->_degree_i<<" "<<(*__it)->_vertex<<endl;
+            if((*__it)->_degree_i<0) {
+                BSP_ERROR<<"Error degree node j less than 0"<<endl;
+                BSP_ERROR<<"Il grado e':"<<(*__it)->_degree_i<<" "<<(*__it)->_vertex<<endl;
                 exit(-1);
             }
         }
-        
+
     }
 }
 
 
 /*public member class Clause. This member builds the clauses unsitisfied by the new assignment into the graph.*/
-void Clause::build(Vertex * &p_V, unsigned int &j){/*build the clasue*/
+void Clause::build(Vertex * &p_V, unsigned int &j) { /*build the clasue*/
     /*update the value of the survey in the clause to the last one*/
     /* and rebuild the clause*/
     this->_vb[*imag(p_V->_I_am_in_cl_at_init[j])]=false;/*set to default value*/
@@ -102,12 +102,12 @@ void Clause::build(Vertex * &p_V, unsigned int &j){/*build the clasue*/
     this->survey_cl_to_i.push_front(this->v_survey_cl_to_i[*imag(p_V->_I_am_in_cl_at_init[j])]);/*build the survey clause to i from the clause*/
     p_V->_where_surveys_are_in_cl[j]=(this->survey_cl_to_i.begin());/*update iterator value*/
     this->survey_begin=survey_cl_to_i.begin();/*update iterator value*/
-    if(!(this->I_am_a_cl_true)){
+    if(!(this->I_am_a_cl_true)) {
         p_V->_surveys_cl_to_i[j]=this->survey_cl_to_i_f[*imag(p_V->_I_am_in_cl_at_init[j])];
         /*update the variable nodes degree of the other variables that have not been fixed yet.*/
-        if(!(this->_I_am_in_list_unsat)){
+        if(!(this->_I_am_in_list_unsat)) {
             for (unsigned int i=0; i<this->survey_cl_to_i_f.size(); ++i) {/*restore all surveys of the clause*/
-                if(this->survey_cl_to_i_f[i]!=-1. and this->_go_forward[i]==1){
+                if(this->survey_cl_to_i_f[i]!=-1. and this->_go_forward[i]==1) {
                     *(this->survey_cl_to_i_f_ptr[i])=this->survey_cl_to_i_f[i];
                     *(this->v_survey_cl_to_i[i])=this->survey_cl_to_i_f[i];
                     this->survey_cl_to_i_f[i]=-1;
@@ -116,19 +116,19 @@ void Clause::build(Vertex * &p_V, unsigned int &j){/*build the clasue*/
             for (list<Vertex *>::iterator __it=this->V.begin(); __it!=this->V.end(); ++__it) {
                 (*__it)->_degree_i++;/*update the variable nodes degree of the other variables that have not been fixed yet.*/
             }
-        }else{
+        } else {
             /*The litteral in an unsat clause is re-build*/
             *(this->survey_cl_to_i_f_ptr[*imag(p_V->_I_am_in_cl_at_init[j])])=this->survey_cl_to_i_f[*imag(p_V->_I_am_in_cl_at_init[j])];
             *(this->v_survey_cl_to_i[*imag(p_V->_I_am_in_cl_at_init[j])])=this->survey_cl_to_i_f[*imag(p_V->_I_am_in_cl_at_init[j])];
             this->survey_cl_to_i_f[*imag(p_V->_I_am_in_cl_at_init[j])]=-1.;/*update clause to variable survey*/
             p_V->_degree_i++;/*update the variable node degree */
         }
-        
-    }else{
+
+    } else {
         /*set the survey in the ture clause at 0., it will be set to the last value when the clause will be unsat*/
         p_V->_surveys_cl_to_i[j]=0.;
     }
-    
+
 }
 
 /***********************************************************************************/
@@ -161,17 +161,17 @@ void Clause::build(Vertex * &p_V, unsigned int &j){/*build the clasue*/
 
 /*public member class Graph which describe unit propagation algorithm. This member is called when a clause is
  composed only by one literal, and therefore has to be satisfied, otherwise we obtain a contraddiction*/
-void Graph::unit_propagation(unsigned int  &c){ /*fix the variable into clause c to true and clean the graph*/
+void Graph::unit_propagation(unsigned int  &c) { /*fix the variable into clause c to true and clean the graph*/
     //cout<<"unit propagation"<<endl;
     _unit_prop++;/*update counter unit propagation*/
     if(_cl[c].size()>1 and _new!=1)exit(-1);/*check that we have the right clause*/
     if(_cl[c].empty())exit(-1);/*check that we have the right clause*/
-    if (*_cl[c]._lit.begin()){
+    if (*_cl[c]._lit.begin()) {
         (*_cl[c].V.begin())->_who_I_am=true; /*set the variable to the value that satisfied the literal into the clause*/
         (*_cl[c].V.begin())->_sT=1.;/*set the associated survey to one*/
         (*_cl[c].V.begin())->_sF=0.;
         (*_cl[c].V.begin())->_sI=0.;
-    }else {
+    } else {
         (*_cl[c].V.begin())->_who_I_am=false;/*set the variable to the value that satisfied the literal into the clause*/
         (*_cl[c].V.begin())->_sT=0.;
         (*_cl[c].V.begin())->_sF=1.;/*set the associated survey to one*/
@@ -188,7 +188,7 @@ void Graph::unit_propagation(unsigned int  &c){ /*fix the variable into clause c
     /*clean the graph*/
     /*
      Clean the graph means:
-     
+
      1) erasing from the factor graph all satisfied clauses;
      2) erasing literals associated to variable i, which are present in a clause that is not satisfied by the variable node assignement.
      */
@@ -197,7 +197,7 @@ void Graph::unit_propagation(unsigned int  &c){ /*fix the variable into clause c
 }
 
 /*public member class Graph which helps us to fix the variables that have the highest value of certitude*/
-void Graph::choose_var_to_fix_and_clean(){
+void Graph::choose_var_to_fix_and_clean() {
     /*set the rangee over variables unfixed are into vertex ptrV*/
     _M_t=0;
     unsigned int _size=(unsigned int)(frac*((double)_N_t))+(unsigned int)_list_fixed_element.size();
@@ -215,11 +215,11 @@ void Graph::choose_var_to_fix_and_clean(){
         ptrV[i]->_I_am_a_fixed_variable=true;/*fix the variable*/
         ptrV[i]->fix_var_i();/*set the variable to the value predicted by the rule described in main.cpp*/
         if(_last_certitude>ptrV[i]->_sC)_last_certitude=ptrV[i]->_sC;/*store last certitude*/
-        
+
         /*clean the graph*/
         /*
          Clean the graph means:
-         
+
          1) erasing from the factor graph all satisfied clauses;
          2) erasing literals associated to variable i, which are present in clauses not satisfied by the variable node assignement.
          */
@@ -229,23 +229,23 @@ void Graph::choose_var_to_fix_and_clean(){
         //cout<<"il grado e': "<<ptrV[i]->_degree_i<<endl;
         ptrV[i]->_degree_i=0;/*set to 0 the degree of the variable node*/
     }
-    
+
     _m_t_m_1=_counter_dec_var;
     _N_t=_N-static_cast<unsigned int>(_list_fixed_element.size());/*update the number of un-fixed variable nodes*/
     //update_products();
 }
 
-void Graph::clean(Vertex * &V_to_clean){
+void Graph::clean(Vertex * &V_to_clean) {
     unsigned int k=0;
     unsigned int temp;
     for (unsigned int j=0; j<V_to_clean->_surveys_cl_to_i.size(); ++j) {
         k=*real(V_to_clean->_I_am_in_cl_at_init[j]);
         _cl[k].clean(V_to_clean, j);/*clean the graph*/
-        if(_cl[k].I_am_a_cl_true and _cl[k]._I_am_in_list_unsat){
+        if(_cl[k].I_am_a_cl_true and _cl[k]._I_am_in_list_unsat) {
             /*At this point the algorithm  picks a clause sat and set it on the top of the vector vec_list*/
             /*The vector vec_list_cl contains pointers to clauses sat and unsat. The value _m divides the sat clause, from 0 to _m-1, to unsat clause,
              from _m to  _M*/
-            
+
             temp=_cl[k]._l;
             swap(vec_list_cl[_cl[k]._l], vec_list_cl[_m]);
             (vec_list_cl[_cl[k]._l])->_l=temp;
@@ -259,7 +259,7 @@ void Graph::clean(Vertex * &V_to_clean){
 
 /*public member class Graph. This memeber sorts in descending order, using as predicate the certitude, vertex
  vector ptrV. The first x components of the vector are not sorted because they contain fixed variables*/
-void Graph::sort_V_Dec_move(){
+void Graph::sort_V_Dec_move() {
     sort(ptrV.begin()+(_list_fixed_element.size()), ptrV.end(), _Vertex_greater_pred());
 }
 
@@ -268,7 +268,7 @@ void Graph::sort_V_Dec_move(){
 /*public memeber class Graph. This memeber computes the surveys for each variable node.
  It is called when a convergence of all messages from a clause to variable is found.
  Moreover this member computes the variable complexity associated to each variable node*/
-void Graph::surveys(){/*compute surveys for each variable node*/
+void Graph::surveys() { /*compute surveys for each variable node*/
     complexity_variables=0.;/*set complexity variable to 0*/
     unsigned int _size_init=static_cast<unsigned int>(_list_fixed_element.size());
     for (unsigned int i=_size_init; i<_N; ++i) {
@@ -278,30 +278,30 @@ void Graph::surveys(){/*compute surveys for each variable node*/
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
     if(complexity_variables==0.) complexity=0;
-    if((_numb_of_back_moves/_numb_of_dec_moves)<_R_BSP){
+    if((_numb_of_back_moves/_numb_of_dec_moves)<_R_BSP) {
         ++_numb_of_back_moves;
         fl_bsp=true;/*update values for BSP ratio choice.*/
         //if(complexity<1.e-6 and complexity>0)fl_bsp=false; /*The algorithm is close to call walksat, and for safety reasons it makes only decimations*/
         /*this checks can be removed, because does not affect the algorithm*/
-    }else{
+    } else {
         ++_numb_of_dec_moves;
         fl_bsp=false;
     }
 }
 
 
-void Graph::unit_propagation(){
+void Graph::unit_propagation() {
     unsigned long __k;
     unsigned int C;
     /*unit propagation*/
-    for(__k=_m; __k<_M; __k++){
+    for(__k=_m; __k<_M; __k++) {
         C=(vec_list_cl[__k])->_c;
-        if(_cl[C]._I_am_in_list_unsat and _cl[C].empty()){/*check if it is empty*/
-            cout<<"Contradiction found"<<endl; /*contradiction found*/
-            cout<<"I quit from convergence_messages function"<<endl;
+        if(_cl[C]._I_am_in_list_unsat and _cl[C].empty()) { /*check if it is empty*/
+            BSP_ERROR<<"Contradiction found"<<endl; /*contradiction found*/
+            BSP_ERROR<<"I quit from convergence_messages function"<<endl;
             exit(-1);/*exit failure*/
         }
-        if(_cl[C].size()==1){
+        if(_cl[C].size()==1) {
             /*set the variable to 1 otherwise you will have contradiction*/
             unit_propagation(C); /*fix the variable into clause c to true and clean the graph*/
             _counter_conv=0;/*set to zero variable counter convergence*/
@@ -309,14 +309,14 @@ void Graph::unit_propagation(){
             __k=_m-1;
         }
     }
-    for(__k=_m; __k<_M; __k++){
+    for(__k=_m; __k<_M; __k++) {
         C=(vec_list_cl[__k])->_c;
-        if(_cl[C].size()==1){
-            cout<<"there is an unit propagation not found"<<endl;
+        if(_cl[C].size()==1) {
+            BSP_WARN<<"there is an unit propagation not found"<<endl;
         }
     }
     _unit_prop=0;
-    cout<<"END UNIT PROPAGATION"<<endl;
+    BSP_INFO<<"END UNIT PROPAGATION"<<endl;
 }
 
 /*public member class Graph. This member update all messages from clauses to variables and stops if:
@@ -324,20 +324,20 @@ void Graph::unit_propagation(){
  b) a contradiction is found : exit FAILURE;
  c) no convergence is found after t_max iteration: exit FAILURE
  */
-void Graph::convergence_messages(){/*compute convergence messages for message passing algorithm*/
+void Graph::convergence_messages() { /*compute convergence messages for message passing algorithm*/
     bool conv_f=false;
     unsigned long i,l, __k;
     unsigned int C;
 START:
     /*unit propagation*/
-    for(__k=_m; __k<_M; __k++){
+    for(__k=_m; __k<_M; __k++) {
         C=(vec_list_cl[__k])->_c;
-        if(_cl[C]._I_am_in_list_unsat and _cl[C].empty()){/*check if it is empty*/
-            cout<<"Contradiction found"<<endl; /*contradiction found*/
-            cout<<"I quit from convergence_messages function"<<endl;
+        if(_cl[C]._I_am_in_list_unsat and _cl[C].empty()) { /*check if it is empty*/
+            BSP_ERROR<<"Contradiction found"<<endl; /*contradiction found*/
+            BSP_ERROR<<"I quit from convergence_messages function"<<endl;
             exit(-1);/*exit failure*/
         }
-        if(_cl[C]._I_am_in_list_unsat and _cl[C].size()==1){
+        if(_cl[C]._I_am_in_list_unsat and _cl[C].size()==1) {
             /*set the variable to 1 otherwise you will have contradiction*/
             unit_propagation(C); /*fix the variable into clause c to true and clean the graph*/
             _counter_conv=0;/*set to zero variable counter convergence*/
@@ -353,7 +353,7 @@ START:
         complexity_clauses=0.;/*set clauses complexity to zero*/
         i=0;
         l=0;
-        for(__k=_m; __k<_M; ++__k){/*for on clause objects*/
+        for(__k=_m; __k<_M; ++__k) { /*for on clause objects*/
             C=(vec_list_cl[__k])->_c;
             s=_cl[C]._size_cl_init;
             i=0;
@@ -363,7 +363,7 @@ START:
                     norm=1.;
                     l=0;
                     while (1) {
-                        if(i!=l && _cl[C]._go_forward[l]){
+                        if(i!=l && _cl[C]._go_forward[l]) {
                             _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
                             _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
                             _new*=__pu();/*new message from cl to variable is computed*/
@@ -373,23 +373,23 @@ START:
                         if(l==s)break;
                     }
                     _new=compute_message(_new,norm);/*set to 0 a message iff the message is smaller than 1e-16*/
-                    if(_new==1.){
+                    if(_new==1.) {
                         unit_propagation(C); /*fix the variable into clause c to true and clean the graph*/
-                        cout<<"The Instance is not really random, I have a survey equal to 1, which gives me nan."<<endl;
-                        cout<<"I try to use unit propagation and fix the variable to the best value for satisfying the clause"<<endl;
-                        cout<<"This may bring us to a contradiction"<<endl;
-                        cout<<"UP"<<endl;
+                        BSP_WARN<<"The Instance is not really random, I have a survey equal to 1, which gives me nan."<<endl;
+                        BSP_WARN<<"I try to use unit propagation and fix the variable to the best value for satisfying the clause"<<endl;
+                        BSP_WARN<<"This may bring us to a contradiction"<<endl;
+                        BSP_DEBUG<<"UP"<<endl;
                         goto START;
                     }
                     _cl[C].old_s[i]=_cl[C].update[i];
                     _cl[C].update[i]=_new;/*update new message value*/
-                    if(_counter_conv==0){
-                        if(_conv(_cl[C].update[i], _cl[C].old_s[i])){
+                    if(_counter_conv==0) {
+                        if(_conv(_cl[C].update[i], _cl[C].old_s[i])) {
                             ++_counter_conv;
                         }
                     }
-                    ++i; 
-                }else{
+                    ++i;
+                } else {
                     ++i;
                 }
                 if(i==s)break;
@@ -403,7 +403,7 @@ START:
             }
         }
         update_products();/*update products into vertex node for speeding up the algorithm*/
-        if(_counter_conv==0){/*if counter convergence is zero, a convergence is found*/
+        if(_counter_conv==0) { /*if counter convergence is zero, a convergence is found*/
             _M_t=static_cast<unsigned int>(_cl_list.size());
             // cout<<"I found a convergence at "<<t<<" "<<_m<<endl;
             _time_conv_print=t;
@@ -412,15 +412,15 @@ START:
             break;
         }
     }
-    if(!conv_f){/*if after t_max iterations no convergence is found, the algorithm return exit failure */
-        cout<<"SP does not find any fixed points -> SP does not converge."<<endl;
-        cout<<"I am sorry I quit :("<<endl;
+    if(!conv_f) { /*if after t_max iterations no convergence is found, the algorithm return exit failure */
+        BSP_ERROR<<"SP does not find any fixed points -> SP does not converge."<<endl;
+        BSP_ERROR<<"I am sorry I quit :("<<endl;
         exit(-1);
     }
 }
 
 /*public member class Graph. This member  updates only clause complexity.*/
-void Graph::update_complexity_clauses(){
+void Graph::update_complexity_clauses() {
     double _ps=1.,_pu=1.;/*products for clause complexity*/
     unsigned long j;
     unsigned int C;
@@ -431,7 +431,7 @@ void Graph::update_complexity_clauses(){
         _pu=1.;/*initialize to one product __pu*/
         /*updating complexity clauses*/
         for (j=0; j<_cl[C]._size_cl_init; ++j) { /*for each literal in a clause clauses complexity is updated */
-            if(_cl[C]._go_forward[j]==1){
+            if(_cl[C]._go_forward[j]==1) {
                 _prod_S=_Pr_S(_cl[C].v_V[j],_cl[C].v_lit[j], _cl[C].div_s[j]);
                 _prod_U=_Pr_U(_cl[C].v_V[j],_cl[C].v_lit[j]);
                 _ps*=__norm();/*update product for clause complexity*/
@@ -440,11 +440,11 @@ void Graph::update_complexity_clauses(){
         }
         complexity_clauses+=log(_ps-_pu);/*update clause complexity*/
     }
-    
+
 }
 
 /*public member class Graph which splits the global factor graph information in different objects and vectors.*/
-void Graph::split_and_collect_information(){/*split the graph in different vectors and lists*/
+void Graph::split_and_collect_information() { /*split the graph in different vectors and lists*/
     /*create clauses*/
     vec_list_cl.resize(_M);
     list<Vertex *>::iterator _it; /*iterator list of Vertex pointers*/
@@ -457,7 +457,7 @@ void Graph::split_and_collect_information(){/*split the graph in different vecto
     vec_list_cl[0]=&_cl[0]; /*pointer to an element of a vector of Clause objects*/
     _m=0;
     for (unsigned int i=0, l=0; i<_ivec.size(); ++i) {
-        if(_ivec[i]==0){
+        if(_ivec[i]==0) {
             pos=0; /*set position to 0*/
             ++l; /*clause label increment*/
             if(l==_M)break;
@@ -466,7 +466,7 @@ void Graph::split_and_collect_information(){/*split the graph in different vecto
             _cl[l]._it_list=_cl_list.begin();/*store the iterator of the unsitisfied clauses list*/
             _cl[l]._I_am_in_list_unsat=true;/*set to true the boolean varibale I_am_in_list_unsat*/
             vec_list_cl[l]=&_cl[l];
-        }else{
+        } else {
             _cl[l]._c=l;/*clause labeling*/
             _cl[l]._l=l;/*position in vec_listy*/
             _cl[l].survey_cl_to_i_f_ptr.push_back(NULL); /*initialization vector of frozen survey pointers*/
@@ -489,15 +489,15 @@ void Graph::split_and_collect_information(){/*split the graph in different vecto
             _cl[l].update.push_back(_rn);
             _cl[l].div_s.push_back(Div_s(_rn));
             pos++;/*update position*/
-            if(_ivec[i]>0){/*check if literal is negated or not*/
+            if(_ivec[i]>0) { /*check if literal is negated or not*/
                 _cl[l]._lit.push_back(true);/*store literal in Boolean list _lit*/
                 _cl[l].cp_lit.push_back(true);/*store literal in a boolean vector*/
                 _cl[l].cp_lit_int.push_back(1);/*store literal as integer*/
-            }else{
+            } else {
                 _cl[l]._lit.push_back(false);/*store literal in Boolean list _lit*/
                 _cl[l].cp_lit.push_back(false);/*store literal in a boolean vector*/
                 _cl[l].cp_lit_int.push_back(0);/*store literal as integer*/
-                
+
             }
             ptrV[abs(_ivec[i])-1]->_lit_list_i.push_back(--_cl[l]._lit.end());/*store iterator in Vertex i*/
         }
@@ -510,7 +510,7 @@ void Graph::split_and_collect_information(){/*split the graph in different vecto
     _cl[0].v_V.resize(_cl[0].size());
     _cl[0]._var.resize(_cl[0].size());
     for (unsigned int i=0,k=0, l=0; i<_ivec.size(); ++i) {
-        if(_ivec[i]==0){
+        if(_ivec[i]==0) {
             k=0;
             ++l; /*increment of one clause label*/
             flag_s=true;
@@ -520,8 +520,8 @@ void Graph::split_and_collect_information(){/*split the graph in different vecto
             _cl[l].v_lit.resize(_cl[l].size());
             _cl[l].v_V.resize(_cl[l].size());
             _cl[l]._var.resize(_cl[l].size());
-        }else{
-            
+        } else {
+
             _cl[l].v_V[k]=ptrV[abs(_ivec[i])-1];/*Vertex pointer stored in list V*/
             _cl[l]._go_forward[k]=1;
             ptrV[abs(_ivec[i])-1]->_I_am_in_cl_at_init.push_back(complex<unsigned int *>(_cl[l]._ptr_c(),_cl[l]._ptr_pos(k)));/*store initial position of Vertex i into clause l*/
@@ -531,11 +531,11 @@ void Graph::split_and_collect_information(){/*split the graph in different vecto
             _cl[l]._var[k]=_ivec[i];
             if(flag_s)_cl[l].survey_begin=_cl[l].survey_cl_to_i.begin();
             flag_s=false;
-            if(_ivec[i]>0){
+            if(_ivec[i]>0) {
                 _cl[l].v_lit[k]=true;
                 ptrV[abs(_ivec[i])-1]->_surveys_cl_to_i_plus.push_back(ptrV[abs(_ivec[i])-1]->ptr_survey());
-                
-            }else{
+
+            } else {
                 _cl[l].v_lit[k]=false;
                 ptrV[abs(_ivec[i])-1]->_surveys_cl_to_i_minus.push_back(ptrV[abs(_ivec[i])-1]->ptr_survey());
             }
@@ -544,11 +544,11 @@ void Graph::split_and_collect_information(){/*split the graph in different vecto
             ptrV[abs(_ivec[i])-1]->_i++;
         }
     }
-    
+
     update_products();/*update products*/
 }
 
-void Graph::update_products(){/*update products*/
+void Graph::update_products() { /*update products*/
     unsigned int _size_init=static_cast<unsigned int>(_list_fixed_element.size());
     for (unsigned int i=_size_init; i<_N; ++i) {
         //        if(!ptrV[i]->_I_am_a_fixed_variable){
@@ -577,19 +577,19 @@ void Graph::update_products(){/*update products*/
 /***********************************************************************************/
 
 /*public member class Graph. This memeber sorts the element of the list in ascending order, using as predicate the certitude, The first x components of the vector are not sorted because they contain fixed variables*/
-void Graph::sort_V_Back_move(){
+void Graph::sort_V_Back_move() {
     sort(ptrV.begin(), ptrV.begin()+(_list_fixed_element.size()), _Vertex_greater_pred());
 }
 
 
 /*public member calss Graph. This member builds up the clauses that are not anymore satisfied by the assignment of the variables*/
-void Graph::build(Vertex * &V_to_build){
+void Graph::build(Vertex * &V_to_build) {
     unsigned int k=0;
     unsigned int temp;
     for (unsigned int j=0; j<V_to_build->_surveys_cl_to_i.size(); ++j) {
         k=*real(V_to_build->_I_am_in_cl_at_init[j]);/*pick the clause that should be unfixed*/
         _cl[k].build(V_to_build, j);/*build the clause in the graph*/
-        if(!_cl[k].I_am_a_cl_true and !_cl[k]._I_am_in_list_unsat){/*check if the clasue is false and if it is in the list of un-sat clauses*/
+        if(!_cl[k].I_am_a_cl_true and !_cl[k]._I_am_in_list_unsat) { /*check if the clasue is false and if it is in the list of un-sat clauses*/
             _cl[k]._I_am_in_list_unsat=true;
             _cl_list.push_front(&_cl[k]);/*set the clause into the list of un-sat clasues*/
             _cl[k]._it_list=_cl_list.begin();/*store the iterator of the list*/
@@ -606,37 +606,37 @@ void Graph::build(Vertex * &V_to_build){
 
 
 /*public member class Graph. This member computes all operation for backtracking moves.*/
-void Graph::backtrack(){
+void Graph::backtrack() {
     //cout<<"I make a backtrack move"<<endl;
     sort_V_Back_move(); /*sort the elements in ptV vector, the ones in position 0, _m-1; in ascending order*/
-    
+
     unsigned long _size=_m_t_m_1+_unit_prop;
     _unit_prop=0;
     _m_t_m_1=0;
     unsigned long _size_init=_list_fixed_element.size();
     for (unsigned long i=_size_init; i>_size_init-_size;) {
-        if((ptrV[--i])->_sC != 1.){ // se sto usando NN questo if deve essere >0 altrimenti !=1
+        if((ptrV[--i])->_sC != 1.) { // se sto usando NN questo if deve essere >0 altrimenti !=1
             /*build the graph*/
             /*
              build the graph means:
-             
+
              1) introducing into the factor graph all unsatisfied clauses, given by the fact that variable i is not anymore fixed;
              2) introducing literals associated to variable i, which are present in clauses not satisfied.
              */
-            
+
             _list_fixed_element.erase(ptrV[i]->_it_list_fixed_elem);/*erase the variable node in fixed element list*/
             ptrV[i]->_it_list_fixed_elem = _list_fixed_element.end(); /*set the iterator to _list_fixed_element.end() by default*/
             ptrV[i]->reset_value_default_var_i();/*reset values into the node*/
             build(ptrV[i]);/*build clauses*/
-            
-        }else{
+
+        } else {
             break;
         }
-        
+
     }
     _N_t=_N-static_cast<unsigned int>(_list_fixed_element.size());/*update the number of un-fixed variable nodes*/
     //update_products();/*update products into vertex node for speeding up the algorithm*/
-    
+
 }
 
 /***********************************************************************************/
@@ -648,7 +648,7 @@ void Graph::backtrack(){
 /***********************************************************************************/
 
 /*public member class Graph. This member prints on file the residual CNF formula.*/
-void Graph::print_on_file_residual_formula(){
+void Graph::print_on_file_residual_formula() {
     ostringstream seed;
     seed<<_seed;/*real seed of the graph in the residual formula title*/
     const string s=seed.str();
@@ -660,9 +660,9 @@ void Graph::print_on_file_residual_formula(){
     rf+=txt;
     ofstream outfile(rf.c_str());
     if (!outfile) {
-        cerr<<"Error file output does not exist"<<endl;
+        BSP_ERROR<<"Error file output does not exist"<<endl;
         exit(-1);
-    }else{
+    } else {
         outfile << "c seed=1234567"<<endl;
         outfile << "p cnf";
         outfile << ' ' << _N << ' ' << _M_t << endl;
@@ -670,12 +670,12 @@ void Graph::print_on_file_residual_formula(){
             outfile<<_cl[(*i)->_c];/*print on file cluases*/
         }
     }
-    
+
 }
 
 /*public member class graph. This member calls WalkSAT function and computes the solution for the residual formula.
  Moreover, it builds the complete solution for the problem and also checks if all solutions are composed by frozen variables or not.*/
-bool Graph::WalkSAT(){
+bool Graph::WalkSAT() {
     sort(ptrV.begin(), ptrV.end(), _Vertex_smaller_labeled_vertex_pred());/*simple ascending sort for labeled vertex.*/
     vector <vector<bool> > sol;
     ostringstream seed;
@@ -690,7 +690,7 @@ bool Graph::WalkSAT(){
     rf+=txt;
     int argc=10;
     char * argv[10];
-    for (int i=0;i<argc;i++) argv[i]=(char *)malloc(1000);
+    for (int i=0; i<argc; i++) argv[i]=(char *)malloc(1000);
     strcpy (argv[0],"test" );
     strcpy (argv[1],"-solcnf" );
     strcpy (argv[2],"-cutoff");
@@ -702,13 +702,14 @@ bool Graph::WalkSAT(){
     strcpy (argv[8],"10" );
     strcpy (argv[9],rf.c_str());
     bool flag=false;
-    for (int i=1;i<argc;i++)fprintf(stderr, "Input %s\n", argv[i]);
-    
+    for (int i=1; i<argc; i++) BSP_DEBUG<<"Input "<<argv[i]<<endl;
+
     WalkSat(sol,argc,argv);/*call WalkSAT*/
+    for (int i=0; i<argc; i++) free(argv[i]);
     vector<long int> mysol;
-    cout<<"Check and white a solution"<<endl;
-    cout<<"time of whitening    freezing probability"<<endl;
-    for (unsigned int i=0;i<sol.size();i++){
+    BSP_INFO<<"Check and white a solution"<<endl;
+    BSP_INFO<<"time of whitening    freezing probability"<<endl;
+    for (unsigned int i=0; i<sol.size(); i++) {
         if(!mysol.empty())mysol.clear();
         mysol.resize(_N+1);
         /*initialization procedure for whitening procedure*/
@@ -718,32 +719,32 @@ bool Graph::WalkSAT(){
         for (unsigned int l=0; l<_N; ++l) {
             ptrV[l]->_I_am_white=false;
         }
-        
+
         /*save SP solutions in vector mysol*/
         for (list<Vertex*>::iterator __it=_list_fixed_element.begin(); __it!=_list_fixed_element.end(); ++__it) {
             unsigned int var=(*__it)->_vertex;
             if((*__it)->_who_I_am)mysol[(*__it)->_vertex]=static_cast<long int>(var);
             else mysol[(*__it)->_vertex]=-(static_cast<long int>(var));
         }
-        
+
         /*build a complete solution for the problem*/
         for (long int j=0; j<sol[i].size(); ++j) {
             if (!sol[i][j] and mysol[j+1]==0) {
                 mysol[j+1]=-(j+1);
                 ptrV[j]->_who_I_am=false;
                 ptrV[j]->_I_am_a_fixed_variable=true;
-            }else if(sol[i][j] and mysol[j+1]==0){
+            } else if(sol[i][j] and mysol[j+1]==0) {
                 mysol[j+1]=(j+1);
                 ptrV[j]->_who_I_am=true;
                 ptrV[j]->_I_am_a_fixed_variable=true;
             }
         }
-        
+
         /*check if the global solution is correct*/
-        for(unsigned int c=0; c<_M;++c){    /*problem check*/
+        for(unsigned int c=0; c<_M; ++c) {  /*problem check*/
             if (!_cl[c]._check()) {
-                cout<<_cl[c];
-                cout<<"NO SOLUTION ERROR"<<endl;/*NO SOLUTION FOUND*/
+                BSP_ERROR<<_cl[c];
+                BSP_ERROR<<"NO SOLUTION ERROR"<<endl;/*NO SOLUTION FOUND*/
                 exit(-1);
             }
         }
@@ -758,7 +759,7 @@ bool Graph::WalkSAT(){
         const string seed="seed=";
         const string under="_";
         const string dat=".txt";
-        
+
         alpha_str<<_alpha;
         var_str<<_N;
         i_str<<i;
@@ -796,24 +797,24 @@ bool Graph::WalkSAT(){
  needs a global rearrangment of all variables.
  For checking if a variable is frozen or not, and therefore if a solution is forzen or not,
  physicists have defined the whitening procedure, and for a SAT problem is described in the following way:
- 
+
  start with a solution and assign iteratively a ”∗” (joker or white color) to variables which belong only
  to clauses which are already satisfied by another variable or already contain a "∗" variable.
- 
+
  If a finite fraction of variable is not assigned to a "*" value, then all those variables are frozen variables
  and the solution  is called frozen. However, in our experience we have not met frozen solutions for K-SAT problems
  for N large enough. We have met them only for smaller values of N.
- 
+
  */
 
 /*public member class Graph.*/
-void Graph::Whitening_Solution(){/*whitening procedure*/
+void Graph::Whitening_Solution() { /*whitening procedure*/
     string mystring;/*string for printing file*/
     const string title="whitening";
     const string dat=".txt";
     ostringstream alpha_str;
     ostringstream var_str;
-    
+
     alpha_str<<_alpha;
     var_str<<_N;
     mystring=directory;
@@ -828,18 +829,18 @@ void Graph::Whitening_Solution(){/*whitening procedure*/
     for (unsigned int t=0; t<1024; ++t) {/*time loop*/
         time_white=t;
         for (unsigned int i=0; i<_N; ++i) {/*loop on all variable nodes*/
-            if(!ptrV[i]->_I_am_white){
+            if(!ptrV[i]->_I_am_white) {
                 flag_white=true;
                 ptrV[i]->_who_I_am=!ptrV[i]->_who_I_am;/*flip the variable and check if the new configuration is still a solution*/
                 for (unsigned j=0; j<ptrV[i]->_I_am_in_cl_at_init.size(); ++j) {
-                    if(!_cl[*real(ptrV[i]->_I_am_in_cl_at_init[j])].I_am_white){/*check in all the clause where the variable appears*/
+                    if(!_cl[*real(ptrV[i]->_I_am_in_cl_at_init[j])].I_am_white) { /*check in all the clause where the variable appears*/
                         flag_white=flag_white and _cl[*real(ptrV[i]->_I_am_in_cl_at_init[j])]._check();
                         if(!flag_white)break;
                     }
                 }
-                if(flag_white){
+                if(flag_white) {
                     for (unsigned j=0; j<ptrV[i]->_I_am_in_cl_at_init.size(); ++j) {
-                        if(!_cl[*real(ptrV[i]->_I_am_in_cl_at_init[j])].I_am_white){/*if the variable is a "*" joker variable*/
+                        if(!_cl[*real(ptrV[i]->_I_am_in_cl_at_init[j])].I_am_white) { /*if the variable is a "*" joker variable*/
                             _cl[*real(ptrV[i]->_I_am_in_cl_at_init[j])].I_am_white=true;/*clauses where joker variables appear become "white"*/
                         }
                     }
@@ -847,19 +848,19 @@ void Graph::Whitening_Solution(){/*whitening procedure*/
                     counter_white_var++;
                 }
                 ptrV[i]->_who_I_am=!ptrV[i]->_who_I_am;/*flip the variable to the correct value*/
-                if(counter_white_var==static_cast<double>(_N)){
+                if(counter_white_var==static_cast<double>(_N)) {
                     t=1025;
                     break;
                 }
             }
         }
-    outfilew<<_seed<<" "<<_N<<" "<<_alpha<<" "<<time_white<<" "<<counter_white_var<<endl;/*print on file*/
+        outfilew<<_seed<<" "<<_N<<" "<<_alpha<<" "<<time_white<<" "<<counter_white_var<<endl;/*print on file*/
     }
-    cout<<time_white<<"\t \t \t \t"<<counter_white_var/(double)(_N)<<endl;/*print on terminal*/
+    BSP_INFO<<time_white<<"\t \t \t \t"<<counter_white_var/(double)(_N)<<endl;/*print on terminal*/
 }
 
 /*public member class Graph. This member prints the variable surveys at the first iteration*/
-void Graph::print_only_one_sol(){
+void Graph::print_only_one_sol() {
     /*output file*/
     const string title="Sol_SP_";
     const string txt=".txt";
@@ -892,14 +893,14 @@ void Graph::print_only_one_sol(){
         if(mysol[i]!=0)outfilesol_<<mysol[i]<<" ";
     }
     outfilesol_<<_seed<<" "<<_comp_init/(double)_N<<" "<<endl;
-    
-    
+
+
 }
 
 
 
 /*public member class Graph. This member prints the variable surveys at the first iteration*/
-void Graph::print_surveys(){
+void Graph::print_surveys() {
     /*output file*/
     const string title="Surveys";
     const string txt=".dat";
@@ -937,11 +938,11 @@ void Graph::print_surveys(){
         if(mysol[i+1]!=0)outfilewff<<_v_sT[i]<<" "<<_v_sI[i]<<" "<<_v_sF[i]<<" ";
     }
     outfilewff<<_seed<<" "<<_comp_init/(double)_N<<endl;
-    
-    
+
+
 }
 /*public member class Graph. This member prints the values on file*/
-void Graph::print(){
+void Graph::print() {
     const string title="Value_Anal_Compl";
     const string txt=".txt";
     string str;
@@ -970,24 +971,24 @@ void Graph::print(){
     for (unsigned i=0; i<_v_Nt.size(); ++i) {
         outfilecomp_<<_v_Nt[i]<<" "<<_v_M_t[i]<<" "<<_v_c[i]<<" "<<_v_time[i]<<" "<<_N<<" "<<_R_BSP<<endl;
     }
-    
+
 }
 
 /*public member class Graph. In this member an instance of the problem is built and is printed on file*/
-void Graph::write_on_file_graph(){/*build a graph and write a CNF formula*/
+void Graph::write_on_file_graph() { /*build a graph and write a CNF formula*/
     /* get the values from INPUT and store them in the right place*/
     _N=static_cast<unsigned int>(stoul(_argv[_argc-1],nullptr,0));
     _alpha=stod(_argv[_argc-2],nullptr);
     double m=((double)_N*_alpha);
     _M=static_cast<unsigned int>(m);
-    while(static_cast<double>(_M)<m){
+    while(static_cast<double>(_M)<m) {
         if(((double)_M)==m)break;
         _M++;
     }
     _alpha=(double)_M/(double)_N;
     _K=static_cast<unsigned int>(stoul(_argv[_argc-3],nullptr,0));
-    cout<<setprecision(9);
-    cout<<"I am going to build an instance with N: "<<_N<<" variables and "<<_M<<" clauses with a clause density equal to "<<_alpha<<endl;
+    BSP_INFO<<setprecision(9)
+           <<"I am going to build an instance with N: "<<_N<<" variables and "<<_M<<" clauses with a clause density equal to "<<_alpha<<endl;
     _ivec.reserve(_K*_M);
     _N_t=_N;
     _M_t=0;
@@ -1012,7 +1013,7 @@ void Graph::write_on_file_graph(){/*build a graph and write a CNF formula*/
     str+=sat;
     str+=_seeds.str();
     str+=txt;
-    
+
     /*I am modifing how to write the output file*/
 #ifdef PRINT_FORMULA_CNF
     /*output file*/
@@ -1028,43 +1029,43 @@ void Graph::write_on_file_graph(){/*build a graph and write a CNF formula*/
     /******************************************************/
     /******************************************************/
     /******************************************************/
-    
+
     /*minimal modifiications for compatibility in c++*/
-    
+
     int i, j, k;
     int lit;
     int cl[MAX_CLEN];
     bool dup;
-    
+
     /*build the CNF instance*/
-    for (i=0; i<_M; i++){
-        
-        for (j=0; j<_K; j++){
-            
+    for (i=0; i<_M; i++) {
+
+        for (j=0; j<_K; j++) {
+
             do {
-                
-                
+
+
                 lit =  static_cast<int>(random() % _N) + 1;
-                
-                
+
+
                 dup = false;
-                
+
                 for (k=0; k<j; k++)
-                    
+
                     if (lit == cl[k]) dup = true;
-                
+
             } while(dup);
-            
+
             cl[j] = lit;
-            
+
         }
         /* flip the literal*/
-        for (j=0; j<_K; j++){
-            
+        for (j=0; j<_K; j++) {
+
             if (_flip()) cl[j] *= -1;
-            
+
             _ivec.push_back(cl[j]);
-            
+
         }
         _ivec.push_back(0);
         /******************************************************/
@@ -1074,27 +1075,27 @@ void Graph::write_on_file_graph(){/*build a graph and write a CNF formula*/
         /*********************** END **************************/
         /******************************************************/
         /******************************************************/
-        
+
         /* print on file*/
 #ifdef PRINT_FORMULA_CNF
         for (j=0; j<_K; j++)outfilewff<<cl[j]<<" ";
-        
+
         outfilewff<<"0"<<" "<<endl;
 #endif
     }
-    
+
 }
 
 /*public member class Graph. This member reads an instance of a problem from a file*/
-void Graph::read_from_file_graph(){/*read an instance given as INPUT*/
+void Graph::read_from_file_graph() { /*read an instance given as INPUT*/
     /*open file to read*/
     ifstream infile(_argv[_argc-1].c_str());
     if (!infile) {
-        cout<<_argv[_argc-1]<<endl;
-        cout <<"File not found"<<endl;
-        cout<<"Please check if the name is correct or if the file exists."<<endl;
+        BSP_ERROR<<_argv[_argc-1]<<endl;
+        BSP_ERROR<<"File not found"<<endl;
+        BSP_ERROR<<"Please check if the name is correct or if the file exists."<<endl;
         exit(-1);
-    }else{
+    } else {
         string ogg1;
         int ogg2, ogg3;
         bool flag=false;
@@ -1105,7 +1106,7 @@ void Graph::read_from_file_graph(){/*read an instance given as INPUT*/
             if(infile.eof())break;
             if (!flag) {
                 infile>>ogg1;
-                if (ogg1=="c"){
+                if (ogg1=="c") {
                     infile>>ogg1;
                     string str;
                     str=ogg1.substr(5);

@@ -51,6 +51,7 @@
 #include <iomanip>
 #include <list>
 #include "random.h"
+#include "Logger.hpp"
 
 //#define NeurNET
 #define WALKSAT
