@@ -259,3 +259,22 @@ Artifacts:
 
 Implementation: `5c872ea`. Backtrack isolation: `0baf9ad`. Certified fallback:
 `1309f18`. Results: `ae6cda9`.
+
+## Idea 013 — failure-triggered SP basin jump: killed
+
+Hypothesis: when a warm-started transactional move fails, retry the identical
+graph mutation from one independent SP message initialization before changing
+the assignment.
+
+Across the five N=300 seeds, exactly one fatal move found a convergent
+alternate basin. Its parent replay was exact, but the run later failed and
+overall outcomes remained 3/5 SAT, identical to transaction recovery alone.
+Mean wall time increased from 22.4 s to 25.3 s; complexity metrics were
+effectively unchanged.
+
+Decision: kill. Multiple accessible SP basins are too rare at the actual hard
+events to justify this recovery path.
+
+Artifacts: `results/idea-013-k3-n300-a4.15/`.
+
+Implementation: `d58445f`. Results: `0aa6476`.
