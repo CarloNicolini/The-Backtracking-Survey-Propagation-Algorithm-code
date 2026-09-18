@@ -283,3 +283,24 @@ transaction probes selectively rather than always.
 Artifacts: `results/idea-011-k3-n300-a4.15/`.
 
 Implementation: `82ccc67`. Results: `0afca5a`.
+
+## Idea 012 — RMS-triggered transaction safety: killed on held-out seeds
+
+Hypothesis: activate transaction probes only when current SP iterations exceed
+the running RMS of prior iterations. Development seeds suggested this
+parameter-free rule caught all fatal checkpoints.
+
+Held-out test: random 3-SAT, `N=300`, `alpha=4.15`, seeds 6–15. Certainty
+solved 4/10 and stability-safe also solved 4/10. The trigger missed every
+terminal fatal action; earlier slow convergences inflated the running RMS.
+Mean worst drop and roughness were effectively unchanged, while wall time rose
+from 0.40 s to 1.60 s. Polarization solved 5/10 but was substantially rougher
+and included one expensive WalkSAT failure.
+
+Decision: kill. The development AUC did not generalize and no threshold
+adjustment is justified. Keep the SP residual diagnostics, but do not use eta
+as a standalone transaction trigger.
+
+Artifacts: `results/idea-012-heldout-k3-n300-a4.15/`.
+
+Implementation: `00a986b`. Results: `68b0110`.
