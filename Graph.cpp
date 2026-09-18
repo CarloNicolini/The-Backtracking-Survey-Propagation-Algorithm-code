@@ -54,6 +54,7 @@ string g_minisat_path = "minisat";
 unsigned g_oracle_timeout = 10;
 bool g_oracle_dir = false;
 unsigned g_oracle_pick = 0;
+unsigned g_lookahead_k = 0;
 string g_nn_path;
 bool g_nn_veto = false;
 double g_nn_cutoff = 0.0;
@@ -274,6 +275,103 @@ bool Graph::vetoed(Vertex* v, const vector<Vertex*>& sel) {
     return false;
 }
 
+/*Try both directions for the top-K scored variables in forked copies of the
+ current SP fixed point. Return the converged move with maximum residual
+ complexity. Trials run concurrently; the parent graph remains untouched.*/
+bool Graph::complexity_lookahead(Vertex*& best_v, int& best_dir,
+                                 double& best_sigma) {
+#ifdef _WIN32
+    BSP_ERROR<<"--lookahead-k needs fork/mmap (POSIX); not supported on Windows"<<endl;
+    exit(-1);
+#else
+    unsigned fixed=static_cast<unsigned>(_list_fixed_element.size());
+    vector<Vertex*> candidates;
+    candidates.reserve(g_lookahead_k);
+    for (unsigned i=fixed; i<_N && candidates.size()<g_lookahead_k; ++i)
+        if (bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF))
+            candidates.push_back(ptrV[i]);
+    if (candidates.empty()) return false;
+
+    struct TrialResult {
+        double sigma;
+        int complete;
+    };
+    unsigned ntrials=2*static_cast<unsigned>(candidates.size());
+    TrialResult* results=(TrialResult*)mmap(
+        NULL, ntrials*sizeof(TrialResult), PROT_READ|PROT_WRITE,
+        MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (results==MAP_FAILED) {
+        BSP_ERROR<<"mmap failed for complexity lookahead"<<endl;
+        exit(-1);
+    }
+    vector<pid_t> pids(ntrials, -1);
+    vector<Vertex*> trial_vars(ntrials, NULL);
+    vector<int> trial_dirs(ntrials, -1);
+
+    _ds_out<<flush;
+    _diag_step_out<<flush;
+    _diag_var_out<<flush;
+    _diag_move_out<<flush;
+    cout<<flush;
+    cerr<<flush;
+    fflush(NULL);
+
+    for (unsigned ci=0; ci<candidates.size(); ++ci) {
+        Vertex* v=candidates[ci];
+        int preferred=(v->_sT>v->_sF) ? 1 : 0;
+        for (unsigned attempt=0; attempt<2; ++attempt) {
+            unsigned ti=2*ci+attempt;
+            int dir=(attempt==0) ? preferred : 1-preferred;
+            results[ti].sigma=0.;
+            results[ti].complete=0;
+            trial_vars[ti]=v;
+            trial_dirs[ti]=dir;
+            pid_t pid=fork();
+            if (pid < 0) {
+                for (unsigned j=0; j<ti; ++j) {
+                    int status=0;
+                    while (waitpid(pids[j], &status, 0)<0 && errno==EINTR) {}
+                }
+                munmap(results, ntrials*sizeof(TrialResult));
+                BSP_ERROR<<"fork failed for complexity lookahead"<<endl;
+                exit(-1);
+            }
+            if (pid==0) {
+                close(STDOUT_FILENO);
+                close(STDERR_FILENO);
+                _in_trial=true;
+                decimate_one(v, dir);
+                stable_partition(ptrV.begin(), ptrV.end(),
+                                 _Vertex_is_fixed_pred());
+                convergence_messages();
+                surveys();
+                results[ti].sigma=complexity;
+                results[ti].complete=1;
+                _exit(0);
+            }
+            pids[ti]=pid;
+        }
+    }
+
+    bool found=false;
+    for (unsigned ti=0; ti<ntrials; ++ti) {
+        int status=0;
+        while (waitpid(pids[ti], &status, 0)<0 && errno==EINTR) {}
+        if (!WIFEXITED(status) || WEXITSTATUS(status)!=0 ||
+            !results[ti].complete)
+            continue;
+        if (!found || results[ti].sigma>best_sigma) {
+            best_v=trial_vars[ti];
+            best_dir=trial_dirs[ti];
+            best_sigma=results[ti].sigma;
+            found=true;
+        }
+    }
+    munmap(results, ntrials*sizeof(TrialResult));
+    return found;
+#endif
+}
+
 /*public member class Graph which helps us to fix the variables that have the highest value of certitude*/
 void Graph::choose_var_to_fix_and_clean() {
     /*set the rangee over variables unfixed are into vertex ptrV*/
@@ -287,19 +385,32 @@ void Graph::choose_var_to_fix_and_clean() {
         _size=1+_size_init;
     }
     unsigned int _batch=_size-_size_init;/*decimation width of this move*/
+    if (g_lookahead_k>0) _batch=1;/*lookahead evaluates one actual move*/
     vector<Vertex*> _veto_sel;
     _veto_sel.reserve(_batch);
     unsigned int _counter_dec_var=0;
-    for (unsigned int i=_size_init; i<_N && _counter_dec_var<_batch; ++i) {
-        if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;/*theta skip*/
-        if (g_veto && vetoed(ptrV[i], _veto_sel)) continue;/*distance-2 veto*/
-        decimate_one(ptrV[i]);
-        _veto_sel.push_back(ptrV[i]);
-        _counter_dec_var++;
+    if (g_lookahead_k>0) {
+        Vertex* best_v=NULL;
+        int best_dir=-1;
+        double best_sigma=0.;
+        if (complexity_lookahead(best_v, best_dir, best_sigma)) {
+            BSP_DEBUG<<"lookahead selected v"<<best_v->_vertex
+                     <<" dir="<<best_dir<<" Sigma_after="<<best_sigma<<endl;
+            decimate_one(best_v, best_dir);
+            _counter_dec_var=1;
+        }
+    } else {
+        for (unsigned int i=_size_init; i<_N && _counter_dec_var<_batch; ++i) {
+            if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;/*theta skip*/
+            if (g_veto && vetoed(ptrV[i], _veto_sel)) continue;/*distance-2 veto*/
+            decimate_one(ptrV[i]);
+            _veto_sel.push_back(ptrV[i]);
+            _counter_dec_var++;
+        }
     }
     if (_counter_dec_var==0) {
-        /*nothing passed the gates: legacy top-1 fallback to guarantee progress*/
-        BSP_WARN<<"theta/veto skipped all unfixed vars: legacy top-1 fallback"<<endl;
+        /*No admissible converged trial: legacy top-1 fallback guarantees progress.*/
+        BSP_WARN<<"move filter found no candidate: legacy top-1 fallback"<<endl;
         decimate_one(ptrV[_size_init]);
         _counter_dec_var=1;
     }
@@ -385,16 +496,19 @@ void Graph::diag_step() {
         _diag_step_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" lookahead_k="<<g_lookahead_k
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" lookahead_k="<<g_lookahead_k
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" lookahead_k="<<g_lookahead_k
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -588,6 +702,7 @@ void Graph::dataset_trials() {
         _ds_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                 <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                <<" lookahead_k="<<g_lookahead_k
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

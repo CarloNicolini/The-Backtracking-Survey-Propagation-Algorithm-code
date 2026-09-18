@@ -493,6 +493,9 @@ private:
 
     bool vetoed(Vertex* v, const vector<Vertex*>& sel);
 
+    bool complexity_lookahead(Vertex*& best_v, int& best_dir,
+                              double& best_sigma);
+
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 
     double __pu();
