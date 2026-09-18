@@ -425,7 +425,6 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
-    if(g_online_lyapunov)G.update_online_lyapunov();/*one transported Jv*/
     if(g_lyapunov)G.compute_lyapunov();/*read-only tangent stability*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/

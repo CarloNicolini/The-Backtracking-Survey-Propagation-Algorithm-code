@@ -5,8 +5,8 @@
 Full local eigensolves correctly identify SP spinodals but are too expensive
 for move selection. The dominant tangent direction changes continuously along
 most of a BSP trajectory. Carry one normalized tangent vector across
-decimation/backtracking steps and apply exactly one analytic Jacobian-vector
-product at each converged state.
+decimation/backtracking steps and update it once alongside every message sweep
+that SP already performs while converging.
 
 The observed norm gives the finite-time growth
 
@@ -15,10 +15,10 @@ The observed norm gives the finite-time growth
 then `v_(t+1)=J_t v_t/rho_online(t)`. Removed edges are zeroed; edges
 reactivated by backtracking receive deterministic nonzero components.
 
-This costs approximately one extra SP sweep per fixed point and has no power
-iteration count, perturbation amplitude, or fitted threshold. It measures
-stability along the actual nonstationary decimation path rather than solving
-every local eigenproblem from scratch.
+This approximately doubles sweep work and has no separate power-iteration
+count, perturbation amplitude, or fitted threshold. It measures stability
+along the actual nonstationary decimation path rather than solving every local
+eigenproblem from scratch.
 
 ## Tests
 

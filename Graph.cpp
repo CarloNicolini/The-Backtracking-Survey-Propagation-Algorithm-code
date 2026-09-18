@@ -1373,6 +1373,7 @@ START:
             }
         }
         update_products();/*update products into vertex node for speeding up the algorithm*/
+        if (g_online_lyapunov) update_online_lyapunov();
         if(_counter_conv==0) { /*if counter convergence is zero, a convergence is found*/
             _M_t=static_cast<unsigned int>(_cl_list.size());
             // cout<<"I found a convergence at "<<t<<" "<<_m<<endl;
