@@ -26,3 +26,15 @@ scheduling mechanism.
 
 The option is `--sigma-feedback`. Compare against certainty and polarization
 at identical seeds; kill if progress becomes too aggressive or success falls.
+
+## Result
+
+The first N=300 seed entered a deterministic two-cycle: 874,688 fixed points,
+backtracking fraction 0.5, only one net fixed variable, and no termination
+after more than 200 seconds. The controller reacts to its own repair gain:
+decimation exceeds the running mean, backtracking undoes it, and the forced
+decimation repeats the same state.
+
+Decision: kill immediately without running additional seeds. A controller on
+the first derivative of Sigma needs hysteresis or a state-space model; a
+memoryless above-mean switch cannot guarantee net progress.
