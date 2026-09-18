@@ -51,6 +51,7 @@ bool g_flexibility_diag = false;
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
 unsigned g_dataset_every = 1;
+long g_dataset_step = -1;
 bool g_oracle = false;
 string g_minisat_path = "minisat";
 unsigned g_oracle_timeout = 10;
@@ -662,7 +663,10 @@ void Graph::dataset_trials() {
     if (complexity==0. || _N_t==0) return;
     /*0-based SP-step index, aligned with diag_step()'s numbering for joins*/
     unsigned step=static_cast<unsigned>(_numb_of_dec_moves+_numb_of_back_moves-3.);
-    if (step % g_dataset_every != 0) return;
+    unsigned diag_step=_diag_step_idx ? _diag_step_idx-1 : 0;
+    if (g_dataset_step>=0) {
+        if (diag_step!=static_cast<unsigned>(g_dataset_step)) return;
+    } else if (step % g_dataset_every != 0) return;
     if (!_ds_header_done) {
         _ds_out.open((g_dataset_prefix + "_dataset.csv").c_str());
         if (!_ds_out) {
@@ -674,11 +678,13 @@ void Graph::dataset_trials() {
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" flexibility_diag="<<g_flexibility_diag
+                <<" dataset_step="<<g_dataset_step
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
                <<"Sigma_before,Sigma_per_N,step_frac,eta_before,r,"
-               <<"converged,crashed,sat_oracle,delta_sigma,eta_after\n";
+               <<"converged,crashed,sat_oracle,delta_sigma,eta_after,"
+               <<"mean_sI_after,delta_mean_sI\n";
         _ds_header_done=true;
     }
     /*shortlist: top-K unfixed by active score (index copy, ptrV untouched)*/
@@ -689,8 +695,8 @@ void Graph::dataset_trials() {
     unsigned k = g_dataset_k < cand.size() ? g_dataset_k : (unsigned)cand.size();
     if (k==0) return;
     partial_sort(cand.begin(), cand.begin()+k, cand.end(), _Vertex_greater_pred());
-    /*shared report area: [converged, delta_sigma, eta_after, sat_oracle]*/
-    double* tout = (double*)mmap(NULL, 4*sizeof(double), PROT_READ|PROT_WRITE,
+    /*shared report: convergence, DeltaSigma, eta, SAT, mean sI*/
+    double* tout = (double*)mmap(NULL, 5*sizeof(double), PROT_READ|PROT_WRITE,
                                  MAP_SHARED|MAP_ANONYMOUS, -1, 0);
     if (tout==MAP_FAILED) {
         BSP_ERROR<<"mmap failed for dataset trial"<<endl;
@@ -723,7 +729,8 @@ void Graph::dataset_trials() {
             <<(static_cast<double>(_N-_N_t)/static_cast<double>(_N))<<","
             <<_time_conv_print<<","<<g_r_bsp;
         for (int dir=0; dir<=1; ++dir) {
-            tout[0]=0; tout[1]=0; tout[2]=0; tout[3]=-1;
+            for (unsigned out=0; out<5; ++out) tout[out]=0.;
+            tout[3]=-1.;
             /*Flush before fork: children inherit stdio buffers, and a child
              dying via exit(-1) in SP would otherwise flush a stale copy
              over the parent's file at the shared offset.*/
@@ -766,6 +773,7 @@ void Graph::dataset_trials() {
                 surveys();/*side effects are child-local*/
                 tout[0]=1; tout[1]=complexity-sigma_before;
                 tout[2]=(double)_time_conv_print;
+                tout[4]=_mean_sI;
                 _exit(0);
             }
             int status=0;
@@ -786,11 +794,13 @@ void Graph::dataset_trials() {
             _ds_out<<step<<","<<mv<<","<<v->_vertex<<","<<dir<<","<<tail.str()<<","
                     <<converged<<","<<crashed<<","<<(int)tout[3]<<","
                     <<setprecision(10)<<(converged?tout[1]:0.)<<","
-                    <<(converged?(int)tout[2]:-1)<<"\n";
+                    <<(converged?(int)tout[2]:-1)<<","
+                    <<(converged?tout[4]:0.)<<","
+                    <<(converged?tout[4]-_mean_sI:0.)<<"\n";
         }
     }
     _ds_out<<flush;
-    munmap(tout, 4*sizeof(double));
+    munmap(tout, 5*sizeof(double));
 #endif
 }
 

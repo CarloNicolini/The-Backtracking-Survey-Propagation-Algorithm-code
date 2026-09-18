@@ -123,6 +123,7 @@ bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 extern string g_dataset_prefix; /*output prefix for _dataset.csv*/
 extern unsigned g_dataset_k; /*shortlist size per step, default 50*/
 extern unsigned g_dataset_every; /*trial cadence in SP steps, default 1*/
+extern long g_dataset_step; /*exact diagnostic step, -1 uses cadence*/
 extern bool g_oracle; /*exact SAT-oracle label per trial via minisat, default off*/
 extern string g_minisat_path; /*minisat binary, default "minisat"*/
 extern unsigned g_oracle_timeout; /*per-trial minisat seconds, default 10 (0 = unbounded)*/

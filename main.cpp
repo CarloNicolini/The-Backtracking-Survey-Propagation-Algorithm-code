@@ -197,6 +197,14 @@ int main(int argc,  char * const argv[]) {
             if (g_dataset_every == 0) g_dataset_every = 1;
             continue;
         }
+        if (a.rfind("--dataset-step=", 0) == 0) {
+            g_dataset_step = stol(a.substr(15));
+            if (g_dataset_step < 0) {
+                BSP_ERROR << "dataset step must be >= 0" << endl;
+                return 1;
+            }
+            continue;
+        }
         if (a == "--oracle=off") {
             g_oracle = false;
             continue;
@@ -534,6 +542,7 @@ void help(const char *prog) {
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
          << "  --dataset-every=S Trial cadence in SP steps (default 1).\n"
+         << "  --dataset-step=S  Run trials only at diagnostic step S.\n"
          << "  --oracle / --oracle=on  Label each trial residual with minisat.\n"
          << "  --oracle=off       Skip the exact minisat label (default).\n"
          << "  --minisat=PATH     Minisat binary (default minisat).\n"
