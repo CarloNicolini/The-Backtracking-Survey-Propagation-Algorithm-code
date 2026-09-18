@@ -117,6 +117,9 @@ extern double g_epsilon; /*SP convergence threshold, default epsilon*/
 extern double g_damping; /*SP update damping in [0,1), default 0 (off)*/
 bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 
+/*Parameter-free Parisi exchange dynamics (eq. 5), off by default.*/
+extern bool g_parisi_exchange;
+
 /*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/
 extern string g_dataset_prefix; /*output prefix for _dataset.csv*/
 extern unsigned g_dataset_k; /*shortlist size per step, default 50*/

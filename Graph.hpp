@@ -275,6 +275,13 @@ public:
         complexity_variables=0.;/*variable complexity set to 0*/
         complexity=0.;/*total complexity set to 0*/
         _unit_prop=0;/*unit propagation counter set to 0*/
+        _parisi_do_exchange=false;
+        _parisi_exchanged_at_level=false;
+        _parisi_fix=NULL;
+        _parisi_release=NULL;
+        _parisi_fix_dir=0;
+        _parisi_P=0.;
+        _parisi_I=1.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -329,6 +336,12 @@ public:
     void apply_nn_scores(); /*overwrite _sC with predicted DeltaSigma if NN loaded*/
 
     void fill_nn_features(Vertex* v, double* f); /*15-d local feature vector*/
+
+    void prepare_parisi_step(); /*choose decimation or eq. (5) exchange*/
+
+    void apply_parisi_step(); /*apply the prepared parameter-free move*/
+
+    bool parisi_will_exchange() { return _parisi_do_exchange; }
 
     int minisat_check(const string& path); /*bounded minisat: 1/0/-2/-3/-4*/
 
@@ -442,6 +455,13 @@ private:
     unsigned _oracle_tmp_ctr;/*unique temp-file counter for oracle checks*/
     unsigned int _diag_step_idx;/*diagnostic step counter*/
     bool _diag_header_done;/*diagnostic CSV headers written*/
+    bool _parisi_do_exchange;/*prepared action: exchange instead of decimation*/
+    bool _parisi_exchanged_at_level;/*guarantee progress after one exchange*/
+    Vertex* _parisi_fix;/*best currently-free variable P_M*/
+    Vertex* _parisi_release;/*worst current fixation I_m*/
+    int _parisi_fix_dir;/*direction selected for _parisi_fix*/
+    double _parisi_P;/*retained-cluster fraction predicted for fixing*/
+    double _parisi_I;/*retained-cluster fraction of the current fixation*/
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -495,6 +515,12 @@ private:
 
     bool complexity_lookahead(Vertex*& best_v, int& best_dir,
                               double& best_sigma);
+
+    double warning_to_fixed(Vertex* v, unsigned edge);
+
+    double current_fixation_factor(Vertex* v);
+
+    bool share_clause(Vertex* a, Vertex* b);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 

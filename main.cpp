@@ -175,6 +175,10 @@ int main(int argc,  char * const argv[]) {
             }
             continue;
         }
+        if (a == "--parisi-exchange") {
+            g_parisi_exchange = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -332,7 +336,8 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
+    if(g_parisi_exchange)BSP_INFO<<"START PARAMETER-FREE PARISI EXCHANGE BSP:"<<endl;
+    else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     /*Check if we have to use unit propagation*/
@@ -385,9 +390,23 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
+    if(g_parisi_exchange)G.prepare_parisi_step();/*state-dependent eq. (5) move*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
     G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
+
+    if(g_parisi_exchange) {
+        BSP_INFO<<G;
+        G.save();
+        if(G.complexity==0)goto PARAPHASE;
+        if(G.complexity<-2. && !G.parisi_will_exchange()) {
+            BSP_ERROR<<"Negative complexity and no improving Parisi exchange"<<endl;
+            BSP_ERROR<<"I am sorry I quit"<<endl;
+            exit(-1);
+        }
+        G.apply_parisi_step();
+        goto SP;
+    }
 
     /*The backtracking survey propagation (BSP) algorithm proceeds similarly to survey inspired decimation (SID), by alternating decimation or backtracking steps on a fraction f of variables, in order to keep the algorithm efficient. The choice between a decimation or a backtracking step is taken accordingly to a stochastic rule, where the parameter r ∈ [0,1) represents the ratio between backtracking steps to decimation steps [1]. When r=0 one obtains survey inspired decimation (SID), while when r!=0 one works with backtracking survey propagation. In this code r=_R_BSP into Header.h file.
      */
@@ -517,6 +536,8 @@ void help(const char *prog) {
          << "  --veto            Veto co-decimating vars sharing a clause.\n"
          << "  --eps=E           SP convergence threshold (default 0.01).\n"
          << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
+         << "  --parisi-exchange Choose decimation or an iso-size fix/release\n"
+         << "                       exchange from Parisi's P_max > I_min rule.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
