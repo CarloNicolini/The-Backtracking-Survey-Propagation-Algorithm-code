@@ -33,3 +33,23 @@ and test the frozen-topology approximation
 
 against the exact post-fix Lyapunov dataset at the normal and fatal
 checkpoints.
+
+## Results
+
+The transpose operator is correct. Relative adjoint-identity errors are
+`5.38e-16` initially, `1.05e-16` after `ptrV` reordering, and `5.60e-17` with
+damping 0.3.
+
+At the small initial checkpoint, independent left/right power iterations give
+eigenvalue 0.89268 versus norm-growth rho 0.89306, with residuals below 0.002.
+At the N=300 checkpoint 1400, however, the dominant mode is not a simple real
+eigenvalue: `w^T v=0.0103`, left/right residuals are 4.87/5.34, and the
+biorthogonal quotient spuriously gives 3.71 while norm growth is 0.961.
+
+Consequently the mask-only candidate sensitivity has Pearson/Spearman
+correlations only 0.079/0.082 with exact post-fix rho. Those scores are
+invalid and are not used for a policy.
+
+Decision: keep the validated matrix-free `J^T` implementation. Replace scalar
+power iteration with Arnoldi/real-Schur treatment of complex or nearly
+degenerate dominant subspaces before revisiting `w^T deltaJ_i v`.
