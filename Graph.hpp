@@ -285,6 +285,10 @@ public:
         _tight_complexity=0.;
         _lyapunov_jvp_error=0.;
         _adjoint_identity_error=0.;
+        _adjoint_eigenvalue=0.;
+        _adjoint_overlap=0.;
+        _adjoint_right_residual=0.;
+        _adjoint_left_residual=0.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -464,6 +468,15 @@ private:
     double _tight_complexity;
     double _lyapunov_jvp_error;
     double _adjoint_identity_error;
+    double _adjoint_eigenvalue;
+    double _adjoint_overlap;
+    double _adjoint_right_residual;
+    double _adjoint_left_residual;
+    vector<unsigned long> _adjoint_offsets;
+    vector<double> _adjoint_right;
+    vector<double> _adjoint_left;
+    vector<double> _adjoint_Jright;
+    vector<double> _adjoint_JTleft;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -533,6 +546,8 @@ private:
                        vector<double>& next);
 
     void compute_lyapunov_at_fixed_point();
+
+    double candidate_mask_sensitivity(Vertex* v, int dir);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 

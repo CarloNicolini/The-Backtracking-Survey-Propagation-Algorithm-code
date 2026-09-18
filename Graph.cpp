@@ -653,6 +653,15 @@ void Graph::message_sweep(const vector<unsigned long>& offsets,
 void Graph::compute_lyapunov_at_fixed_point() {
     _lyapunov_jvp_error=0.;
     _adjoint_identity_error=0.;
+    _adjoint_eigenvalue=0.;
+    _adjoint_overlap=0.;
+    _adjoint_right_residual=0.;
+    _adjoint_left_residual=0.;
+    _adjoint_offsets.clear();
+    _adjoint_right.clear();
+    _adjoint_left.clear();
+    _adjoint_Jright.clear();
+    _adjoint_JTleft.clear();
     vector<unsigned long> offsets(_M+1, 0);
     for (unsigned c=0; c<_M; ++c)
         offsets[c+1]=offsets[c]+_cl[c]._size_cl_init;
@@ -790,6 +799,115 @@ void Graph::compute_lyapunov_at_fixed_point() {
         exponent+=growth[i];
     _lyapunov_exponent=exponent/static_cast<double>(window);
     _lyapunov_rho=exp(_lyapunov_exponent);
+
+    if (g_adjoint_check) {
+        vector<double> left(tangent.size(), 0.);
+        state=_seed^0xc2b2ae35U;
+        norm2=0.;
+        for (unsigned ci=_m; ci<_M; ++ci) {
+            unsigned c=vec_list_cl[ci]->_c;
+            for (unsigned j=0; j<_cl[c]._size_cl_init; ++j) {
+                if (!_cl[c]._go_forward[j]) continue;
+                state=1664525U*state+1013904223U;
+                double value=(static_cast<double>(state)+0.5)
+                             /2147483648.0-1.;
+                left[offsets[c]+j]=value;
+                norm2+=static_cast<long double>(value)*value;
+            }
+        }
+        norm=static_cast<double>(sqrtl(norm2));
+        for (unsigned i=0; i<left.size(); ++i) left[i]/=norm;
+        aligned_count=0;
+        for (unsigned iteration=0; iteration<128; ++iteration) {
+            jacobian_transpose_vector_product(offsets, left, next);
+            norm2=0.;
+            for (unsigned i=0; i<next.size(); ++i)
+                norm2+=static_cast<long double>(next[i])*next[i];
+            norm=static_cast<double>(sqrtl(norm2));
+            if (norm<=1.e-300) break;
+            for (unsigned i=0; i<next.size(); ++i) next[i]/=norm;
+            double alignment=0.;
+            for (unsigned i=0; i<next.size(); ++i)
+                alignment+=left[i]*next[i];
+            if (iteration>=8 && 1.-fabs(alignment)<1.e-10) ++aligned_count;
+            else aligned_count=0;
+            left.swap(next);
+            if (aligned_count>=4) break;
+        }
+        vector<double> Jright;
+        vector<double> JTleft;
+        jacobian_vector_product(offsets, tangent, Jright);
+        jacobian_transpose_vector_product(offsets, left, JTleft);
+        long double overlap=0.;
+        long double left_Jright=0.;
+        for (unsigned i=0; i<tangent.size(); ++i) {
+            overlap+=static_cast<long double>(left[i])*tangent[i];
+            left_Jright+=static_cast<long double>(left[i])*Jright[i];
+        }
+        _adjoint_overlap=static_cast<double>(overlap);
+        if (fabsl(overlap)>1.e-14L) {
+            _adjoint_eigenvalue=static_cast<double>(left_Jright/overlap);
+            long double right_error2=0.;
+            long double left_error2=0.;
+            long double Jright2=0.;
+            long double JTleft2=0.;
+            for (unsigned i=0; i<tangent.size(); ++i) {
+                double right_error=Jright[i]-_adjoint_eigenvalue*tangent[i];
+                double left_error=JTleft[i]-_adjoint_eigenvalue*left[i];
+                right_error2+=static_cast<long double>(right_error)*right_error;
+                left_error2+=static_cast<long double>(left_error)*left_error;
+                Jright2+=static_cast<long double>(Jright[i])*Jright[i];
+                JTleft2+=static_cast<long double>(JTleft[i])*JTleft[i];
+            }
+            _adjoint_right_residual=Jright2>0.
+                ? static_cast<double>(sqrtl(right_error2/Jright2)) : 0.;
+            _adjoint_left_residual=JTleft2>0.
+                ? static_cast<double>(sqrtl(left_error2/JTleft2)) : 0.;
+        }
+        _adjoint_offsets=offsets;
+        _adjoint_right=tangent;
+        _adjoint_left=left;
+        _adjoint_Jright=Jright;
+        _adjoint_JTleft=JTleft;
+    }
+}
+
+/*Mask-only first-order spectral-radius response for fixing v to dir. It
+ removes rows/columns of messages deleted by clean(), but deliberately omits
+ relaxation and changed surviving-row coefficients.*/
+double Graph::candidate_mask_sensitivity(Vertex* v, int dir) {
+    if (_adjoint_right.empty() || fabs(_adjoint_overlap)<=1.e-14) return 0.;
+    vector<unsigned char> deleted(_adjoint_right.size(), 0);
+    for (unsigned edge=0; edge<v->_I_am_in_cl_at_init.size(); ++edge) {
+        unsigned c=*real(v->_I_am_in_cl_at_init[edge]);
+        unsigned pos=*imag(v->_I_am_in_cl_at_init[edge]);
+        Clause& cl=_cl[c];
+        if (!cl._I_am_in_list_unsat || !cl._go_forward[pos]) continue;
+        bool satisfies=cl.v_lit[pos]==(dir==1);
+        if (satisfies) {
+            for (unsigned j=0; j<cl._size_cl_init; ++j)
+                if (cl._go_forward[j]) deleted[_adjoint_offsets[c]+j]=1;
+        } else {
+            deleted[_adjoint_offsets[c]+pos]=1;
+        }
+    }
+    vector<double> deleted_right(_adjoint_right.size(), 0.);
+    for (unsigned i=0; i<deleted.size(); ++i)
+        if (deleted[i]) deleted_right[i]=_adjoint_right[i];
+    vector<double> J_deleted_right;
+    jacobian_vector_product(_adjoint_offsets, deleted_right, J_deleted_right);
+    long double numerator=0.;
+    for (unsigned i=0; i<deleted.size(); ++i)
+        if (deleted[i])
+            numerator-=static_cast<long double>(_adjoint_left[i])
+                       *_adjoint_Jright[i]
+                      +static_cast<long double>(_adjoint_JTleft[i])
+                       *_adjoint_right[i]
+                      -static_cast<long double>(_adjoint_left[i])
+                       *J_deleted_right[i];
+    double delta_lambda=static_cast<double>(
+        numerator/static_cast<long double>(_adjoint_overlap));
+    return _adjoint_eigenvalue>=0. ? delta_lambda : -delta_lambda;
 }
 
 /*Measure both the implemented epsilon-stopping state and, in a discarded
@@ -899,6 +1017,8 @@ void Graph::diag_step() {
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations,"
                       <<"lyapunov_jvp_error,adjoint_identity_error,"
+                      <<"adjoint_eigenvalue,adjoint_overlap,"
+                      <<"adjoint_right_residual,adjoint_left_residual,"
                       <<"tight_converged,tight_lyapunov_rho,"
                       <<"tight_lyapunov_exponent,tight_lyapunov_iterations,"
                       <<"tight_Sigma\n";
@@ -934,6 +1054,8 @@ void Graph::diag_step() {
                   <<_lyapunov_rho<<","<<_lyapunov_exponent<<","
                   <<_lyapunov_iterations<<","<<_lyapunov_jvp_error<<","
                   <<_adjoint_identity_error<<","
+                  <<_adjoint_eigenvalue<<","<<_adjoint_overlap<<","
+                  <<_adjoint_right_residual<<","<<_adjoint_left_residual<<","
                   <<(_tight_lyapunov_converged ? 1 : 0)<<","
                   <<_tight_lyapunov_rho<<","<<_tight_lyapunov_exponent<<","
                   <<_tight_lyapunov_iterations<<","<<_tight_complexity<<endl;
@@ -1134,7 +1256,7 @@ void Graph::dataset_trials() {
                <<"Sigma_before,Sigma_per_N,step_frac,eta_before,r,"
                <<"converged,crashed,sat_oracle,delta_sigma,eta_after,"
                <<"lyapunov_rho_after,lyapunov_exponent_after,"
-               <<"tight_sigma_after\n";
+               <<"tight_sigma_after,adjoint_mask_delta_rho\n";
         _ds_header_done=true;
     }
     /*shortlist: top-K unfixed by active score (index copy, ptrV untouched)*/
@@ -1179,6 +1301,8 @@ void Graph::dataset_trials() {
             <<(static_cast<double>(_N-_N_t)/static_cast<double>(_N))<<","
             <<_time_conv_print<<","<<g_r_bsp;
         for (int dir=0; dir<=1; ++dir) {
+            double adjoint_sensitivity=g_adjoint_check
+                ? candidate_mask_sensitivity(v, dir) : 0.;
             for (unsigned out=0; out<7; ++out) tout[out]=0.;
             tout[3]=-1.;
             /*Flush before fork: children inherit stdio buffers, and a child
@@ -1229,6 +1353,7 @@ void Graph::dataset_trials() {
                 tout[0]=1; tout[1]=complexity-sigma_before;
                 tout[2]=(double)_time_conv_print;
                 if (g_lyapunov) {
+                    g_adjoint_check=false;/*parent-only candidate sensitivity*/
                     compute_lyapunov_at_fixed_point();
                     tout[4]=_lyapunov_rho;
                     tout[5]=_lyapunov_exponent;
@@ -1257,7 +1382,8 @@ void Graph::dataset_trials() {
                     <<(converged?(int)tout[2]:-1)<<","
                     <<(converged?tout[4]:0.)<<","
                     <<(converged?tout[5]:0.)<<","
-                    <<(converged?tout[6]:0.)<<"\n";
+                    <<(converged?tout[6]:0.)<<","
+                    <<adjoint_sensitivity<<"\n";
         }
     }
     _ds_out<<flush;
