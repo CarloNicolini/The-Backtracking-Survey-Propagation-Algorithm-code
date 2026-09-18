@@ -3,10 +3,10 @@
 ## Hypothesis
 
 Full local eigensolves correctly identify SP spinodals but are too expensive
-for move selection. The dominant tangent direction changes continuously along
-most of a BSP trajectory. Carry one normalized tangent vector across
-decimation/backtracking steps and update it once alongside every message sweep
-that SP already performs while converging.
+for move selection. Initialize one tangent direction at the start of each SP
+reconvergence and update it once alongside every message sweep that SP already
+performs. This prevents tangent directions from being mixed across different
+factor-graph topologies.
 
 The observed norm gives the finite-time growth
 
@@ -16,9 +16,9 @@ then `v_(t+1)=J_t v_t/rho_online(t)`. Removed edges are zeroed; edges
 reactivated by backtracking receive deterministic nonzero components.
 
 This approximately doubles sweep work and has no separate power-iteration
-count, perturbation amplitude, or fitted threshold. It measures stability
-along the actual nonstationary decimation path rather than solving every local
-eigenproblem from scratch.
+count, perturbation amplitude, or fitted threshold. It uses the sweeps already
+spent on the current residual formula as an online power iteration instead of
+solving a separate local eigenproblem.
 
 ## Tests
 
@@ -27,7 +27,7 @@ eigenproblem from scratch.
    local `rho(J)`.
 3. Test whether online growth approaches one before known fatal moves and
    separates them from successful trajectories.
-4. Only if predictive, use the transported mode's per-variable participation
+4. Only if predictive, use the online mode's per-variable participation
    to rank stability-preserving moves without candidate reconvergence.
 
 The option is `--online-lyapunov`.

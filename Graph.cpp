@@ -1298,6 +1298,11 @@ void Graph::convergence_messages(unsigned max_iterations) { /*compute convergenc
     bool conv_f=false;
     unsigned long i,l, __k;
     unsigned int C;
+    if (g_online_lyapunov) {
+        _online_offsets.clear();
+        _online_tangent.clear();
+        _online_active.clear();
+    }
 START:
     /*unit propagation*/
     for(__k=_m; __k<_M; __k++) {
