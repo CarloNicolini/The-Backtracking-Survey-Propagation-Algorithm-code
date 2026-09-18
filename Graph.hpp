@@ -284,6 +284,13 @@ public:
         _tight_lyapunov_converged=false;
         _tight_complexity=0.;
         _lyapunov_jvp_error=0.;
+        _stability_action=0;
+        _stability_fix=NULL;
+        _stability_release=NULL;
+        _stability_dir=0;
+        _stability_rho=0.;
+        _stability_sigma=0.;
+        _stability_probes=0;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -330,6 +337,12 @@ public:
     void surveys(); /*compute surveys for each variable node*/
 
     void compute_lyapunov(); /*largest exponent of one SP message sweep*/
+
+    void prepare_stability_move(); /*first attractive move in physical ordering*/
+
+    void apply_stability_move(); /*commit prepared fix or release*/
+
+    bool stability_will_release() { return _stability_action==1; }
 
     void diag_step(); /*log one SP fixed point (Phase 1 diagnostics)*/
 
@@ -462,6 +475,13 @@ private:
     bool _tight_lyapunov_converged;
     double _tight_complexity;
     double _lyapunov_jvp_error;
+    int _stability_action;/*0=fix, 1=release*/
+    Vertex* _stability_fix;
+    Vertex* _stability_release;
+    int _stability_dir;
+    double _stability_rho;
+    double _stability_sigma;
+    unsigned _stability_probes;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -526,6 +546,17 @@ private:
                        vector<double>& next);
 
     void compute_lyapunov_at_fixed_point();
+
+    struct StabilityProbe {
+        bool converged;
+        double sigma;
+        double rho;
+        StabilityProbe() : converged(false), sigma(0.), rho(0.) {}
+    };
+
+    StabilityProbe probe_stability(Vertex* fix, int dir, Vertex* release);
+
+    void release_stability(Vertex* v);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 

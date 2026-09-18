@@ -119,6 +119,7 @@ extern bool g_dynamic_I_backtrack; /*rank releases by current assignment retenti
 extern bool g_lyapunov; /*compute the largest SP message-sweep exponent*/
 extern bool g_lyapunov_check; /*finite-difference check of analytic Jv*/
 extern long g_lyapunov_step; /*-1 every fixed point, otherwise one diagnostic step*/
+extern bool g_stability_constrained; /*require a tight attractive post-move SP point*/
 bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 
 /*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/

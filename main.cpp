@@ -188,6 +188,10 @@ int main(int argc,  char * const argv[]) {
             g_lyapunov_check = true;
             continue;
         }
+        if (a == "--stability-constrained") {
+            g_stability_constrained = true;
+            continue;
+        }
         if (a.rfind("--lyapunov-step=", 0) == 0) {
             g_lyapunov = true;
             g_lyapunov_step = stol(a.substr(16));
@@ -279,6 +283,10 @@ int main(int argc,  char * const argv[]) {
         BSP_ERROR << "--lyapunov requires --diag=PREFIX" << endl;
         return 1;
     }
+    if (g_stability_constrained && (g_lyapunov || g_dynamic_I_backtrack)) {
+        BSP_ERROR << "--stability-constrained is exclusive with other stability/backtracking modes" << endl;
+        return 1;
+    }
     if (g_oracle_pick > 0) {
         BSP_ERROR << "--oracle-pick is not implemented yet (use --oracle-dir)" << endl;
         return 1;
@@ -362,7 +370,9 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_dynamic_I_backtrack)
+    if(g_stability_constrained)
+        BSP_INFO<<"START STABILITY-CONSTRAINED BSP WITH r="<<g_r_bsp<<":"<<endl;
+    else if(g_dynamic_I_backtrack)
         BSP_INFO<<"START DYNAMIC-I BSP WITH r="<<g_r_bsp<<":"<<endl;
     else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
@@ -418,9 +428,24 @@ SP:
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
     if(g_lyapunov)G.compute_lyapunov();/*read-only tangent stability*/
+    if(g_stability_constrained && G.complexity!=0.)
+        G.prepare_stability_move();
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
     G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
+
+    if(g_stability_constrained) {
+        BSP_INFO<<G;
+        G.save();
+        if(G.complexity==0)goto PARAPHASE;
+        if(G.complexity<-2. && !G.stability_will_release()) {
+            BSP_ERROR<<"Negative complexity and no stable release move"<<endl;
+            BSP_ERROR<<"I am sorry I quit"<<endl;
+            exit(-1);
+        }
+        G.apply_stability_move();
+        goto SP;
+    }
 
     /*The backtracking survey propagation (BSP) algorithm proceeds similarly to survey inspired decimation (SID), by alternating decimation or backtracking steps on a fraction f of variables, in order to keep the algorithm efficient. The choice between a decimation or a backtracking step is taken accordingly to a stochastic rule, where the parameter r ∈ [0,1) represents the ratio between backtracking steps to decimation steps [1]. When r=0 one obtains survey inspired decimation (SID), while when r!=0 one works with backtracking survey propagation. In this code r=_R_BSP into Header.h file.
      */
@@ -556,6 +581,8 @@ void help(const char *prog) {
          << "                       exponent at every logged fixed point.\n"
          << "  --lyapunov-step=S Compute it only at diagnostic step S.\n"
          << "  --lyapunov-check  Validate analytic Jv by central differences.\n"
+         << "  --stability-constrained Try moves by cluster retention and accept\n"
+         << "                       the first tightly converged state with rho<1.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

@@ -49,6 +49,7 @@ bool g_dynamic_I_backtrack = false;
 bool g_lyapunov = false;
 bool g_lyapunov_check = false;
 long g_lyapunov_step = -1;
+bool g_stability_constrained = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -735,6 +736,157 @@ void Graph::compute_lyapunov() {
 #endif
 }
 
+void Graph::release_stability(Vertex* v) {
+    _list_fixed_element.erase(v->_it_list_fixed_elem);
+    v->_it_list_fixed_elem=_list_fixed_element.end();
+    diag_move("back", v, -1);
+    v->reset_value_default_var_i();
+    build(v);
+}
+
+/*Probe one graph mutation, refine its SP state to ZERO tolerance, and return
+ the largest tangent growth. Failed or unstable children cannot mutate the
+ parent fixed point.*/
+Graph::StabilityProbe Graph::probe_stability(Vertex* fix, int dir,
+                                              Vertex* release) {
+    StabilityProbe probe;
+#ifdef _WIN32
+    (void)fix;
+    (void)dir;
+    (void)release;
+    BSP_ERROR<<"--stability-constrained needs fork/mmap (POSIX)"<<endl;
+    exit(-1);
+#else
+    double* result=(double*)mmap(NULL, 3*sizeof(double),
+                                 PROT_READ|PROT_WRITE,
+                                 MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (result==MAP_FAILED) {
+        BSP_ERROR<<"mmap failed for stability probe"<<endl;
+        exit(-1);
+    }
+    result[0]=0.;
+    result[1]=0.;
+    result[2]=0.;
+    _diag_step_out<<flush;
+    _diag_var_out<<flush;
+    _diag_move_out<<flush;
+    cout<<flush;
+    cerr<<flush;
+    fflush(NULL);
+    pid_t pid=fork();
+    if (pid<0) {
+        munmap(result, 3*sizeof(double));
+        BSP_ERROR<<"fork failed for stability probe"<<endl;
+        exit(-1);
+    }
+    if (pid==0) {
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        _in_trial=true;
+        if (release) release_stability(release);
+        if (fix) decimate_one(fix, dir);
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        g_epsilon=ZERO;
+        convergence_messages(8*t_max);
+        surveys();
+        compute_lyapunov_at_fixed_point();
+        result[1]=complexity;
+        result[2]=_lyapunov_rho;
+        result[0]=1.;
+        _exit(0);
+    }
+    int status=0;
+    while (waitpid(pid, &status, 0)<0 && errno==EINTR) {}
+    probe.converged=WIFEXITED(status) && WEXITSTATUS(status)==0
+                    && result[0]>0.;
+    if (probe.converged) {
+        probe.sigma=result[1];
+        probe.rho=result[2];
+    }
+    munmap(result, 3*sizeof(double));
+    return probe;
+#endif
+}
+
+/*Order fixes by assignment-specific cluster retention and releases by
+ current I(k). Accept the first proposal whose tightly refined SP point is
+ attractive. This is a stability feasibility constraint, not a weighted
+ score between Sigma and lambda.*/
+void Graph::prepare_stability_move() {
+    _stability_action=fl_bsp ? 1 : 0;
+    _stability_fix=NULL;
+    _stability_release=NULL;
+    _stability_dir=0;
+    _stability_rho=0.;
+    _stability_sigma=0.;
+    _stability_probes=0;
+
+    if (!fl_bsp) {
+        struct FixCandidate {
+            double retention;
+            Vertex* vertex;
+            int dir;
+        };
+        vector<FixCandidate> candidates;
+        candidates.reserve(2*_N_t);
+        for (unsigned i=0; i<_N; ++i) {
+            Vertex* v=ptrV[i];
+            if (v->_I_am_a_fixed_variable) continue;
+            FixCandidate truth={1.-v->_sF,v,1};
+            FixCandidate falsehood={1.-v->_sT,v,0};
+            candidates.push_back(truth);
+            candidates.push_back(falsehood);
+        }
+        sort(candidates.begin(), candidates.end(),
+             [](const FixCandidate& a, const FixCandidate& b) {
+                 return a.retention>b.retention;
+             });
+        for (unsigned i=0; i<candidates.size(); ++i) {
+            ++_stability_probes;
+            StabilityProbe probe=probe_stability(
+                candidates[i].vertex, candidates[i].dir, NULL);
+            if (!probe.converged || probe.rho>=1.) continue;
+            _stability_fix=candidates[i].vertex;
+            _stability_dir=candidates[i].dir;
+            _stability_rho=probe.rho;
+            _stability_sigma=probe.sigma;
+            return;
+        }
+    } else {
+        vector<pair<double, Vertex*> > candidates;
+        for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+             it!=_list_fixed_element.end(); ++it)
+            if (!(*it)->_forced_by_up)
+                candidates.push_back(make_pair(current_fixation_factor(*it), *it));
+        sort(candidates.begin(), candidates.end());
+        for (unsigned i=0; i<candidates.size(); ++i) {
+            ++_stability_probes;
+            StabilityProbe probe=probe_stability(NULL, -1,
+                                                  candidates[i].second);
+            if (!probe.converged || probe.rho>=1.) continue;
+            _stability_release=candidates[i].second;
+            _stability_rho=probe.rho;
+            _stability_sigma=probe.sigma;
+            return;
+        }
+    }
+    BSP_ERROR<<"No tightly stable SP move exists"<<endl;
+    exit(-1);
+}
+
+void Graph::apply_stability_move() {
+    _unit_prop=0;
+    _M_t=0;
+    if (_stability_action==1) {
+        release_stability(_stability_release);
+    } else {
+        decimate_one(_stability_fix, _stability_dir);
+    }
+    stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+    _m_t_m_1=1;
+    _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+}
+
 /*public member class Graph. Logs one SP fixed point for Phase 1 diagnostics.
  No-op unless --diag=PREFIX was given. Called after surveys(), so fl_bsp
  already holds this step's decimation-vs-backtracking decision. Fixed
@@ -759,13 +911,15 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" stability_constrained="<<g_stability_constrained
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations,"
                       <<"lyapunov_jvp_error,"
                       <<"tight_converged,tight_lyapunov_rho,"
                       <<"tight_lyapunov_exponent,tight_lyapunov_iterations,"
-                      <<"tight_Sigma\n";
+                      <<"tight_Sigma,selected_stability_rho,"
+                      <<"selected_stability_sigma,stability_probes\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -773,6 +927,7 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" stability_constrained="<<g_stability_constrained
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -782,12 +937,16 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" stability_constrained="<<g_stability_constrained
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
     }
     unsigned step=_diag_step_idx++;
-    _diag_step_out<<step<<","<<(fl_bsp ? "back" : "dec")<<","
+    const char* move=g_stability_constrained
+        ? (_stability_action==1 ? "back" : "dec")
+        : (fl_bsp ? "back" : "dec");
+    _diag_step_out<<step<<","<<move<<","
                   <<_N_t<<","<<_M_t<<","
                   <<setprecision(10)<<complexity<<","
                   <<(complexity/static_cast<double>(_N))<<","
@@ -797,7 +956,9 @@ void Graph::diag_step() {
                   <<_lyapunov_iterations<<","<<_lyapunov_jvp_error<<","
                   <<(_tight_lyapunov_converged ? 1 : 0)<<","
                   <<_tight_lyapunov_rho<<","<<_tight_lyapunov_exponent<<","
-                  <<_tight_lyapunov_iterations<<","<<_tight_complexity<<endl;
+                  <<_tight_lyapunov_iterations<<","<<_tight_complexity<<","
+                  <<_stability_rho<<","<<_stability_sigma<<","
+                  <<_stability_probes<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -987,6 +1148,7 @@ void Graph::dataset_trials() {
                 <<" lyapunov="<<g_lyapunov
                 <<" lyapunov_step="<<g_lyapunov_step
                 <<" lyapunov_check="<<g_lyapunov_check
+                <<" stability_constrained="<<g_stability_constrained
                 <<" dataset_step="<<g_dataset_step
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
@@ -1013,7 +1175,9 @@ void Graph::dataset_trials() {
         exit(-1);
     }
     double sigma_before=complexity;
-    const char* mv = fl_bsp ? "back" : "dec";
+    const char* mv=g_stability_constrained
+        ? (_stability_action==1 ? "back" : "dec")
+        : (fl_bsp ? "back" : "dec");
     for (unsigned ci=0; ci<k; ++ci) {
         Vertex* v=cand[ci];
         double sT=v->_sT, sF=v->_sF, sI=v->_sI;
