@@ -195,6 +195,10 @@ int main(int argc,  char * const argv[]) {
             g_transaction_safe = true;
             continue;
         }
+        if (a == "--stability-safe") {
+            g_stability_safe = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -290,6 +294,12 @@ int main(int argc,  char * const argv[]) {
         BSP_ERROR << "--transaction-safe is exclusive with other experimental schedulers" << endl;
         return 1;
     }
+    if (g_stability_safe &&
+        (g_transaction_safe || g_sigma_certified || g_parisi_exchange ||
+         g_dynamic_I_backtrack)) {
+        BSP_ERROR << "--stability-safe is exclusive with other experimental schedulers" << endl;
+        return 1;
+    }
     if (!g_nn_path.empty()) {
         if (!bsp_nn_load(g_nn_path)) return 1;
     }
@@ -369,7 +379,8 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_transaction_safe)BSP_INFO<<"START TRANSACTION-SAFE BSP WITH r="<<g_r_bsp<<":"<<endl;
+    if(g_stability_safe)BSP_INFO<<"START STABILITY-SAFE BSP WITH r="<<g_r_bsp<<":"<<endl;
+    else if(g_transaction_safe)BSP_INFO<<"START TRANSACTION-SAFE BSP WITH r="<<g_r_bsp<<":"<<endl;
     else if(g_sigma_certified)BSP_INFO<<"START SIGMA-CERTIFIED BSP:"<<endl;
     else if(g_parisi_exchange)BSP_INFO<<"START PARAMETER-FREE PARISI EXCHANGE BSP:"<<endl;
     else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
@@ -425,6 +436,14 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
+    if(g_stability_safe) {
+        G.check_certified_replay();
+        G.update_stability_trigger();
+        if(G.stability_triggered() && G.complexity!=0.) {
+            if(G.fl_bsp)G.prepare_safe_backtrack();
+            else G.prepare_safe_decimation();
+        }
+    }
     if(g_transaction_safe)G.check_certified_replay();
     if(g_transaction_safe && G.complexity!=0.) {
         if(G.fl_bsp)G.prepare_safe_backtrack();
@@ -440,7 +459,7 @@ SP:
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
     G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
 
-    if(g_transaction_safe && G.complexity==0) {
+    if((g_transaction_safe || g_stability_safe) && G.complexity==0) {
         BSP_INFO<<G;
         G.save();
         goto PARAPHASE;
@@ -500,7 +519,10 @@ SP:
         BSP_INFO<<G;/*print on terminal complexity*/
         G.save();
         if(G.complexity==0)goto PARAPHASE; /*go to PARAPHASE for building final solution*/
-        if(G.complexity<-2. && !(g_transaction_safe && G.safe_will_release())) {
+        if(G.complexity<-2. &&
+           !((g_transaction_safe ||
+              (g_stability_safe && G.stability_triggered()))
+             && G.safe_will_release())) {
             /*By experience we know that when N is large, e.g. (> 1000), and SP
              gives a negative complexity, with probability equal to one SP will not converge. For this
              reason we have set an exit strategy here.*/
@@ -509,7 +531,8 @@ SP:
             BSP_ERROR<<"I am sorry I quit"<<endl;
             exit(-1);
         }
-        if(g_transaction_safe) {
+        if(g_transaction_safe ||
+           (g_stability_safe && G.stability_triggered())) {
             G.apply_safe_decimation();
         } else {
             G.sort_V_Dec_move();/*sort for picking up variable nodes with the highest value of s_C*/
@@ -538,7 +561,9 @@ SP:
 
 
 
-        if(g_transaction_safe)G.apply_safe_backtrack();
+        if(g_transaction_safe ||
+           (g_stability_safe && G.stability_triggered()))
+            G.apply_safe_backtrack();
         else G.backtrack();/*bactrack move*/
         goto SP;/*go to SP*/
     }
@@ -610,6 +635,8 @@ void help(const char *prog) {
          << "                       log(P), or try one measured Parisi repair.\n"
          << "  --transaction-safe Preserve the BSP schedule, but reject fatal\n"
          << "                       decimations in fork-isolated SP probes.\n"
+         << "  --stability-safe  Activate transaction safety only when current\n"
+         << "                       SP iterations exceed their prior running RMS.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

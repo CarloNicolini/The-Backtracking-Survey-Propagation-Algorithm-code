@@ -50,6 +50,7 @@ bool g_parisi_audit = false;
 bool g_dynamic_I_backtrack = false;
 bool g_sigma_certified = false;
 bool g_transaction_safe = false;
+bool g_stability_safe = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -540,6 +541,16 @@ void Graph::check_certified_replay() {
     if (_cert_replay_error>1.e-8)
         BSP_WARN<<"transaction replay error="<<_cert_replay_error<<endl;
     _cert_replay_pending=false;
+}
+
+void Graph::update_stability_trigger() {
+    _stability_threshold=_eta_count
+        ? sqrt(_eta_sq_sum/static_cast<double>(_eta_count)) : 0.;
+    _stability_trigger=_eta_count
+        && static_cast<double>(_time_conv_print)>_stability_threshold;
+    double eta=static_cast<double>(_time_conv_print);
+    _eta_sq_sum+=eta*eta;
+    ++_eta_count;
 }
 
 /*Preserve the fixed-ratio BSP action schedule, but contain a fatal
@@ -1064,11 +1075,13 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" transaction_safe="<<g_transaction_safe
+                      <<" stability_safe="<<g_stability_safe
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
                       <<"actual_release_gain,release_converged,"
-                      <<"certified_sigma,replay_error,sp_residual,sp_contraction\n";
+                      <<"certified_sigma,replay_error,sp_residual,sp_contraction,"
+                      <<"stability_rms,stability_trigger\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -1078,6 +1091,7 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" transaction_safe="<<g_transaction_safe
+                      <<" stability_safe="<<g_stability_safe
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -1089,12 +1103,15 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" transaction_safe="<<g_transaction_safe
+                      <<" stability_safe="<<g_stability_safe
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
     }
     unsigned step=_diag_step_idx++;
-    const char* move=g_transaction_safe
+    bool protected_move=g_transaction_safe ||
+                        (g_stability_safe && _stability_trigger);
+    const char* move=protected_move
         ? (fl_bsp ? (_cert_action==2 ? "back" : "dec")
                   : (_cert_action==2 ? "back" : "dec"))
         : (g_sigma_certified
@@ -1115,7 +1132,9 @@ void Graph::diag_step() {
                   <<_parisi_release_gain<<","
                   <<(_parisi_release_converged ? 1 : 0)<<","
                   <<_cert_probe_sigma<<","<<_cert_replay_error<<","
-                  <<_sp_residual<<","<<_sp_contraction<<endl;
+                  <<_sp_residual<<","<<_sp_contraction<<","
+                  <<_stability_threshold<<","
+                  <<(_stability_trigger ? 1 : 0)<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -1304,6 +1323,7 @@ void Graph::dataset_trials() {
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" sigma_certified="<<g_sigma_certified
                 <<" transaction_safe="<<g_transaction_safe
+                <<" stability_safe="<<g_stability_safe
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -1327,7 +1347,9 @@ void Graph::dataset_trials() {
         exit(-1);
     }
     double sigma_before=complexity;
-    const char* mv=g_transaction_safe
+    bool protected_move=g_transaction_safe ||
+                        (g_stability_safe && _stability_trigger);
+    const char* mv=protected_move
         ? (fl_bsp ? (_cert_action==2 ? "back" : "dec")
                   : (_cert_action==2 ? "back" : "dec"))
         : (g_sigma_certified

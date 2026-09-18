@@ -296,6 +296,10 @@ public:
         _cert_replay_error=0.;
         _sp_residual=0.;
         _sp_contraction=0.;
+        _eta_sq_sum=0.;
+        _eta_count=0;
+        _stability_threshold=0.;
+        _stability_trigger=false;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -374,6 +378,10 @@ public:
     void check_certified_replay(); /*compare parent SP with selected child*/
 
     bool safe_will_release() { return _cert_action==2; }
+
+    void update_stability_trigger(); /*eta versus prior running RMS*/
+
+    bool stability_triggered() { return _stability_trigger; }
 
     int minisat_check(const string& path); /*bounded minisat: 1/0/-2/-3/-4*/
 
@@ -508,6 +516,10 @@ private:
     double _cert_replay_error;
     double _sp_residual;/*maximum message change at accepted fixed point*/
     double _sp_contraction;/*ratio of final two maximum residuals*/
+    double _eta_sq_sum;
+    unsigned _eta_count;
+    double _stability_threshold;
+    bool _stability_trigger;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
