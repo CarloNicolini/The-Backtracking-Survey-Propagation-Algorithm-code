@@ -188,6 +188,10 @@ int main(int argc,  char * const argv[]) {
             g_lyapunov_check = true;
             continue;
         }
+        if (a == "--online-lyapunov") {
+            g_online_lyapunov = true;
+            continue;
+        }
         if (a.rfind("--lyapunov-step=", 0) == 0) {
             g_lyapunov = true;
             g_lyapunov_step = stol(a.substr(16));
@@ -277,6 +281,10 @@ int main(int argc,  char * const argv[]) {
     }
     if (g_lyapunov && g_diag_prefix.empty()) {
         BSP_ERROR << "--lyapunov requires --diag=PREFIX" << endl;
+        return 1;
+    }
+    if (g_online_lyapunov && g_diag_prefix.empty()) {
+        BSP_ERROR << "--online-lyapunov requires --diag=PREFIX" << endl;
         return 1;
     }
     if (g_oracle_pick > 0) {
@@ -417,6 +425,7 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
+    if(g_online_lyapunov)G.update_online_lyapunov();/*one transported Jv*/
     if(g_lyapunov)G.compute_lyapunov();/*read-only tangent stability*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
@@ -556,6 +565,8 @@ void help(const char *prog) {
          << "                       exponent at every logged fixed point.\n"
          << "  --lyapunov-step=S Compute it only at diagnostic step S.\n"
          << "  --lyapunov-check  Validate analytic Jv by central differences.\n"
+         << "  --online-lyapunov Transport one tangent vector with one Jv per\n"
+         << "                       BSP fixed point.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

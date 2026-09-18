@@ -284,6 +284,8 @@ public:
         _tight_lyapunov_converged=false;
         _tight_complexity=0.;
         _lyapunov_jvp_error=0.;
+        _online_lyapunov_rho=0.;
+        _online_lyapunov_exponent=-HUGE_VAL;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -330,6 +332,8 @@ public:
     void surveys(); /*compute surveys for each variable node*/
 
     void compute_lyapunov(); /*largest exponent of one SP message sweep*/
+
+    void update_online_lyapunov(); /*one transported Jv along BSP trajectory*/
 
     void diag_step(); /*log one SP fixed point (Phase 1 diagnostics)*/
 
@@ -462,6 +466,11 @@ private:
     bool _tight_lyapunov_converged;
     double _tight_complexity;
     double _lyapunov_jvp_error;
+    double _online_lyapunov_rho;
+    double _online_lyapunov_exponent;
+    vector<unsigned long> _online_offsets;
+    vector<double> _online_tangent;
+    vector<unsigned char> _online_active;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;

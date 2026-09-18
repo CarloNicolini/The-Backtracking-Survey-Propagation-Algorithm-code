@@ -49,6 +49,7 @@ bool g_dynamic_I_backtrack = false;
 bool g_lyapunov = false;
 bool g_lyapunov_check = false;
 long g_lyapunov_step = -1;
+bool g_online_lyapunov = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -735,6 +736,71 @@ void Graph::compute_lyapunov() {
 #endif
 }
 
+/*Transport one normalized perturbation along the actual sequence of SP maps.
+ One Jv per fixed point gives a finite-time Lyapunov growth signal at roughly
+ one extra sweep of cost. Newly reactivated backtracking edges receive a
+ deterministic nonzero tangent component.*/
+void Graph::update_online_lyapunov() {
+    if (_online_offsets.empty()) {
+        _online_offsets.assign(_M+1, 0);
+        for (unsigned c=0; c<_M; ++c)
+            _online_offsets[c+1]=_online_offsets[c]+_cl[c]._size_cl_init;
+        _online_tangent.assign(_online_offsets[_M], 0.);
+        _online_active.assign(_online_offsets[_M], 0);
+    }
+    vector<unsigned char> current_active(_online_tangent.size(), 0);
+    long double norm2=0.;
+    unsigned active=0;
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        for (unsigned j=0; j<_cl[c]._size_cl_init; ++j) {
+            if (!_cl[c]._go_forward[j]) continue;
+            unsigned long index=_online_offsets[c]+j;
+            current_active[index]=1;
+            if (!_online_active[index]) {
+                unsigned state=_seed
+                    ^(2654435761U*static_cast<unsigned>(index+1))
+                    ^(2246822519U*(_diag_step_idx+1));
+                state=1664525U*state+1013904223U;
+                _online_tangent[index]
+                    =(static_cast<double>(state)+0.5)/2147483648.0-1.;
+            }
+            norm2+=static_cast<long double>(_online_tangent[index])
+                   *_online_tangent[index];
+            ++active;
+        }
+    }
+    _online_active.swap(current_active);
+    if (active==0 || norm2<=0.) {
+        _online_lyapunov_rho=0.;
+        _online_lyapunov_exponent=-HUGE_VAL;
+        return;
+    }
+    double norm=static_cast<double>(sqrtl(norm2));
+    for (unsigned i=0; i<_online_tangent.size(); ++i)
+        _online_tangent[i]=_online_active[i]
+            ? _online_tangent[i]/norm : 0.;
+
+    vector<double> next;
+    jacobian_vector_product(_online_offsets, _online_tangent, next);
+    norm2=0.;
+    for (unsigned i=0; i<next.size(); ++i)
+        if (_online_active[i])
+            norm2+=static_cast<long double>(next[i])*next[i];
+    norm=static_cast<double>(sqrtl(norm2));
+    if (norm<=1.e-300) {
+        _online_lyapunov_rho=0.;
+        _online_lyapunov_exponent=-HUGE_VAL;
+        _online_tangent.swap(next);
+        return;
+    }
+    _online_lyapunov_rho=norm;
+    _online_lyapunov_exponent=log(norm);
+    for (unsigned i=0; i<next.size(); ++i)
+        next[i]=_online_active[i] ? next[i]/norm : 0.;
+    _online_tangent.swap(next);
+}
+
 /*public member class Graph. Logs one SP fixed point for Phase 1 diagnostics.
  No-op unless --diag=PREFIX was given. Called after surveys(), so fl_bsp
  already holds this step's decimation-vs-backtracking decision. Fixed
@@ -759,8 +825,10 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" online_lyapunov="<<g_online_lyapunov
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
+                      <<"online_lyapunov_rho,online_lyapunov_exponent,"
                       <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations,"
                       <<"lyapunov_jvp_error,"
                       <<"tight_converged,tight_lyapunov_rho,"
@@ -773,6 +841,7 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" online_lyapunov="<<g_online_lyapunov
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -782,6 +851,7 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" online_lyapunov="<<g_online_lyapunov
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -793,6 +863,7 @@ void Graph::diag_step() {
                   <<(complexity/static_cast<double>(_N))<<","
                   <<_time_conv_print<<","<<_unit_prop<<","
                   <<_last_certitude<<","<<_list_fixed_element.size()<<","
+                  <<_online_lyapunov_rho<<","<<_online_lyapunov_exponent<<","
                   <<_lyapunov_rho<<","<<_lyapunov_exponent<<","
                   <<_lyapunov_iterations<<","<<_lyapunov_jvp_error<<","
                   <<(_tight_lyapunov_converged ? 1 : 0)<<","
@@ -987,6 +1058,7 @@ void Graph::dataset_trials() {
                 <<" lyapunov="<<g_lyapunov
                 <<" lyapunov_step="<<g_lyapunov_step
                 <<" lyapunov_check="<<g_lyapunov_check
+                <<" online_lyapunov="<<g_online_lyapunov
                 <<" dataset_step="<<g_dataset_step
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
