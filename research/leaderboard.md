@@ -129,3 +129,40 @@ Artifacts:
 
 Hypothesis commit: `4a0edff`. Metric correction: `bef5cd3`. Results commit:
 `6216388`. Scale-validation results: `1080aa6`.
+
+## Idea 005 — event-driven Parisi exchanges: controller killed, estimator kept
+
+Hypothesis: replace the fixed backtracking schedule by Parisi's equation (5).
+At each SP fixed point, estimate the best free-variable retention `P_max` and
+the weakest current fixation `I_min`; exchange them at constant fixed depth
+when `P_max > I_min`, otherwise decimate. Exchanges were relaxed while
+measured Sigma increased, making complexity a Lyapunov feedback signal.
+
+The key new component worked. On one `N=300`, `alpha=4.15` audit, 120 forked
+release/reconvergence trials gave Pearson `r=0.99684` between `-log(I_min)` and
+the measured complexity gain. All 120 gains had the predicted positive sign;
+mean predicted and measured gains were 0.02263 and 0.02232, with MAE 0.00056.
+This validates the O(degree*K) reconstruction of current fixed-variable
+surveys and removes the legacy dependence on stale fixation-time scores.
+
+The simultaneous exchange controller did not generalize. At `N=300`, five
+seeds, it matched certainty's 1/5 SAT, reduced per-transition roughness 6.9%
+and worst drop 8.0%, and was 4.5 times faster. At `N=1000`, however, it solved
+4/5 versus certainty's 5/5; its fixed-depth frontier was 33.6% rougher and its
+frontier area/level 2.2% lower. Applying release and fixation simultaneously
+therefore loses the accurately predicted release gain through nonlinear
+re-equilibration.
+
+Decision: kill the event-driven simultaneous-exchange controller. Keep the
+dynamic `I(k)` estimator and test the more faithful intervention: retain the
+standard BSP schedule but replace stale-score backtracking with the current
+`I(k)` ordering.
+
+Artifacts:
+
+- `results/idea-005-audit-k3-n300-a4.15/`
+- `results/idea-005-relax-k3-n300-a4.15/`
+- `results/idea-005-relax-k3-n1000-a4.15/`
+
+Implementation: `d5e6db0`. Release audit: `501e9cb`. Lyapunov refinement:
+`71ccef2`. Results: `679ace9`.
