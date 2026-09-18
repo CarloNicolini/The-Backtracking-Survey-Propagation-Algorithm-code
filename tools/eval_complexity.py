@@ -53,18 +53,27 @@ def summarize_curve(rows):
     sigma = [float(row["Sigma"]) for row in rows]
     deltas = [before - after for before, after in zip(sigma, sigma[1:])]
     transitions = len(deltas)
+    has_terminal_zero = bool(sigma) and sigma[-1] == 0.0
+    shape_deltas = deltas[:-1] if has_terminal_zero else deltas
     auc = sum((before + after) / 2 for before, after in zip(sigma, sigma[1:]))
     return {
         "steps": transitions,
         "sigma_initial": sigma[0] if sigma else 0.0,
         "sigma_final": sigma[-1] if sigma else 0.0,
         "max_drop": max(deltas, default=0.0),
+        "terminal_drop": deltas[-1] if has_terminal_zero and deltas else 0.0,
+        "max_drop_preterminal": max(shape_deltas, default=0.0),
         "mean_drop": (
             (sigma[0] - sigma[-1]) / transitions if transitions else 0.0
         ),
         "mean_abs_delta": (
             sum(abs(delta) for delta in deltas) / transitions
             if transitions
+            else 0.0
+        ),
+        "mean_abs_delta_preterminal": (
+            sum(abs(delta) for delta in shape_deltas) / len(shape_deltas)
+            if shape_deltas
             else 0.0
         ),
         "auc_sigma": auc,
@@ -140,8 +149,11 @@ def write_summary(path, records):
         "sigma_initial",
         "sigma_final",
         "max_drop",
+        "terminal_drop",
+        "max_drop_preterminal",
         "mean_drop",
         "mean_abs_delta",
+        "mean_abs_delta_preterminal",
         "auc_sigma",
         "auc_per_step",
         "eta_mean",
@@ -168,8 +180,10 @@ def write_aggregate(path, records):
         "sat",
         "sp_nonconvergence",
         "mean_max_drop",
+        "mean_max_drop_preterminal",
         "mean_drop",
         "mean_abs_delta",
+        "mean_abs_delta_preterminal",
         "mean_auc_per_step",
         "mean_steps",
         "mean_wall_seconds",
@@ -185,8 +199,14 @@ def write_aggregate(path, records):
                     record["status"] == "sp-nonconvergence" for record in group
                 ),
                 "mean_max_drop": mean(group, "max_drop"),
+                "mean_max_drop_preterminal": mean(
+                    group, "max_drop_preterminal"
+                ),
                 "mean_drop": mean(group, "mean_drop"),
                 "mean_abs_delta": mean(group, "mean_abs_delta"),
+                "mean_abs_delta_preterminal": mean(
+                    group, "mean_abs_delta_preterminal"
+                ),
                 "mean_auc_per_step": mean(group, "auc_per_step"),
                 "mean_steps": mean(group, "steps"),
                 "mean_wall_seconds": mean(group, "wall_seconds"),
