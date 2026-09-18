@@ -285,6 +285,15 @@ public:
         _parisi_I=1.;
         _parisi_release_gain=0.;
         _parisi_release_converged=false;
+        _cert_action=0;
+        _cert_fix=NULL;
+        _cert_release=NULL;
+        _cert_fix_dir=0;
+        _cert_P=0.;
+        _cert_probe_sigma=0.;
+        _cert_probe_converged=false;
+        _cert_replay_pending=false;
+        _cert_replay_error=0.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -347,6 +356,10 @@ public:
     void apply_parisi_step(); /*apply the prepared parameter-free move*/
 
     bool parisi_will_exchange() { return _parisi_do_exchange; }
+
+    void prepare_certified_step(); /*probe and select a Sigma-certified move*/
+
+    void apply_certified_step(); /*commit the selected certified move*/
 
     int minisat_check(const string& path); /*bounded minisat: 1/0/-2/-3/-4*/
 
@@ -470,6 +483,15 @@ private:
     double _parisi_I;/*retained-cluster fraction of the current fixation*/
     double _parisi_release_gain;/*audited Sigma_after_release-Sigma*/
     bool _parisi_release_converged;/*whether the audited release found an SP point*/
+    int _cert_action;/*0=fix, 1=swap, 2=release*/
+    Vertex* _cert_fix;
+    Vertex* _cert_release;
+    int _cert_fix_dir;
+    double _cert_P;
+    double _cert_probe_sigma;
+    bool _cert_probe_converged;
+    bool _cert_replay_pending;
+    double _cert_replay_error;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -529,6 +551,17 @@ private:
     double current_fixation_factor(Vertex* v);
 
     bool share_clause(Vertex* a, Vertex* b);
+
+    struct CertifiedProbe {
+        bool converged;
+        double sigma;
+        unsigned fixed;
+        CertifiedProbe() : converged(false), sigma(0.), fixed(0) {}
+    };
+
+    CertifiedProbe probe_certified(Vertex* fix, int dir, Vertex* release);
+
+    void release_certified(Vertex* v);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 
