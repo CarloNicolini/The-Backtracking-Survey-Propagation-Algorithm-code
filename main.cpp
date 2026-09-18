@@ -187,6 +187,10 @@ int main(int argc,  char * const argv[]) {
             g_dynamic_I_backtrack = true;
             continue;
         }
+        if (a == "--two-stage-exchange") {
+            g_two_stage_exchange = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -273,6 +277,11 @@ int main(int argc,  char * const argv[]) {
         BSP_ERROR << "--parisi-exchange and --dynamic-i-backtrack are exclusive" << endl;
         return 1;
     }
+    if (g_two_stage_exchange &&
+        (g_parisi_exchange || g_dynamic_I_backtrack || g_parisi_audit)) {
+        BSP_ERROR << "--two-stage-exchange is exclusive with other Parisi schedulers" << endl;
+        return 1;
+    }
     if (!g_nn_path.empty()) {
         if (!bsp_nn_load(g_nn_path)) return 1;
     }
@@ -352,7 +361,8 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_parisi_exchange)BSP_INFO<<"START PARAMETER-FREE PARISI EXCHANGE BSP:"<<endl;
+    if(g_two_stage_exchange)BSP_INFO<<"START TWO-STAGE PARISI EXCHANGE BSP:"<<endl;
+    else if(g_parisi_exchange)BSP_INFO<<"START PARAMETER-FREE PARISI EXCHANGE BSP:"<<endl;
     else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
@@ -406,11 +416,27 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
-    if(g_parisi_exchange)G.prepare_parisi_step();/*state-dependent eq. (5) move*/
+    if(g_parisi_exchange && G.complexity!=0.)
+        G.prepare_parisi_step();/*state-dependent eq. (5) move*/
+    if(g_two_stage_exchange && G.complexity!=0.)
+        G.prepare_two_stage_step();/*release, re-equilibrate, replace*/
     if(g_parisi_audit)G.audit_parisi_release();/*expensive estimator validation*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
     G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
+
+    if(g_two_stage_exchange) {
+        BSP_INFO<<G;
+        G.save();
+        if(G.complexity==0)goto PARAPHASE;
+        if(G.complexity<-2. && !G.two_stage_will_release()) {
+            BSP_ERROR<<"Negative complexity and no two-stage release"<<endl;
+            BSP_ERROR<<"I am sorry I quit"<<endl;
+            exit(-1);
+        }
+        G.apply_two_stage_step();
+        goto SP;
+    }
 
     if(g_parisi_exchange) {
         BSP_INFO<<G;
@@ -559,6 +585,8 @@ void help(const char *prog) {
          << "                       opportunity for I_min validation.\n"
          << "  --dynamic-i-backtrack Rank fixed variables by current Parisi I(k)\n"
          << "                       during the standard BSP backtracking schedule.\n"
+         << "  --two-stage-exchange Release I_min, reconverge, choose a replacement,\n"
+         << "                       then force one net-progress decimation.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

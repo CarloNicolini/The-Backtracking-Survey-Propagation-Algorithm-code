@@ -121,6 +121,7 @@ bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 extern bool g_parisi_exchange;
 extern bool g_parisi_audit; /*fork one release trial for estimator validation*/
 extern bool g_dynamic_I_backtrack; /*rank releases by current I(k), not stale score*/
+extern bool g_two_stage_exchange; /*release, reconverge, replace, then progress*/
 
 /*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/
 extern string g_dataset_prefix; /*output prefix for _dataset.csv*/

@@ -285,6 +285,9 @@ public:
         _parisi_I=1.;
         _parisi_release_gain=0.;
         _parisi_release_converged=false;
+        _two_stage_state=0;
+        _two_action=0;
+        _two_released=NULL;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -347,6 +350,12 @@ public:
     void apply_parisi_step(); /*apply the prepared parameter-free move*/
 
     bool parisi_will_exchange() { return _parisi_do_exchange; }
+
+    void prepare_two_stage_step(); /*release/reconverge/replace state machine*/
+
+    void apply_two_stage_step(); /*apply prepared two-stage action*/
+
+    bool two_stage_will_release() { return _two_action==1; }
 
     int minisat_check(const string& path); /*bounded minisat: 1/0/-2/-3/-4*/
 
@@ -470,6 +479,9 @@ private:
     double _parisi_I;/*retained-cluster fraction of the current fixation*/
     double _parisi_release_gain;/*audited Sigma_after_release-Sigma*/
     bool _parisi_release_converged;/*whether the audited release found an SP point*/
+    int _two_stage_state;/*0=normal, 1=replace released var, 2=force progress*/
+    int _two_action;/*0=decimate, 1=release, 2=replace*/
+    Vertex* _two_released;/*excluded from immediate replacement*/
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;

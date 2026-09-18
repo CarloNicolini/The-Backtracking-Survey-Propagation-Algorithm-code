@@ -48,6 +48,7 @@ double g_damping = 0.0;
 bool g_parisi_exchange = false;
 bool g_parisi_audit = false;
 bool g_dynamic_I_backtrack = false;
+bool g_two_stage_exchange = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -443,6 +444,77 @@ void Graph::apply_parisi_step() {
     _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
 }
 
+/*Parisi exchange with an intervening SP equilibration. State 0 may release
+ I_min, state 1 fixes a replacement selected from the updated cavity state,
+ and state 2 forces one additional decimation to guarantee net progress.*/
+void Graph::prepare_two_stage_step() {
+    _two_action=0;
+    _parisi_fix=NULL;
+    _parisi_release=NULL;
+    _parisi_P=0.;
+    _parisi_I=1.;
+    for (unsigned i=0; i<_N; ++i) {
+        Vertex* v=ptrV[i];
+        if (v->_I_am_a_fixed_variable) continue;
+        if (_two_stage_state==1 && v==_two_released) continue;
+        double P=1.-min(v->_sT, v->_sF);
+        if (!_parisi_fix || P>_parisi_P) {
+            _parisi_fix=v;
+            _parisi_P=P;
+        }
+    }
+    if (!_parisi_fix && _two_stage_state==1) {
+        _parisi_fix=_two_released;/*only possible replacement remains*/
+        _parisi_P=1.-min(_parisi_fix->_sT, _parisi_fix->_sF);
+    }
+    if (!_parisi_fix) return;
+    _parisi_fix_dir=(_parisi_fix->_sT>_parisi_fix->_sF) ? 1 : 0;
+
+    if (_two_stage_state==1) {
+        _two_action=2;
+        return;
+    }
+    if (_two_stage_state==2) return;/*forced progress decimation*/
+
+    for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+         it!=_list_fixed_element.end(); ++it) {
+        Vertex* v=*it;
+        if (v->_forced_by_up || share_clause(_parisi_fix, v)) continue;
+        double I=current_fixation_factor(v);
+        if (!_parisi_release || I<_parisi_I) {
+            _parisi_release=v;
+            _parisi_I=I;
+        }
+    }
+    if (_parisi_release && _parisi_P>_parisi_I) _two_action=1;
+}
+
+void Graph::apply_two_stage_step() {
+    _unit_prop=0;
+    _M_t=0;
+    if (_two_action==1) {
+        _list_fixed_element.erase(_parisi_release->_it_list_fixed_elem);
+        _parisi_release->_it_list_fixed_elem=_list_fixed_element.end();
+        diag_move("back", _parisi_release, -1);
+        _parisi_release->reset_value_default_var_i();
+        build(_parisi_release);
+        _two_released=_parisi_release;
+        _two_stage_state=1;
+        ++_numb_of_back_moves;
+    } else {
+        decimate_one(_parisi_fix, _parisi_fix_dir);
+        ++_numb_of_dec_moves;
+        if (_two_action==2) _two_stage_state=2;
+        else {
+            _two_stage_state=0;
+            _two_released=NULL;
+        }
+    }
+    stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+    _m_t_m_1=1;
+    _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+}
+
 /*public member class Graph. True if v shares an unsatisfied clause with any
  variable already selected in sel (factor-graph distance 2 veto, Phase 2).
  NOTE: selected vars were just fixed and erased from V, so membership is
@@ -652,9 +724,9 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
     if(complexity_variables==0.) complexity=0;
-    if(g_parisi_exchange) {
+    if(g_parisi_exchange || g_two_stage_exchange) {
         fl_bsp=false;
-        return;/*prepare_parisi_step() makes the state-dependent decision*/
+        return;/*an exchange controller makes the state-dependent decision*/
     }
     if((_numb_of_back_moves/_numb_of_dec_moves)<g_r_bsp) {
         ++_numb_of_back_moves;
@@ -691,6 +763,7 @@ void Graph::diag_step() {
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" two_stage_exchange="<<g_two_stage_exchange
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
@@ -702,6 +775,7 @@ void Graph::diag_step() {
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" two_stage_exchange="<<g_two_stage_exchange
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -711,14 +785,17 @@ void Graph::diag_step() {
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" two_stage_exchange="<<g_two_stage_exchange
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
     }
     unsigned step=_diag_step_idx++;
-    const char* move=g_parisi_exchange
-        ? (_parisi_do_exchange ? "exchange" : "dec")
-        : (fl_bsp ? "back" : "dec");
+    const char* move=g_two_stage_exchange
+        ? (_two_action==1 ? "release" : (_two_action==2 ? "replace" : "dec"))
+        : (g_parisi_exchange
+           ? (_parisi_do_exchange ? "exchange" : "dec")
+           : (fl_bsp ? "back" : "dec"));
     double predicted=(g_parisi_exchange && _parisi_P>0. && _parisi_I>0.)
         ? log(_parisi_P/_parisi_I) : 0.;
     _diag_step_out<<step<<","<<move<<","
@@ -917,6 +994,7 @@ void Graph::dataset_trials() {
                 <<" parisi_exchange="<<g_parisi_exchange
                 <<" parisi_audit="<<g_parisi_audit
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                <<" two_stage_exchange="<<g_two_stage_exchange
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -940,9 +1018,11 @@ void Graph::dataset_trials() {
         exit(-1);
     }
     double sigma_before=complexity;
-    const char* mv=g_parisi_exchange
-        ? (_parisi_do_exchange ? "exchange" : "dec")
-        : (fl_bsp ? "back" : "dec");
+    const char* mv=g_two_stage_exchange
+        ? (_two_action==1 ? "release" : (_two_action==2 ? "replace" : "dec"))
+        : (g_parisi_exchange
+           ? (_parisi_do_exchange ? "exchange" : "dec")
+           : (fl_bsp ? "back" : "dec"));
     for (unsigned ci=0; ci<k; ++ci) {
         Vertex* v=cand[ci];
         double sT=v->_sT, sF=v->_sF, sI=v->_sI;
