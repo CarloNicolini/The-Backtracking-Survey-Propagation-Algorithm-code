@@ -55,6 +55,7 @@ unsigned g_oracle_timeout = 10;
 bool g_oracle_dir = false;
 unsigned g_oracle_pick = 0;
 unsigned g_lookahead_k = 0;
+unsigned g_cert_window = 0;
 string g_nn_path;
 bool g_nn_veto = false;
 double g_nn_cutoff = 0.0;
@@ -444,10 +445,22 @@ void Graph::clean(Vertex * &V_to_clean) {
     }
 }
 
-/*public member class Graph. This memeber sorts in descending order, using as predicate the certitude, vertex
- vector ptrV. The first x components of the vector are not sorted because they contain fixed variables*/
+/*Sort unfixed variables by the active scorer. With --cert-window=K, first
+ sort by certainty and rerank only its top-K candidates with the active
+ scorer, keeping at least enough candidates to fill the decimation batch.*/
 void Graph::sort_V_Dec_move() {
-    sort(ptrV.begin()+(_list_fixed_element.size()), ptrV.end(), _Vertex_greater_pred());
+    vector<Vertex*>::iterator first=ptrV.begin()+(_list_fixed_element.size());
+    if (g_cert_window==0) {
+        sort(first, ptrV.end(), _Vertex_greater_pred());
+        return;
+    }
+    sort(first, ptrV.end(), _Vertex_cert_greater_pred());
+    unsigned available=static_cast<unsigned>(ptrV.end()-first);
+    unsigned batch=static_cast<unsigned>(frac*static_cast<double>(_N_t));
+    if (batch==0) batch=1;
+    unsigned window=max(g_cert_window, batch);
+    if (window>available) window=available;
+    sort(first, first+window, _Vertex_greater_pred());
 }
 
 
@@ -497,18 +510,21 @@ void Graph::diag_step() {
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" lookahead_k="<<g_lookahead_k
+                      <<" cert_window="<<g_cert_window
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" lookahead_k="<<g_lookahead_k
+                      <<" cert_window="<<g_cert_window
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" lookahead_k="<<g_lookahead_k
+                      <<" cert_window="<<g_cert_window
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -703,6 +719,7 @@ void Graph::dataset_trials() {
                 <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" lookahead_k="<<g_lookahead_k
+                <<" cert_window="<<g_cert_window
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

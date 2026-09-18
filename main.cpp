@@ -217,6 +217,10 @@ int main(int argc,  char * const argv[]) {
             g_lookahead_k = static_cast<unsigned>(stoul(a.substr(14)));
             continue;
         }
+        if (a.rfind("--cert-window=", 0) == 0) {
+            g_cert_window = static_cast<unsigned>(stoul(a.substr(14)));
+            continue;
+        }
         if (a.rfind("--nn=", 0) == 0) {
             g_nn_path = a.substr(5);
             continue;
@@ -529,6 +533,8 @@ void help(const char *prog) {
          << "  --oracle-pick=K   Scan top-K for a SAT-preserving move (0=off).\n"
          << "  --lookahead-k=K  Try both directions for the top-K scored vars;\n"
          << "                       fix the converged move with maximum Sigma (0=off).\n"
+         << "  --cert-window=K Rerank only the top-K certainty candidates with\n"
+         << "                       the active scorer (0=off).\n"
          << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"
          << "  --nn-veto=C       Veto mode: bury vars scoring below C,\n"
          << "                       keep hand-crafted bias otherwise (needs --nn).\n"

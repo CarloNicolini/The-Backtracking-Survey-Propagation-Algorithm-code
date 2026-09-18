@@ -128,6 +128,7 @@ extern unsigned g_oracle_timeout; /*per-trial minisat seconds, default 10 (0 = u
 extern bool g_oracle_dir; /*check both dirs per chosen var, take a SAT one*/
 extern unsigned g_oracle_pick; /*scan top-K for SAT-preserving (var,dir), 0 = off*/
 extern unsigned g_lookahead_k; /*top-K by scorer, choose max post-fix Sigma; 0 = off*/
+extern unsigned g_cert_window; /*rerank only top-K certainty vars; 0 = off*/
 extern string g_nn_path; /*GenANN weights from bsp-train; empty = off*/
 extern bool g_nn_veto; /*veto mode: bury vars scoring below cutoff, else keep bias*/
 extern double g_nn_cutoff; /*veto threshold on predicted DeltaSigma*/

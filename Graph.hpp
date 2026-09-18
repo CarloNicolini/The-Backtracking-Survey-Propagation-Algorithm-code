@@ -507,6 +507,12 @@ private:
         }
     };
 
+    struct _Vertex_cert_greater_pred {
+        bool operator()(Vertex * x, Vertex * y) {
+            return (1.-min(x->_sT, x->_sF)) > (1.-min(y->_sT, y->_sF));
+        }
+    };
+
     struct _Vertex_smaller_labeled_vertex_pred {/*predicate for sort on a vector of Vertex*/
         bool operator()(Vertex * x, Vertex * y) {
             return x->_vertex < y->_vertex;
