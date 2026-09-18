@@ -228,3 +228,31 @@ Artifacts:
 - `results/idea-007-recovery-k3-n1000-a4.15/`
 
 Implementation: `c8ff796`. Recovery ladder: `1edf603`. Results: `af6f313`.
+
+## Idea 008 — self-financing compound progress: killed
+
+Hypothesis: compare two fork-measured proposals with equal net progress:
+directly fix the best free variable, or release the minimum-current-I fixation
+and fix two clause-separated variables. Choose the lower measured complexity
+loss per actual net fixation.
+
+The mechanism was active and safe: the N=300 runs selected 125 compound moves
+with zero replay error. It retained idea 007's recovery gain, solving 3/5
+versus 1/5 for both baselines. However, its mean pre-terminal worst drop was
+0.4475 versus certainty's 0.4573, while move-depth roughness rose 37.4%.
+More importantly, fixed-depth frontier roughness rose 34.2% and frontier
+area/level fell 28.1%. Exhaustive recovery on the two unsolved seeds made
+mean wall time roughly ten times certainty.
+
+Decision: kill. Expanding the move to `release one + fix two` and measuring it
+exactly still gives a myopic greedy policy; a locally superior `q -> q+1`
+state can lead to a worse future frontier. Do not tune the compound size. The
+next structural test should use SP fixed-point multiplicity itself as a
+control signal, following Parisi's interpretation of non-convergence.
+
+Artifacts:
+
+- `results/idea-008-smoke-k3-n80-a4.0/`
+- `results/idea-008-k3-n300-a4.15/`
+
+Implementation: `71bd2af`. Results: `a945282`.
