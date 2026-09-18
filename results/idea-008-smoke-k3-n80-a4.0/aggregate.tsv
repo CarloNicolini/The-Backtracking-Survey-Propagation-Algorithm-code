@@ -1,0 +1,2 @@
+config	runs	sat	sp_nonconvergence	mean_max_drop	mean_max_drop_preterminal	mean_drop	mean_abs_delta	mean_abs_delta_preterminal	mean_auc_per_step	mean_fixed_frontier_max_drop	mean_fixed_frontier_roughness	mean_fixed_frontier_auc_per_level	mean_steps	mean_wall_seconds
+financed	5	3	1	0.330749654112099	0.330749654112099	0.040997902635179925	0.044655550937562905	0.0469401409328385	0.569447039411379	0.31807492294487266	0.04342654495771496	0.6065149080642346	18.6	0.11774967899546027
