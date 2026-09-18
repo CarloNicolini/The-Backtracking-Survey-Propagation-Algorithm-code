@@ -194,3 +194,21 @@ Artifacts:
 - `results/idea-006-k3-n1000-a4.15/`
 
 Implementation: `b064217`. Results: `871f12b`.
+
+## Idea 015 — sign-regret mistake correction: killed
+
+Hypothesis: release only fixed variables whose currently preferred sign has
+flipped, ranked by `log(P_best/P_assigned)`; convert zero-regret backtracking
+slots into decimations.
+
+Sign reversals were too sparse. The controller advanced aggressively and
+solved 0/5 N=300 seeds; the sole certainty success instead ended in a
+contradiction. Mean worst drop improved 5.2%, but roughness rose 24.9% and the
+success invariant failed.
+
+Decision: kill without promotion. Useful BSP backtracking is not limited to
+locally visible sign mistakes.
+
+Artifacts: `results/idea-015-k3-n300-a4.15/`.
+
+Implementation: `d714ddd`. Results: `e545c8a`.
