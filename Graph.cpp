@@ -46,6 +46,7 @@ bool g_veto = false;
 double g_epsilon = epsilon;
 double g_damping = 0.0;
 bool g_dynamic_I_backtrack = false;
+bool g_flexibility_diag = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -396,9 +397,33 @@ void Graph::sort_V_Dec_move() {
 void Graph::surveys() { /*compute surveys for each variable node*/
     complexity_variables=0.;/*set complexity variable to 0*/
     unsigned int _size_init=static_cast<unsigned int>(_list_fixed_element.size());
+    double sum_sI=0.;
+    double sum_polarization=0.;
+    double sum_entropy=0.;
     for (unsigned int i=_size_init; i<_N; ++i) {
         ptrV[i]->compute_s();/*compute surveys for each variable node*/
         complexity_variables+=(static_cast<double>(ptrV[i]->_degree_i)-1.)*log(ptrV[i]->complexity_variable);/*update graph variable complexity*/
+        if (g_flexibility_diag) {
+            double sT=ptrV[i]->_sT;
+            double sF=ptrV[i]->_sF;
+            double sI=ptrV[i]->_sI;
+            sum_sI+=sI;
+            sum_polarization+=fabs(sT-sF);
+            if (sT>0.) sum_entropy-=sT*log(sT);
+            if (sF>0.) sum_entropy-=sF*log(sF);
+            if (sI>0.) sum_entropy-=sI*log(sI);
+        }
+    }
+    if (g_flexibility_diag) {
+        unsigned free_variables=_N-_size_init;
+        _mean_sI=free_variables ? sum_sI/free_variables : 1.;
+        _mean_abs_polarization=free_variables
+            ? sum_polarization/free_variables : 0.;
+        _mean_survey_entropy=free_variables ? sum_entropy/free_variables : 0.;
+        _flexibility_change=_have_previous_flexibility
+            ? _mean_sI-_previous_mean_sI : 0.;
+        _previous_mean_sI=_mean_sI;
+        _have_previous_flexibility=true;
     }
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
@@ -435,18 +460,23 @@ void Graph::diag_step() {
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" flexibility_diag="<<g_flexibility_diag
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
+        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
+                      <<"mean_sI,mean_abs_polarization,mean_survey_entropy,"
+                      <<"delta_mean_sI\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" flexibility_diag="<<g_flexibility_diag
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" flexibility_diag="<<g_flexibility_diag
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -457,7 +487,9 @@ void Graph::diag_step() {
                   <<setprecision(10)<<complexity<<","
                   <<(complexity/static_cast<double>(_N))<<","
                   <<_time_conv_print<<","<<_unit_prop<<","
-                  <<_last_certitude<<","<<_list_fixed_element.size()<<endl;
+                  <<_last_certitude<<","<<_list_fixed_element.size()<<","
+                  <<_mean_sI<<","<<_mean_abs_polarization<<","
+                  <<_mean_survey_entropy<<","<<_flexibility_change<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -641,6 +673,7 @@ void Graph::dataset_trials() {
                 <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                <<" flexibility_diag="<<g_flexibility_diag
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

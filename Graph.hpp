@@ -275,6 +275,12 @@ public:
         complexity_variables=0.;/*variable complexity set to 0*/
         complexity=0.;/*total complexity set to 0*/
         _unit_prop=0;/*unit propagation counter set to 0*/
+        _mean_sI=0.;
+        _mean_abs_polarization=0.;
+        _mean_survey_entropy=0.;
+        _flexibility_change=0.;
+        _previous_mean_sI=0.;
+        _have_previous_flexibility=false;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -442,6 +448,12 @@ private:
     unsigned _oracle_tmp_ctr;/*unique temp-file counter for oracle checks*/
     unsigned int _diag_step_idx;/*diagnostic step counter*/
     bool _diag_header_done;/*diagnostic CSV headers written*/
+    double _mean_sI;
+    double _mean_abs_polarization;
+    double _mean_survey_entropy;
+    double _flexibility_change;
+    double _previous_mean_sI;
+    bool _have_previous_flexibility;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
