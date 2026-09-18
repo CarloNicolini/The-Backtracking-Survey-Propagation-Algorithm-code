@@ -294,6 +294,8 @@ public:
         _cert_probe_converged=false;
         _cert_replay_pending=false;
         _cert_replay_error=0.;
+        _sp_residual=0.;
+        _sp_contraction=0.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -504,6 +506,8 @@ private:
     bool _cert_probe_converged;
     bool _cert_replay_pending;
     double _cert_replay_error;
+    double _sp_residual;/*maximum message change at accepted fixed point*/
+    double _sp_contraction;/*ratio of final two maximum residuals*/
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;

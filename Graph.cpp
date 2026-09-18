@@ -1068,7 +1068,7 @@ void Graph::diag_step() {
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
                       <<"actual_release_gain,release_converged,"
-                      <<"certified_sigma,replay_error\n";
+                      <<"certified_sigma,replay_error,sp_residual,sp_contraction\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -1114,7 +1114,8 @@ void Graph::diag_step() {
                   <<(_parisi_I>0. ? -log(_parisi_I) : HUGE_VAL)<<","
                   <<_parisi_release_gain<<","
                   <<(_parisi_release_converged ? 1 : 0)<<","
-                  <<_cert_probe_sigma<<","<<_cert_replay_error<<endl;
+                  <<_cert_probe_sigma<<","<<_cert_replay_error<<","
+                  <<_sp_residual<<","<<_sp_contraction<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -1531,7 +1532,9 @@ void Graph::convergence_messages() { /*compute convergence messages for message 
     bool conv_f=false;
     unsigned long i,l, __k;
     unsigned int C;
+    double previous_residual=0.;
 START:
+    previous_residual=0.;
     /*unit propagation*/
     for(__k=_m; __k<_M; __k++) {
         C=(vec_list_cl[__k])->_c;
@@ -1552,6 +1555,7 @@ START:
     /*convergence*/
     for (unsigned int t=0; t<t_max; ++t) {
         conv_f=false;
+        double iteration_residual=0.;
         _counter_conv=0;/*set counter convergence to zero*/
         complexity_clauses=0.;/*set clauses complexity to zero*/
         i=0;
@@ -1586,11 +1590,9 @@ START:
                     }
                     _cl[C].old_s[i]=_cl[C].update[i];
                     _cl[C].update[i]=_new+(_cl[C].old_s[i]-_new)*g_damping;/*damped update, legacy when 0*/
-                    if(_counter_conv==0) {
-                        if(_conv(_cl[C].update[i], _cl[C].old_s[i])) {
-                            ++_counter_conv;
-                        }
-                    }
+                    double residual=fabs(_cl[C].update[i]-_cl[C].old_s[i]);
+                    if(residual>iteration_residual) iteration_residual=residual;
+                    if(residual>g_epsilon) _counter_conv=1;
                     ++i;
                 } else {
                     ++i;
@@ -1610,10 +1612,14 @@ START:
             _M_t=static_cast<unsigned int>(_cl_list.size());
             // cout<<"I found a convergence at "<<t<<" "<<_m<<endl;
             _time_conv_print=t;
+            _sp_residual=iteration_residual;
+            _sp_contraction=previous_residual>0.
+                ? iteration_residual/previous_residual : 0.;
             update_complexity_clauses();/*update complexity_clause*/
             conv_f=true;
             break;
         }
+        previous_residual=iteration_residual;
     }
     if(!conv_f) { /*if after t_max iterations no convergence is found, the algorithm return exit failure */
         BSP_ERROR<<"SP does not find any fixed points -> SP does not converge."<<endl;
