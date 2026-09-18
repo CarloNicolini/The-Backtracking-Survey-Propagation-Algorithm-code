@@ -205,7 +205,9 @@ def write_summary(path, records):
         "wall_seconds",
     ]
     with path.open("w", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fields, delimiter="\t")
+        writer = csv.DictWriter(
+            stream, fieldnames=fields, delimiter="\t", lineterminator="\n"
+        )
         writer.writeheader()
         for record in records:
             writer.writerow({field: record[field] for field in fields})
@@ -270,7 +272,9 @@ def write_aggregate(path, records):
             }
         )
     with path.open("w", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fields, delimiter="\t")
+        writer = csv.DictWriter(
+            stream, fieldnames=fields, delimiter="\t", lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(aggregate)
     return aggregate
