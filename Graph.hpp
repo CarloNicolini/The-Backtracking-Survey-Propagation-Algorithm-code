@@ -462,6 +462,8 @@ private:
     bool _tight_lyapunov_converged;
     double _tight_complexity;
     double _lyapunov_jvp_error;
+    vector<double> _lyapunov_incoming_participation;
+    vector<double> _lyapunov_neighborhood_participation;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;

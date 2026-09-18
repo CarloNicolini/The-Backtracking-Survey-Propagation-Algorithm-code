@@ -551,6 +551,8 @@ void Graph::message_sweep(const vector<unsigned long>& offsets,
  fixed point. This reads messages and products but never mutates solver state.*/
 void Graph::compute_lyapunov_at_fixed_point() {
     _lyapunov_jvp_error=0.;
+    _lyapunov_incoming_participation.assign(_N, 0.);
+    _lyapunov_neighborhood_participation.assign(_N, 0.);
     vector<unsigned long> offsets(_M+1, 0);
     for (unsigned c=0; c<_M; ++c)
         offsets[c+1]=offsets[c]+_cl[c]._size_cl_init;
@@ -656,6 +658,24 @@ void Graph::compute_lyapunov_at_fixed_point() {
         exponent+=growth[i];
     _lyapunov_exponent=exponent/static_cast<double>(window);
     _lyapunov_rho=exp(_lyapunov_exponent);
+
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        Clause& cl=_cl[c];
+        double clause_energy=0.;
+        for (unsigned j=0; j<cl._size_cl_init; ++j)
+            if (cl._go_forward[j]) {
+                double value=tangent[offsets[c]+j];
+                clause_energy+=value*value;
+                unsigned label=cl.v_V[j]->_vertex-1;
+                _lyapunov_incoming_participation[label]+=value*value;
+            }
+        for (unsigned j=0; j<cl._size_cl_init; ++j)
+            if (cl._go_forward[j]) {
+                unsigned label=cl.v_V[j]->_vertex-1;
+                _lyapunov_neighborhood_participation[label]+=clause_energy;
+            }
+    }
 }
 
 /*Measure both the implemented epsilon-stopping state and, in a discarded
@@ -673,6 +693,8 @@ void Graph::compute_lyapunov() {
         _tight_lyapunov_converged=false;
         _tight_complexity=0.;
         _lyapunov_jvp_error=0.;
+        _lyapunov_incoming_participation.assign(_N, 0.);
+        _lyapunov_neighborhood_participation.assign(_N, 0.);
         return;
     }
     compute_lyapunov_at_fixed_point();
@@ -774,7 +796,8 @@ void Graph::diag_step() {
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
+        _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN,"
+                     <<"lyapunov_incoming,lyapunov_neighborhood\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -806,7 +829,11 @@ void Graph::diag_step() {
                      <<(v->_who_I_am ? 1 : 0)<<","
                      <<setprecision(10)<<v->_sT<<","<<v->_sF<<","<<v->_sI<<","
                      <<v->_sC<<","<<fabs(v->_sT-v->_sF)<<","
-                     <<v->_degree_i<<","<<v->_sNN<<"\n";
+                     <<v->_degree_i<<","<<v->_sNN<<","
+                     <<(_lyapunov_incoming_participation.size()==_N
+                        ? _lyapunov_incoming_participation[v->_vertex-1] : 0.)<<","
+                     <<(_lyapunov_neighborhood_participation.size()==_N
+                        ? _lyapunov_neighborhood_participation[v->_vertex-1] : 0.)<<"\n";
     }
     _diag_var_out<<flush;
     if (g_dump_residuals) {
