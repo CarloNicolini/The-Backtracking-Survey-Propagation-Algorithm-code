@@ -50,6 +50,7 @@ bool g_parisi_audit = false;
 bool g_dynamic_I_backtrack = false;
 bool g_sigma_certified = false;
 bool g_transaction_safe = false;
+bool g_basin_jump = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -332,15 +333,34 @@ void Graph::release_certified(Vertex* v) {
     build(v);
 }
 
+void Graph::randomize_active_messages(unsigned seed) {
+    unsigned state=seed ? seed : 1;
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        for (unsigned j=0; j<_cl[c]._size_cl_init; ++j) {
+            if (!_cl[c]._go_forward[j]) continue;
+            state=1664525U*state+1013904223U;
+            double eta=(static_cast<double>(state)+0.5)/4294967296.0;
+            _cl[c].old_s[j]=eta;
+            _cl[c].update[j]=eta;
+            _cl[c].div_s[j]=1./(1.-eta);
+            *_cl[c].v_survey_cl_to_i[j]=eta;
+        }
+    }
+    update_products();
+}
+
 /*Probe one fix, release, or swap in a fork. Fatal SP exits remain child-local,
  and the parent stays at its last converged fixed point.*/
 Graph::CertifiedProbe Graph::probe_certified(Vertex* fix, int dir,
-                                              Vertex* release) {
+                                              Vertex* release,
+                                              unsigned random_seed) {
     CertifiedProbe probe;
 #ifdef _WIN32
     (void)fix;
     (void)dir;
     (void)release;
+    (void)random_seed;
     BSP_ERROR<<"--sigma-certified needs fork/mmap (POSIX); not supported on Windows"<<endl;
     exit(-1);
 #else
@@ -373,6 +393,7 @@ Graph::CertifiedProbe Graph::probe_certified(Vertex* fix, int dir,
         if (release) release_certified(release);
         if (fix) decimate_one(fix, dir);
         stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        if (random_seed) randomize_active_messages(random_seed);
         convergence_messages();
         surveys();
         result[0]=complexity;
@@ -526,6 +547,7 @@ void Graph::apply_certified_step() {
         ++_numb_of_dec_moves;
     }
     stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+    if (_cert_random_seed) randomize_active_messages(_cert_random_seed);
     _m_t_m_1=1;
     _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
     _cert_replay_pending=_cert_probe_converged;
@@ -550,6 +572,7 @@ void Graph::prepare_safe_decimation() {
     _cert_action=0;
     _cert_fix=NULL;
     _cert_release=NULL;
+    _cert_random_seed=0;
     _cert_P=0.;
     _cert_probe_converged=false;
     vector<pair<double, Vertex*> > candidates;
@@ -570,6 +593,21 @@ void Graph::prepare_safe_decimation() {
         _cert_probe_converged=true;
         _cert_probe_sigma=preferred.sigma;
         return;
+    }
+
+    if (g_basin_jump) {
+        unsigned seed=_seed^(2654435761U*(_diag_step_idx+1))
+                      ^(2246822519U*_cert_fix->_vertex)
+                      ^static_cast<unsigned>(_cert_fix_dir+1);
+        CertifiedProbe alternate_branch=probe_certified(
+            _cert_fix, _cert_fix_dir, NULL, seed);
+        if (alternate_branch.converged) {
+            _cert_random_seed=seed;
+            ++_basin_jumps;
+            _cert_probe_converged=true;
+            _cert_probe_sigma=alternate_branch.sigma;
+            return;
+        }
     }
 
     CertifiedProbe flipped=probe_certified(_cert_fix, 1-_cert_fix_dir, NULL);
@@ -635,6 +673,7 @@ void Graph::apply_safe_decimation() {
 void Graph::prepare_safe_backtrack() {
     _cert_action=4;/*no-op unless a release is certified*/
     _cert_release=NULL;
+    _cert_random_seed=0;
     _cert_probe_converged=false;
     vector<pair<double, Vertex*> > stale_order;
     for (list<Vertex*>::iterator it=_list_fixed_element.begin();
@@ -651,6 +690,21 @@ void Graph::prepare_safe_backtrack() {
         _cert_probe_converged=true;
         _cert_probe_sigma=legacy.sigma;
         return;
+    }
+
+    if (g_basin_jump) {
+        unsigned seed=_seed^(2654435761U*(_diag_step_idx+1))
+                      ^(3266489917U*_cert_release->_vertex);
+        CertifiedProbe alternate_branch=probe_certified(
+            NULL, -1, _cert_release, seed);
+        if (alternate_branch.converged) {
+            _cert_random_seed=seed;
+            ++_basin_jumps;
+            _cert_action=2;
+            _cert_probe_converged=true;
+            _cert_probe_sigma=alternate_branch.sigma;
+            return;
+        }
     }
 
     vector<pair<double, Vertex*> > current_order;
@@ -679,6 +733,7 @@ void Graph::apply_safe_backtrack() {
         _M_t=0;
         release_certified(_cert_release);
         stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        if (_cert_random_seed) randomize_active_messages(_cert_random_seed);
         _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
         _cert_replay_pending=_cert_probe_converged;
     } else {
@@ -687,6 +742,7 @@ void Graph::apply_safe_backtrack() {
         --_numb_of_back_moves;/*surveys() scheduled backtrack; replace it*/
         ++_numb_of_dec_moves;
         stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        if (_cert_random_seed) randomize_active_messages(_cert_random_seed);
         _m_t_m_1=1;
         _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
         _cert_replay_pending=_cert_probe_converged;
@@ -1064,11 +1120,12 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" transaction_safe="<<g_transaction_safe
+                      <<" basin_jump="<<g_basin_jump
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
                       <<"actual_release_gain,release_converged,"
-                      <<"certified_sigma,replay_error\n";
+                      <<"certified_sigma,replay_error,basin_seed,basin_jumps\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -1078,6 +1135,7 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" transaction_safe="<<g_transaction_safe
+                      <<" basin_jump="<<g_basin_jump
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -1089,6 +1147,7 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" transaction_safe="<<g_transaction_safe
+                      <<" basin_jump="<<g_basin_jump
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -1114,7 +1173,8 @@ void Graph::diag_step() {
                   <<(_parisi_I>0. ? -log(_parisi_I) : HUGE_VAL)<<","
                   <<_parisi_release_gain<<","
                   <<(_parisi_release_converged ? 1 : 0)<<","
-                  <<_cert_probe_sigma<<","<<_cert_replay_error<<endl;
+                  <<_cert_probe_sigma<<","<<_cert_replay_error<<","
+                  <<_cert_random_seed<<","<<_basin_jumps<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -1303,6 +1363,7 @@ void Graph::dataset_trials() {
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" sigma_certified="<<g_sigma_certified
                 <<" transaction_safe="<<g_transaction_safe
+                <<" basin_jump="<<g_basin_jump
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

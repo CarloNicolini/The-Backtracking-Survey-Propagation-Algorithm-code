@@ -294,6 +294,8 @@ public:
         _cert_probe_converged=false;
         _cert_replay_pending=false;
         _cert_replay_error=0.;
+        _cert_random_seed=0;
+        _basin_jumps=0;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -504,6 +506,8 @@ private:
     bool _cert_probe_converged;
     bool _cert_replay_pending;
     double _cert_replay_error;
+    unsigned _cert_random_seed;
+    unsigned _basin_jumps;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -571,9 +575,12 @@ private:
         CertifiedProbe() : converged(false), sigma(0.), fixed(0) {}
     };
 
-    CertifiedProbe probe_certified(Vertex* fix, int dir, Vertex* release);
+    CertifiedProbe probe_certified(Vertex* fix, int dir, Vertex* release,
+                                   unsigned random_seed=0);
 
     void release_certified(Vertex* v);
+
+    void randomize_active_messages(unsigned seed);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 

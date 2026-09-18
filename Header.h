@@ -123,6 +123,7 @@ extern bool g_parisi_audit; /*fork one release trial for estimator validation*/
 extern bool g_dynamic_I_backtrack; /*rank releases by current I(k), not stale score*/
 extern bool g_sigma_certified; /*fork-isolated proposal certification*/
 extern bool g_transaction_safe; /*preserve BSP schedule, reject fatal decimations*/
+extern bool g_basin_jump; /*retry fatal move from an independent SP initialization*/
 
 /*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/
 extern string g_dataset_prefix; /*output prefix for _dataset.csv*/

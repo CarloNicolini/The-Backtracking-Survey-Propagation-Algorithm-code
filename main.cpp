@@ -195,6 +195,11 @@ int main(int argc,  char * const argv[]) {
             g_transaction_safe = true;
             continue;
         }
+        if (a == "--basin-jump") {
+            g_basin_jump = true;
+            g_transaction_safe = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -369,7 +374,8 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_transaction_safe)BSP_INFO<<"START TRANSACTION-SAFE BSP WITH r="<<g_r_bsp<<":"<<endl;
+    if(g_basin_jump)BSP_INFO<<"START BASIN-JUMP BSP WITH r="<<g_r_bsp<<":"<<endl;
+    else if(g_transaction_safe)BSP_INFO<<"START TRANSACTION-SAFE BSP WITH r="<<g_r_bsp<<":"<<endl;
     else if(g_sigma_certified)BSP_INFO<<"START SIGMA-CERTIFIED BSP:"<<endl;
     else if(g_parisi_exchange)BSP_INFO<<"START PARAMETER-FREE PARISI EXCHANGE BSP:"<<endl;
     else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
@@ -610,6 +616,8 @@ void help(const char *prog) {
          << "                       log(P), or try one measured Parisi repair.\n"
          << "  --transaction-safe Preserve the BSP schedule, but reject fatal\n"
          << "                       decimations in fork-isolated SP probes.\n"
+         << "  --basin-jump      On a fatal probe, retry the same move from one\n"
+         << "                       independently initialized SP message state.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
