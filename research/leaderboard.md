@@ -38,3 +38,35 @@ Artifacts:
 - Per-run full curves in each `trace_steps.csv` below that directory.
 
 Implementation commit: `1a933cf`. Results commit: `112dfc9`.
+
+## Idea 002 — relative direction-margin gate: killed
+
+Hypothesis: retain certainty's low immediate complexity cost, but skip
+variables whose assignment direction has normalized margin
+`|sT-sF|/(sT+sF) < theta`. This uses the existing `--theta` path and adds no
+message-passing work.
+
+Pilot: random 3-SAT, `N=300`, `r=0.9`, seeds 1–5, at `alpha=4.0` and `4.15`;
+`theta` in `{0.25, 0.5, 0.75}`. At `alpha=4.0`, `theta=0.5` changed certainty
+from 2/5 SAT, 2/5 SP non-convergence, and 1/5 WalkSAT failure to 3/5 SAT and
+2/5 SP non-convergence. Its mean max drop (1.59031 versus 1.58153), roughness
+(0.0332335 versus 0.0332072), and area/step (3.86240 versus 3.84691) were
+otherwise effectively unchanged. At `alpha=4.15`, every threshold produced
+curves and outcomes identical to certainty: 1/5 SAT and 4/5 SP
+non-convergence.
+
+Decision: kill the relative-margin gate as a primary policy. It repaired one
+low-alpha WalkSAT outcome at negligible SP cost, but did not flatten Sigma and
+became completely inactive closer to the hard regime. Relative margin can be
+large when both `sT` and `sF` are tiny, so it does not reliably detect the
+high-`sI`, low-information moves it was intended to veto. The next test should
+regularize certainty with absolute polarization rather than a ratio.
+
+Artifacts:
+
+- `results/idea-002-pilot-k3-n300-a4.0/`
+- `results/idea-002-pilot-k3-n300-a4.15/`
+- Full certainty, polarization, and `theta=0.5` curves are committed; each
+  directory also contains all-policy summaries and an SVG comparison.
+
+Hypothesis commit: `6bfaa01`. Results commit: `94fe768`.
