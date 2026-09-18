@@ -42,3 +42,19 @@ choosing the globally smallest rho.
 
 The option is `--stability-constrained`. The first implementation uses
 single-variable moves and is restricted to moderate-N hypothesis testing.
+
+## Pilot result
+
+On N=300 seed 1, the controller rejects the original fatal certainty move and
+continues from step 1836 to step 2239. It eventually exhausts stable moves
+without finding a solution. Near termination it alternates attractive states
+with `rho` around 0.996 while Sigma is about -0.4.
+
+The run required 4,289 forked probes (mean 1.91 and maximum 66 per fixed
+point) and 570 s, versus 0.54 s for the baseline. This falsifies the exhaustive
+method as a practical policy and shows that dynamical attraction alone can
+follow an unphysical negative-complexity branch.
+
+Decision: retain this implementation only as a ground-truth oracle for move
+stability. A practical policy must approximate its first-stable search and
+jointly enforce `rho<1` and nonnegative complexity.
