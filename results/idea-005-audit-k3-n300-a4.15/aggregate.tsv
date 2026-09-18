@@ -1,0 +1,2 @@
+config	runs	sat	sp_nonconvergence	mean_max_drop	mean_max_drop_preterminal	mean_drop	mean_abs_delta	mean_abs_delta_preterminal	mean_auc_per_step	mean_steps	mean_wall_seconds
+parisi_audit	1	0	1	0.03909756780000001	0.03909756780000001	0.013885528294285715	0.016463966193714284	0.016463966193714284	1.595168652795142	175.0	0.21722498798044398

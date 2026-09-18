@@ -1,0 +1,2 @@
+config	seed	status	returncode	steps	sigma_initial	sigma_final	max_drop	terminal_drop	max_drop_preterminal	mean_drop	mean_abs_delta	mean_abs_delta_preterminal	auc_sigma	auc_per_step	eta_mean	wall_seconds
+parisi_audit	1	sp-nonconvergence	255	175	2.666799837	0.2368323855	0.03909756780000001	0.0	0.03909756780000001	0.013885528294285715	0.016463966193714284	0.016463966193714284	279.1545142391499	1.595168652795142	5.8522727272727275	0.21722498798044398
