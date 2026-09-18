@@ -441,8 +441,10 @@ void Graph::jacobian_vector_product(const vector<unsigned long>& offsets,
         }
     }
     for (unsigned i=0; i<_N; ++i) {
-        dprod_plus[i]=-ptrV[i]->prod_V_plus*sum_plus[i];
-        dprod_minus[i]=-ptrV[i]->prod_V_minus*sum_minus[i];
+        Vertex* v=ptrV[i];
+        unsigned label=v->_vertex-1;
+        dprod_plus[label]=-v->prod_V_plus*sum_plus[label];
+        dprod_minus[label]=-v->prod_V_minus*sum_minus[label];
     }
 
     for (unsigned ci=_m; ci<_M; ++ci) {
