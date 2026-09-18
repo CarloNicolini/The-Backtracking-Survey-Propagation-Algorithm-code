@@ -183,6 +183,10 @@ int main(int argc,  char * const argv[]) {
             g_parisi_audit = true;
             continue;
         }
+        if (a == "--dynamic-i-backtrack") {
+            g_dynamic_I_backtrack = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -263,6 +267,10 @@ int main(int argc,  char * const argv[]) {
     }
     if (g_parisi_audit && !g_parisi_exchange) {
         BSP_ERROR << "--parisi-audit requires --parisi-exchange" << endl;
+        return 1;
+    }
+    if (g_parisi_exchange && g_dynamic_I_backtrack) {
+        BSP_ERROR << "--parisi-exchange and --dynamic-i-backtrack are exclusive" << endl;
         return 1;
     }
     if (!g_nn_path.empty()) {
@@ -549,6 +557,8 @@ void help(const char *prog) {
          << "                       exchange from Parisi's P_max > I_min rule.\n"
          << "  --parisi-audit    Fork one exact release trial per exchange\n"
          << "                       opportunity for I_min validation.\n"
+         << "  --dynamic-i-backtrack Rank fixed variables by current Parisi I(k)\n"
+         << "                       during the standard BSP backtracking schedule.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

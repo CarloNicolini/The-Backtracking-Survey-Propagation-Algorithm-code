@@ -47,6 +47,7 @@ double g_epsilon = epsilon;
 double g_damping = 0.0;
 bool g_parisi_exchange = false;
 bool g_parisi_audit = false;
+bool g_dynamic_I_backtrack = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -689,6 +690,7 @@ void Graph::diag_step() {
                       <<" lookahead_k="<<g_lookahead_k
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
+                      <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
@@ -699,6 +701,7 @@ void Graph::diag_step() {
                       <<" lookahead_k="<<g_lookahead_k
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
+                      <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -707,6 +710,7 @@ void Graph::diag_step() {
                       <<" lookahead_k="<<g_lookahead_k
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
+                      <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -912,6 +916,7 @@ void Graph::dataset_trials() {
                 <<" lookahead_k="<<g_lookahead_k
                 <<" parisi_exchange="<<g_parisi_exchange
                 <<" parisi_audit="<<g_parisi_audit
+                <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -1415,6 +1420,32 @@ void Graph::build(Vertex * &V_to_build) {
 /*public member class Graph. This member computes all operation for backtracking moves.*/
 void Graph::backtrack() {
     //cout<<"I make a backtrack move"<<endl;
+    if (g_dynamic_I_backtrack) {
+        unsigned long count=_m_t_m_1+_unit_prop;
+        _unit_prop=0;
+        vector<pair<double, Vertex*> > candidates;
+        candidates.reserve(_list_fixed_element.size());
+        for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+             it!=_list_fixed_element.end(); ++it) {
+            if (!(*it)->_forced_by_up)
+                candidates.push_back(make_pair(current_fixation_factor(*it), *it));
+        }
+        sort(candidates.begin(), candidates.end());
+        if (count>candidates.size()) count=candidates.size();
+        for (unsigned long i=0; i<count; ++i) {
+            Vertex* v=candidates[i].second;
+            BSP_DEBUG<<"dynamic-I release v"<<v->_vertex
+                     <<" I="<<candidates[i].first<<endl;
+            _list_fixed_element.erase(v->_it_list_fixed_elem);
+            v->_it_list_fixed_elem=_list_fixed_element.end();
+            diag_move("back", v, -1);
+            v->reset_value_default_var_i();
+            build(v);
+        }
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+        return;
+    }
     sort_V_Back_move(); /*sort the elements in ptV vector, the ones in position 0, _m-1; in ascending order*/
 
     unsigned long _size=_m_t_m_1+_unit_prop;
