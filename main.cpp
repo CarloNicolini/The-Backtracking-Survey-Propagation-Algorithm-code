@@ -192,6 +192,11 @@ int main(int argc,  char * const argv[]) {
             g_stability_constrained = true;
             continue;
         }
+        if (a == "--tight-physical") {
+            g_tight_physical = true;
+            g_stability_constrained = true;
+            continue;
+        }
         if (a.rfind("--lyapunov-step=", 0) == 0) {
             g_lyapunov = true;
             g_lyapunov_step = stol(a.substr(16));
@@ -370,7 +375,9 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_stability_constrained)
+    if(g_tight_physical)
+        BSP_INFO<<"START TIGHT-PHYSICAL BSP WITH r="<<g_r_bsp<<":"<<endl;
+    else if(g_stability_constrained)
         BSP_INFO<<"START STABILITY-CONSTRAINED BSP WITH r="<<g_r_bsp<<":"<<endl;
     else if(g_dynamic_I_backtrack)
         BSP_INFO<<"START DYNAMIC-I BSP WITH r="<<g_r_bsp<<":"<<endl;
@@ -583,6 +590,8 @@ void help(const char *prog) {
          << "  --lyapunov-check  Validate analytic Jv by central differences.\n"
          << "  --stability-constrained Try moves by cluster retention and accept\n"
          << "                       the first tightly converged state with rho<1.\n"
+         << "  --tight-physical  Require tight convergence and Sigma_after>=0,\n"
+         << "                       without computing candidate Lyapunov vectors.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

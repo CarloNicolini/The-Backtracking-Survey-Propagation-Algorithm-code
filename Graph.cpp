@@ -50,6 +50,7 @@ bool g_lyapunov = false;
 bool g_lyapunov_check = false;
 long g_lyapunov_step = -1;
 bool g_stability_constrained = false;
+bool g_tight_physical = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -789,9 +790,9 @@ Graph::StabilityProbe Graph::probe_stability(Vertex* fix, int dir,
         g_epsilon=ZERO;
         convergence_messages(8*t_max);
         surveys();
-        compute_lyapunov_at_fixed_point();
+        if (!g_tight_physical) compute_lyapunov_at_fixed_point();
         result[1]=complexity;
-        result[2]=_lyapunov_rho;
+        result[2]=g_tight_physical ? 0. : _lyapunov_rho;
         result[0]=1.;
         _exit(0);
     }
@@ -845,7 +846,8 @@ void Graph::prepare_stability_move() {
             ++_stability_probes;
             StabilityProbe probe=probe_stability(
                 candidates[i].vertex, candidates[i].dir, NULL);
-            if (!probe.converged || probe.rho>=1.) continue;
+            if (!probe.converged || probe.sigma<0. ||
+                (!g_tight_physical && probe.rho>=1.)) continue;
             _stability_fix=candidates[i].vertex;
             _stability_dir=candidates[i].dir;
             _stability_rho=probe.rho;
@@ -863,7 +865,8 @@ void Graph::prepare_stability_move() {
             ++_stability_probes;
             StabilityProbe probe=probe_stability(NULL, -1,
                                                   candidates[i].second);
-            if (!probe.converged || probe.rho>=1.) continue;
+            if (!probe.converged || probe.sigma<0. ||
+                (!g_tight_physical && probe.rho>=1.)) continue;
             _stability_release=candidates[i].second;
             _stability_rho=probe.rho;
             _stability_sigma=probe.sigma;
@@ -912,6 +915,7 @@ void Graph::diag_step() {
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
                       <<" stability_constrained="<<g_stability_constrained
+                      <<" tight_physical="<<g_tight_physical
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations,"
@@ -928,6 +932,7 @@ void Graph::diag_step() {
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
                       <<" stability_constrained="<<g_stability_constrained
+                      <<" tight_physical="<<g_tight_physical
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -938,6 +943,7 @@ void Graph::diag_step() {
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
                       <<" stability_constrained="<<g_stability_constrained
+                      <<" tight_physical="<<g_tight_physical
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -1149,6 +1155,7 @@ void Graph::dataset_trials() {
                 <<" lyapunov_step="<<g_lyapunov_step
                 <<" lyapunov_check="<<g_lyapunov_check
                 <<" stability_constrained="<<g_stability_constrained
+                <<" tight_physical="<<g_tight_physical
                 <<" dataset_step="<<g_dataset_step
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
