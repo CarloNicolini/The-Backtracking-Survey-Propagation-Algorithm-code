@@ -195,6 +195,10 @@ int main(int argc,  char * const argv[]) {
             g_self_financing = true;
             continue;
         }
+        if (a == "--branch-consensus") {
+            g_branch_consensus = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -290,6 +294,12 @@ int main(int argc,  char * const argv[]) {
         BSP_ERROR << "--self-financing is exclusive with other experimental schedulers" << endl;
         return 1;
     }
+    if (g_branch_consensus &&
+        (g_sigma_certified || g_self_financing || g_parisi_exchange ||
+         g_dynamic_I_backtrack || !g_nn_path.empty())) {
+        BSP_ERROR << "--branch-consensus is exclusive with other experimental scorers" << endl;
+        return 1;
+    }
     if (!g_nn_path.empty()) {
         if (!bsp_nn_load(g_nn_path)) return 1;
     }
@@ -369,7 +379,8 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_self_financing)BSP_INFO<<"START SELF-FINANCING BSP:"<<endl;
+    if(g_branch_consensus)BSP_INFO<<"START TWO-BRANCH CONSENSUS BSP:"<<endl;
+    else if(g_self_financing)BSP_INFO<<"START SELF-FINANCING BSP:"<<endl;
     else if(g_sigma_certified)BSP_INFO<<"START SIGMA-CERTIFIED BSP:"<<endl;
     else if(g_parisi_exchange)BSP_INFO<<"START PARAMETER-FREE PARISI EXCHANGE BSP:"<<endl;
     else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
@@ -425,6 +436,7 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
+    if(g_branch_consensus)G.apply_branch_consensus();/*independent SP branch*/
     if(g_parisi_exchange && G.complexity!=0.)
         G.prepare_parisi_step();/*state-dependent eq. (5) move*/
     if(g_sigma_certified && G.complexity!=0.)
@@ -604,6 +616,8 @@ void help(const char *prog) {
          << "                       log(P), or try one measured Parisi repair.\n"
          << "  --self-financing  Compare a direct fix with a measured net-progress\n"
          << "                       release-one/fix-two compound move.\n"
+         << "  --branch-consensus Rank decimation by worst retention among two\n"
+         << "                       independently initialized SP fixed points.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

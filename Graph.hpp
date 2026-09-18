@@ -300,6 +300,9 @@ public:
         _finance_compound_sigma=0.;
         _finance_direct_cost=0.;
         _finance_compound_cost=0.;
+        _branch_converged=false;
+        _branch_distance=0.;
+        _branch_consensus_fraction=0.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -354,6 +357,8 @@ public:
     void apply_nn_scores(); /*overwrite _sC with predicted DeltaSigma if NN loaded*/
 
     void fill_nn_features(Vertex* v, double* f); /*15-d local feature vector*/
+
+    void apply_branch_consensus(); /*rank by worst retention across two SP branches*/
 
     void prepare_parisi_step(); /*choose decimation or eq. (5) exchange*/
 
@@ -506,6 +511,9 @@ private:
     double _finance_compound_sigma;
     double _finance_direct_cost;
     double _finance_compound_cost;
+    bool _branch_converged;
+    double _branch_distance;
+    double _branch_consensus_fraction;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -577,6 +585,8 @@ private:
                                    Vertex* fix2=NULL, int dir2=-1);
 
     void release_certified(Vertex* v);
+
+    void randomize_active_messages(unsigned seed);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 

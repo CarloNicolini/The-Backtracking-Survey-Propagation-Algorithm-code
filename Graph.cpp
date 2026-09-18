@@ -50,6 +50,7 @@ bool g_parisi_audit = false;
 bool g_dynamic_I_backtrack = false;
 bool g_sigma_certified = false;
 bool g_self_financing = false;
+bool g_branch_consensus = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -1020,12 +1021,14 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" self_financing="<<g_self_financing
+                      <<" branch_consensus="<<g_branch_consensus
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
                       <<"actual_release_gain,release_converged,"
                       <<"certified_sigma,replay_error,direct_sigma,compound_sigma,"
-                      <<"direct_cost,compound_cost\n";
+                      <<"direct_cost,compound_cost,branch_converged,"
+                      <<"branch_distance,branch_consensus_fraction\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -1035,6 +1038,7 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" self_financing="<<g_self_financing
+                      <<" branch_consensus="<<g_branch_consensus
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -1046,6 +1050,7 @@ void Graph::diag_step() {
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
                       <<" self_financing="<<g_self_financing
+                      <<" branch_consensus="<<g_branch_consensus
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -1071,7 +1076,9 @@ void Graph::diag_step() {
                   <<(_parisi_release_converged ? 1 : 0)<<","
                   <<_cert_probe_sigma<<","<<_cert_replay_error<<","
                   <<_finance_direct_sigma<<","<<_finance_compound_sigma<<","
-                  <<_finance_direct_cost<<","<<_finance_compound_cost<<endl;
+                  <<_finance_direct_cost<<","<<_finance_compound_cost<<","
+                  <<(_branch_converged ? 1 : 0)<<","<<_branch_distance<<","
+                  <<_branch_consensus_fraction<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -1260,6 +1267,7 @@ void Graph::dataset_trials() {
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" sigma_certified="<<g_sigma_certified
                 <<" self_financing="<<g_self_financing
+                <<" branch_consensus="<<g_branch_consensus
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -1445,6 +1453,120 @@ void Graph::apply_nn_scores() {
         BSP_INFO<<"NN veto buried "<<buried<<"/"<<n<<" unfixed variables"<<endl;
     else
         BSP_INFO<<"NN scorer applied to "<<kept<<"/"<<n<<" unfixed variables"<<endl;
+}
+
+/*Reset every active clause-to-variable message from a deterministic,
+ independent initialization before searching for a second SP fixed point.*/
+void Graph::randomize_active_messages(unsigned seed) {
+    unsigned state=seed ? seed : 1;
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        for (unsigned j=0; j<_cl[c]._size_cl_init; ++j) {
+            if (!_cl[c]._go_forward[j]) continue;
+            state=1664525U*state+1013904223U;
+            double eta=(static_cast<double>(state)+0.5)/4294967296.0;
+            _cl[c].old_s[j]=eta;
+            _cl[c].update[j]=eta;
+            _cl[c].div_s[j]=1./(1.-eta);
+            *_cl[c].v_survey_cl_to_i[j]=eta;
+        }
+    }
+    update_products();
+}
+
+/*Find one independently initialized SP branch in a fork. On decimation
+ steps, retain only variables whose preferred direction agrees across both
+ branches and rank them by the worse assignment-specific retention.*/
+void Graph::apply_branch_consensus() {
+    _branch_converged=false;
+    _branch_distance=0.;
+    _branch_consensus_fraction=0.;
+    if (fl_bsp || _N_t==0) return;
+#ifdef _WIN32
+    BSP_ERROR<<"--branch-consensus needs fork/mmap (POSIX); not supported on Windows"<<endl;
+    exit(-1);
+#else
+    double* result=(double*)mmap(
+        NULL, (3+2*_N)*sizeof(double), PROT_READ|PROT_WRITE,
+        MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (result==MAP_FAILED) {
+        BSP_ERROR<<"mmap failed for branch consensus"<<endl;
+        exit(-1);
+    }
+    result[0]=0.;
+    result[1]=0.;
+    result[2]=0.;
+    _ds_out<<flush;
+    _diag_step_out<<flush;
+    _diag_var_out<<flush;
+    _diag_move_out<<flush;
+    cout<<flush;
+    cerr<<flush;
+    fflush(NULL);
+    pid_t pid=fork();
+    if (pid<0) {
+        munmap(result, (3+2*_N)*sizeof(double));
+        BSP_ERROR<<"fork failed for branch consensus"<<endl;
+        exit(-1);
+    }
+    if (pid==0) {
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        _in_trial=true;
+        randomize_active_messages(_seed^(2654435761U*(_diag_step_idx+1)));
+        convergence_messages();
+        surveys();
+        result[1]=static_cast<double>(_list_fixed_element.size());
+        for (unsigned i=0; i<_N; ++i) {
+            Vertex* v=ptrV[i];
+            unsigned label=v->_vertex-1;
+            result[3+2*label]=v->_sT;
+            result[4+2*label]=v->_sF;
+        }
+        result[0]=1.;
+        _exit(0);
+    }
+    int status=0;
+    while (waitpid(pid, &status, 0)<0 && errno==EINTR) {}
+    bool valid=WIFEXITED(status) && WEXITSTATUS(status)==0 && result[0]>0.
+               && static_cast<unsigned>(result[1])==_list_fixed_element.size();
+    if (valid) {
+        unsigned agree=0, free_count=0;
+        double distance=0.;
+        for (unsigned i=0; i<_N; ++i) {
+            Vertex* v=ptrV[i];
+            if (v->_I_am_a_fixed_variable) continue;
+            unsigned label=v->_vertex-1;
+            double child_sT=result[3+2*label];
+            double child_sF=result[4+2*label];
+            double child_sI=1.-child_sT-child_sF;
+            distance+=0.5*(fabs(v->_sT-child_sT)+fabs(v->_sF-child_sF)
+                           +fabs(v->_sI-child_sI));
+            bool parent_dir=v->_sT>v->_sF;
+            bool child_dir=child_sT>child_sF;
+            ++free_count;
+            if (parent_dir!=child_dir) {
+                v->_sC=-1.e100;
+                continue;
+            }
+            double parent_P=parent_dir ? 1.-v->_sF : 1.-v->_sT;
+            double child_P=child_dir ? 1.-child_sF : 1.-child_sT;
+            v->_sC=min(parent_P, child_P);
+            ++agree;
+        }
+        if (agree==0)
+            for (unsigned i=0; i<_N; ++i)
+                if (!ptrV[i]->_I_am_a_fixed_variable)
+                    ptrV[i]->_sC=1.-min(ptrV[i]->_sT, ptrV[i]->_sF);
+        _branch_converged=true;
+        _branch_distance=free_count ? distance/free_count : 0.;
+        _branch_consensus_fraction=free_count
+            ? static_cast<double>(agree)/free_count : 0.;
+        BSP_DEBUG<<"branch distance="<<_branch_distance
+                 <<" consensus="<<_branch_consensus_fraction<<endl;
+    }
+    munmap(result, (3+2*_N)*sizeof(double));
+#endif
 }
 
 
