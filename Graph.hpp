@@ -283,6 +283,7 @@ public:
         _tight_lyapunov_iterations=0;
         _tight_lyapunov_converged=false;
         _tight_complexity=0.;
+        _lyapunov_jvp_error=0.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -460,6 +461,7 @@ private:
     unsigned _tight_lyapunov_iterations;
     bool _tight_lyapunov_converged;
     double _tight_complexity;
+    double _lyapunov_jvp_error;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -518,6 +520,10 @@ private:
     void jacobian_vector_product(const vector<unsigned long>& offsets,
                                  const vector<double>& tangent,
                                  vector<double>& next);
+
+    void message_sweep(const vector<unsigned long>& offsets,
+                       const vector<double>& messages,
+                       vector<double>& next);
 
     void compute_lyapunov_at_fixed_point();
 

@@ -40,6 +40,10 @@ records a separate tight exponent and complexity. The refined child is
 discarded. The diagnostic requires `--diag` and does not change parent
 messages, surveys, complexity, or the move schedule.
 
+`--lyapunov-check` independently evaluates the same sweep on
+`eta +/- h v` for four central-difference scales from `1e-4` to `1e-7` and
+records the minimum relative error against analytic `Jv`.
+
 ## Falsifiable first experiment
 
 1. Prove baseline runs with and without the diagnostic have identical numeric
