@@ -501,7 +501,7 @@ void Graph::jacobian_vector_product(const vector<unsigned long>& offsets,
 
 /*Benettin/power estimate of the largest Lyapunov exponent at the current SP
  fixed point. This reads messages and products but never mutates solver state.*/
-void Graph::compute_lyapunov() {
+void Graph::compute_lyapunov_at_fixed_point() {
     vector<unsigned long> offsets(_M+1, 0);
     for (unsigned c=0; c<_M; ++c)
         offsets[c+1]=offsets[c]+_cl[c]._size_cl_init;
@@ -562,6 +562,70 @@ void Graph::compute_lyapunov() {
     _lyapunov_rho=exp(_lyapunov_exponent);
 }
 
+/*Measure both the implemented epsilon-stopping state and, in a discarded
+ fork, the tighter fixed point reached from it. The parent BSP trajectory is
+ untouched by the refinement.*/
+void Graph::compute_lyapunov() {
+    compute_lyapunov_at_fixed_point();
+    _tight_lyapunov_rho=0.;
+    _tight_lyapunov_exponent=-HUGE_VAL;
+    _tight_lyapunov_iterations=0;
+    _tight_lyapunov_converged=false;
+    _tight_complexity=0.;
+#ifndef _WIN32
+    double* result=(double*)mmap(NULL, 6*sizeof(double),
+                                 PROT_READ|PROT_WRITE,
+                                 MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (result==MAP_FAILED) {
+        BSP_ERROR<<"mmap failed for Lyapunov refinement"<<endl;
+        exit(-1);
+    }
+    for (unsigned i=0; i<6; ++i) result[i]=0.;
+    _diag_step_out<<flush;
+    _diag_var_out<<flush;
+    _diag_move_out<<flush;
+    cout<<flush;
+    cerr<<flush;
+    fflush(NULL);
+    pid_t pid=fork();
+    if (pid<0) {
+        munmap(result, 6*sizeof(double));
+        BSP_ERROR<<"fork failed for Lyapunov refinement"<<endl;
+        exit(-1);
+    }
+    if (pid==0) {
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        _in_trial=true;
+        unsigned fixed_before=static_cast<unsigned>(_list_fixed_element.size());
+        g_epsilon=ZERO;
+        convergence_messages();
+        surveys();
+        if (_list_fixed_element.size()!=fixed_before) _exit(42);
+        compute_lyapunov_at_fixed_point();
+        result[1]=_lyapunov_rho;
+        result[2]=_lyapunov_exponent;
+        result[3]=static_cast<double>(_lyapunov_iterations);
+        result[4]=complexity;
+        result[5]=static_cast<double>(_list_fixed_element.size());
+        result[0]=1.;
+        _exit(0);
+    }
+    int status=0;
+    while (waitpid(pid, &status, 0)<0 && errno==EINTR) {}
+    bool valid=WIFEXITED(status) && WEXITSTATUS(status)==0 && result[0]>0.
+               && static_cast<unsigned>(result[5])==_list_fixed_element.size();
+    if (valid) {
+        _tight_lyapunov_converged=true;
+        _tight_lyapunov_rho=result[1];
+        _tight_lyapunov_exponent=result[2];
+        _tight_lyapunov_iterations=static_cast<unsigned>(result[3]);
+        _tight_complexity=result[4];
+    }
+    munmap(result, 6*sizeof(double));
+#endif
+}
+
 /*public member class Graph. Logs one SP fixed point for Phase 1 diagnostics.
  No-op unless --diag=PREFIX was given. Called after surveys(), so fl_bsp
  already holds this step's decimation-vs-backtracking decision. Fixed
@@ -586,7 +650,10 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
-                      <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations\n";
+                      <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations,"
+                      <<"tight_converged,tight_lyapunov_rho,"
+                      <<"tight_lyapunov_exponent,tight_lyapunov_iterations,"
+                      <<"tight_Sigma\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -611,7 +678,10 @@ void Graph::diag_step() {
                   <<_time_conv_print<<","<<_unit_prop<<","
                   <<_last_certitude<<","<<_list_fixed_element.size()<<","
                   <<_lyapunov_rho<<","<<_lyapunov_exponent<<","
-                  <<_lyapunov_iterations<<endl;
+                  <<_lyapunov_iterations<<","
+                  <<(_tight_lyapunov_converged ? 1 : 0)<<","
+                  <<_tight_lyapunov_rho<<","<<_tight_lyapunov_exponent<<","
+                  <<_tight_lyapunov_iterations<<","<<_tight_complexity<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];

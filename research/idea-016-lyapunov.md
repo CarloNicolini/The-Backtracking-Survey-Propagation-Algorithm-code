@@ -34,8 +34,11 @@ numerators and normalizations, ZERO clamping, and message damping.
 A deterministic Benettin/power iteration estimates the dominant tangent
 growth without constructing the Jacobian. The diagnostic records
 `lyapunov_rho`, `lyapunov_exponent`, and tangent iterations in the normal step
-CSV. It requires `--diag` and does not change messages, surveys, complexity, or
-the move schedule.
+CSV. Because the production tolerance `epsilon=0.01` stops at an approximate
+fixed point, it also forks the graph, refines the same state to `ZERO`, and
+records a separate tight exponent and complexity. The refined child is
+discarded. The diagnostic requires `--diag` and does not change parent
+messages, surveys, complexity, or the move schedule.
 
 ## Falsifiable first experiment
 

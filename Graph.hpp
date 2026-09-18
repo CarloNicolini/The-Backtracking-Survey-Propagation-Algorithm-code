@@ -278,6 +278,11 @@ public:
         _lyapunov_rho=0.;
         _lyapunov_exponent=-HUGE_VAL;
         _lyapunov_iterations=0;
+        _tight_lyapunov_rho=0.;
+        _tight_lyapunov_exponent=-HUGE_VAL;
+        _tight_lyapunov_iterations=0;
+        _tight_lyapunov_converged=false;
+        _tight_complexity=0.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -450,6 +455,11 @@ private:
     double _lyapunov_rho;/*dominant tangent growth per complete SP sweep*/
     double _lyapunov_exponent;/*log(_lyapunov_rho)*/
     unsigned _lyapunov_iterations;/*tangent power iterations used*/
+    double _tight_lyapunov_rho;
+    double _tight_lyapunov_exponent;
+    unsigned _tight_lyapunov_iterations;
+    bool _tight_lyapunov_converged;
+    double _tight_complexity;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -508,6 +518,8 @@ private:
     void jacobian_vector_product(const vector<unsigned long>& offsets,
                                  const vector<double>& tangent,
                                  vector<double>& next);
+
+    void compute_lyapunov_at_fixed_point();
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 
