@@ -275,6 +275,9 @@ public:
         complexity_variables=0.;/*variable complexity set to 0*/
         complexity=0.;/*total complexity set to 0*/
         _unit_prop=0;/*unit propagation counter set to 0*/
+        _lyapunov_rho=0.;
+        _lyapunov_exponent=-HUGE_VAL;
+        _lyapunov_iterations=0;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -319,6 +322,8 @@ public:
     void convergence_messages(); /*compute fix points all messages*/
 
     void surveys(); /*compute surveys for each variable node*/
+
+    void compute_lyapunov(); /*largest exponent of one SP message sweep*/
 
     void diag_step(); /*log one SP fixed point (Phase 1 diagnostics)*/
 
@@ -442,6 +447,9 @@ private:
     unsigned _oracle_tmp_ctr;/*unique temp-file counter for oracle checks*/
     unsigned int _diag_step_idx;/*diagnostic step counter*/
     bool _diag_header_done;/*diagnostic CSV headers written*/
+    double _lyapunov_rho;/*dominant tangent growth per complete SP sweep*/
+    double _lyapunov_exponent;/*log(_lyapunov_rho)*/
+    unsigned _lyapunov_iterations;/*tangent power iterations used*/
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -496,6 +504,10 @@ private:
     double warning_to_fixed(Vertex* v, unsigned edge);
 
     double current_fixation_factor(Vertex* v);
+
+    void jacobian_vector_product(const vector<unsigned long>& offsets,
+                                 const vector<double>& tangent,
+                                 vector<double>& next);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 

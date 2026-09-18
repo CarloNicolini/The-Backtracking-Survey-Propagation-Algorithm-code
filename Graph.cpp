@@ -46,6 +46,7 @@ bool g_veto = false;
 double g_epsilon = epsilon;
 double g_damping = 0.0;
 bool g_dynamic_I_backtrack = false;
+bool g_lyapunov = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -414,6 +415,151 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     }
 }
 
+/*Directional derivative of one complete synchronous SP sweep. Clause
+ messages are updated into arrays during a sweep, while vertex products are
+ refreshed only at its end, so the implemented map is Jacobi despite the
+ sequential clause loop.*/
+void Graph::jacobian_vector_product(const vector<unsigned long>& offsets,
+                                    const vector<double>& tangent,
+                                    vector<double>& next) {
+    next.assign(tangent.size(), 0.);
+    vector<double> sum_plus(_N, 0.);
+    vector<double> sum_minus(_N, 0.);
+    vector<double> dprod_plus(_N, 0.);
+    vector<double> dprod_minus(_N, 0.);
+
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        Clause& cl=_cl[c];
+        for (unsigned j=0; j<cl._size_cl_init; ++j) {
+            if (!cl._go_forward[j]) continue;
+            Vertex* v=cl.v_V[j];
+            unsigned label=v->_vertex-1;
+            double scaled=tangent[offsets[c]+j]*cl.div_s[j];
+            if (cl.v_lit[j]) sum_plus[label]+=scaled;
+            else sum_minus[label]+=scaled;
+        }
+    }
+    for (unsigned i=0; i<_N; ++i) {
+        dprod_plus[i]=-ptrV[i]->prod_V_plus*sum_plus[i];
+        dprod_minus[i]=-ptrV[i]->prod_V_minus*sum_minus[i];
+    }
+
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        Clause& cl=_cl[c];
+        for (unsigned target=0; target<cl._size_cl_init; ++target) {
+            if (!cl._go_forward[target]) continue;
+            double numerator=1.;
+            double denominator=1.;
+            double dnumerator=0.;
+            double ddenominator=0.;
+            for (unsigned j=0; j<cl._size_cl_init; ++j) {
+                if (j==target || !cl._go_forward[j]) continue;
+                Vertex* v=cl.v_V[j];
+                unsigned label=v->_vertex-1;
+                bool positive=cl.v_lit[j];
+                double prod_s=positive ? v->prod_V_plus : v->prod_V_minus;
+                double dprod_s=positive ? dprod_plus[label] : dprod_minus[label];
+                double prod_u=positive ? v->prod_V_minus : v->prod_V_plus;
+                double dprod_u=positive ? dprod_minus[label] : dprod_plus[label];
+                double divisor=cl.div_s[j];
+                double edge_tangent=tangent[offsets[c]+j];
+                double S=prod_s*divisor;
+                double dS=dprod_s*divisor
+                           +prod_s*edge_tangent*divisor*divisor;
+                double U=prod_u;
+                double dU=dprod_u;
+                double num_factor=(1.-U)*S;
+                double dnum_factor=(1.-U)*dS-S*dU;
+                double den_factor=S+U-rho_SP*S*U;
+                double dden_factor=dS+dU-rho_SP*(dS*U+S*dU);
+
+                dnumerator=dnumerator*num_factor
+                             +numerator*dnum_factor;
+                numerator*=num_factor;
+                ddenominator=ddenominator*den_factor
+                               +denominator*dden_factor;
+                denominator*=den_factor;
+            }
+            if (denominator<=0.) {
+                next[offsets[c]+target]=0.;
+                continue;
+            }
+            double value=numerator/denominator;
+            double derivative=(dnumerator*denominator
+                               -numerator*ddenominator)
+                              /(denominator*denominator);
+            if (value<ZERO) derivative=0.;/*same clamp as compute_message()*/
+            next[offsets[c]+target]=(1.-g_damping)*derivative
+                                    +g_damping*tangent[offsets[c]+target];
+        }
+    }
+}
+
+/*Benettin/power estimate of the largest Lyapunov exponent at the current SP
+ fixed point. This reads messages and products but never mutates solver state.*/
+void Graph::compute_lyapunov() {
+    vector<unsigned long> offsets(_M+1, 0);
+    for (unsigned c=0; c<_M; ++c)
+        offsets[c+1]=offsets[c]+_cl[c]._size_cl_init;
+    vector<double> tangent(offsets[_M], 0.);
+    vector<double> next(offsets[_M], 0.);
+    unsigned state=_seed^0x9e3779b9U;
+    unsigned active=0;
+    long double norm2=0.;
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        for (unsigned j=0; j<_cl[c]._size_cl_init; ++j) {
+            if (!_cl[c]._go_forward[j]) continue;
+            state=1664525U*state+1013904223U;
+            double value=(static_cast<double>(state)+0.5)/2147483648.0-1.;
+            tangent[offsets[c]+j]=value;
+            norm2+=static_cast<long double>(value)*value;
+            ++active;
+        }
+    }
+    if (active==0 || norm2<=0.) {
+        _lyapunov_rho=0.;
+        _lyapunov_exponent=-HUGE_VAL;
+        _lyapunov_iterations=0;
+        return;
+    }
+    double norm=static_cast<double>(sqrtl(norm2));
+    for (unsigned i=0; i<tangent.size(); ++i) tangent[i]/=norm;
+
+    vector<double> growth;
+    unsigned aligned_count=0;
+    for (unsigned iteration=0; iteration<128; ++iteration) {
+        jacobian_vector_product(offsets, tangent, next);
+        norm2=0.;
+        for (unsigned i=0; i<next.size(); ++i)
+            norm2+=static_cast<long double>(next[i])*next[i];
+        norm=static_cast<double>(sqrtl(norm2));
+        _lyapunov_iterations=iteration+1;
+        if (norm<=1.e-300) {
+            _lyapunov_rho=0.;
+            _lyapunov_exponent=-HUGE_VAL;
+            return;
+        }
+        growth.push_back(log(norm));
+        for (unsigned i=0; i<next.size(); ++i) next[i]/=norm;
+        double alignment=0.;
+        for (unsigned i=0; i<next.size(); ++i)
+            alignment+=tangent[i]*next[i];
+        if (iteration>=8 && 1.-fabs(alignment)<1.e-10) ++aligned_count;
+        else aligned_count=0;
+        tangent.swap(next);
+        if (aligned_count>=4) break;
+    }
+    unsigned window=growth.size()<16 ? static_cast<unsigned>(growth.size()) : 16;
+    double exponent=0.;
+    for (unsigned i=growth.size()-window; i<growth.size(); ++i)
+        exponent+=growth[i];
+    _lyapunov_exponent=exponent/static_cast<double>(window);
+    _lyapunov_rho=exp(_lyapunov_exponent);
+}
+
 /*public member class Graph. Logs one SP fixed point for Phase 1 diagnostics.
  No-op unless --diag=PREFIX was given. Called after surveys(), so fl_bsp
  already holds this step's decimation-vs-backtracking decision. Fixed
@@ -435,18 +581,22 @@ void Graph::diag_step() {
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" lyapunov="<<g_lyapunov
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
+        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
+                      <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" lyapunov="<<g_lyapunov
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" lyapunov="<<g_lyapunov
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -457,7 +607,9 @@ void Graph::diag_step() {
                   <<setprecision(10)<<complexity<<","
                   <<(complexity/static_cast<double>(_N))<<","
                   <<_time_conv_print<<","<<_unit_prop<<","
-                  <<_last_certitude<<","<<_list_fixed_element.size()<<endl;
+                  <<_last_certitude<<","<<_list_fixed_element.size()<<","
+                  <<_lyapunov_rho<<","<<_lyapunov_exponent<<","
+                  <<_lyapunov_iterations<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -641,6 +793,7 @@ void Graph::dataset_trials() {
                 <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                <<" lyapunov="<<g_lyapunov
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

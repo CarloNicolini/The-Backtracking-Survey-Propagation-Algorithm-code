@@ -179,6 +179,10 @@ int main(int argc,  char * const argv[]) {
             g_dynamic_I_backtrack = true;
             continue;
         }
+        if (a == "--lyapunov") {
+            g_lyapunov = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -247,6 +251,10 @@ int main(int argc,  char * const argv[]) {
     }
     if (g_dump_residuals && g_diag_prefix.empty()) {
         BSP_ERROR << "--dump-residuals requires --diag=PREFIX" << endl;
+        return 1;
+    }
+    if (g_lyapunov && g_diag_prefix.empty()) {
+        BSP_ERROR << "--lyapunov requires --diag=PREFIX" << endl;
         return 1;
     }
     if (g_oracle_pick > 0) {
@@ -387,6 +395,7 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
+    if(g_lyapunov)G.compute_lyapunov();/*read-only tangent stability*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
     G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
@@ -521,6 +530,8 @@ void help(const char *prog) {
          << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
          << "  --dynamic-i-backtrack Rank releases by current assignment-specific\n"
          << "                       Parisi I(k), rather than stale fixation scores.\n"
+         << "  --lyapunov        Compute the largest SP message-sweep Lyapunov\n"
+         << "                       exponent at every logged fixed point.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
