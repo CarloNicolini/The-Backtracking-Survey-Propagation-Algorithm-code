@@ -29,3 +29,15 @@ Lyapunov margin, complexity buffer, shortlist size, or weighted score.
 The option is `--tight-physical`. Promote only if it preserves or improves
 success and complexity smoothness while reducing the idea-017 cost by orders
 of magnitude.
+
+## Pilot result
+
+On N=300 seed 1, the filter avoids the original failure at step 1836 and
+continues to step 2049 while keeping Sigma nonnegative. It still terminates
+without a feasible move. Runtime is 239 s versus 0.54 s for certainty: lower
+than the full Lyapunov oracle, but far outside the algorithmic budget.
+
+Decision: kill the per-candidate tight filter. The expensive operation is
+refining each proposed state, not the tangent power iteration alone. A
+practical continuation must carry an online Lyapunov direction between BSP
+steps and update it with O(1) Jacobian-vector products.
