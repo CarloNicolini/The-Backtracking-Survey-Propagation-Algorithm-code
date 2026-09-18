@@ -228,6 +228,10 @@ K=3 target validation: `3cf30e6`.
 
 These ideas remain isolated on their named research branches:
 
+- Idea 004, certainty-windowed gamma (`research/idea-004-cert-window`):
+  canceled when the research program was redirected away from shortlist/window
+  hyperparameter selection. Its partial target screen is not used to support
+  the final claim.
 - Idea 007, Sigma-certified transactions (`research/idea-007-sigma-certified`):
   rescued two N=300 failures, but worsened fixed-depth roughness by 33.5% at
   N=1000. Recovery primitive kept; always-progress controller killed.
