@@ -857,7 +857,7 @@ void Graph::prepare_stability_move() {
         for (list<Vertex*>::iterator it=_list_fixed_element.begin();
              it!=_list_fixed_element.end(); ++it)
             if (!(*it)->_forced_by_up)
-                candidates.push_back(make_pair(current_fixation_factor(*it), *it));
+                candidates.push_back(make_pair((*it)->_sC, *it));
         sort(candidates.begin(), candidates.end());
         for (unsigned i=0; i<candidates.size(); ++i) {
             ++_stability_probes;

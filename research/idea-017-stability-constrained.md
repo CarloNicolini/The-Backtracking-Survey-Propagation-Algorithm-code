@@ -16,8 +16,9 @@ and `rho < 1`. Because proposals are ordered by retained-cluster fraction,
 this is the maximum-retention move among the dynamically attractive states
 encountered.
 
-For a scheduled backtrack, order fixed variables by current Parisi `I(k)` and
+For a scheduled backtrack, retain the legacy fixed-variable ordering and
 accept the first release with a tightly converged attractive fixed point.
+This isolates the stability constraint from the dynamic-I mechanism.
 
 No score interpolation, stability margin, candidate count, or fitted
 threshold is used. The only boundary is the dynamical definition of local
