@@ -94,17 +94,38 @@ non-convergence. `gamma=0.1` reduced pre-terminal roughness by 1.89%, but
 increased the maximum pre-terminal drop by 3.95%; area/step rose 0.33%.
 `gamma=0.05` was smoother there, but did not improve outcomes.
 
-Decision: keep `gamma=0.1` as the first serious contender and promote it to
-larger `N` and more seeds. The pilot is promising rather than conclusive: the
-success gain occurs at the easier alpha, while the harder point remains
-limited by SP convergence.
+The first larger test showed that `gamma=0.1` was too strong, so the exponent
+was refined. At `N=1000`, `alpha=4.15`, 15 seeds, `gamma=0.01` matched
+certainty's 13/15 SAT and 2/15 SP non-convergence. It reduced pre-terminal
+roughness by 5.90% on average and on 12/15 paired seeds, increased area/step
+by 0.44%, and reduced wall time by 3.97%. Its mean maximum drop was 4.83%
+larger. Polarization solved only 11/15.
+
+Target validation: random 3-SAT, `N=10000`, `alpha=4.2`, `r=0.9`, seeds 1–5.
+`gamma=0.01` and polarization solved 5/5; certainty solved 4/5. Gamma reduced
+pre-terminal roughness by 16.92% versus certainty (on every paired seed) and
+16.28% versus polarization, with wall time equal to certainty and 9.65% below
+polarization. Its area/step was 1.52% below certainty and 5.98% above
+polarization. The unresolved cost is the tail: mean maximum drop was 28.37%
+above certainty.
+
+Decision: `--scorer=gamma:0.01` is the current winner because its soft
+absolute-polarization factor suppresses variables whose assignment direction
+is based on a tiny survey difference, while the small exponent largely
+preserves certainty's low-cost ranking. At target scale it gives the smoothest
+average Sigma trajectory and removes the observed certainty failure without
+extra per-step computation. Keep it behind the existing CLI flag, and next
+target the larger worst-drop tail rather than increasing gamma.
 
 Artifacts:
 
 - `results/idea-003-pilot-k3-n300-a4.0/`
 - `results/idea-003-pilot-k3-n300-a4.15/`
+- `results/idea-003-validation-k3-n1000-a4.15-15seeds/`
+- `results/idea-003-target-k3-n10000-a4.2-5seeds/`
 - Full certainty, polarization, and `gamma=0.1` curves are committed; each
-  directory also contains all-policy summaries and an SVG comparison.
+  pilot directory contains all-policy summaries and an SVG comparison.
+  Validation directories contain combined summaries and full SVG curves.
 
 Hypothesis commit: `4a0edff`. Metric correction: `bef5cd3`. Results commit:
-`6216388`.
+`6216388`. Scale-validation results: `1080aa6`.
