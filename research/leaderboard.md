@@ -167,7 +167,7 @@ Artifacts:
 Implementation: `d5e6db0`. Release audit: `501e9cb`. Lyapunov refinement:
 `71ccef2`. Results: `679ace9`.
 
-## Idea 006 — current-I backtracking under the legacy schedule: killed
+## Idea 006 — current-I backtracking: K=4 winner, K=3 rejected
 
 Hypothesis: preserve the standard `r=0.9` BSP schedule and change only release
 selection from stale fixation-time `_sC` to the validated current `I(k)`.
@@ -181,16 +181,26 @@ reduced mean worst drop by 6.7% and fixed-depth frontier roughness by 23.2%,
 but increased move-depth roughness by 2.5%, reduced frontier area by 1.5%, and
 added 26.7% wall time.
 
-Decision: kill the direct substitution. The estimator identifies releases
-that increase Sigma locally, but the fixed `r=0.9` schedule demands too many
-releases whether or not a profitable replacement exists. The next controller
-should gate release by `P_max > I_min`, reconverge after releasing, then choose
-the replacement from the updated state instead of applying both changes
-simultaneously.
+Target K=4 validation reverses that conclusion. At `N=1000`, `alpha=9.5`,
+seeds 1–10, current-I solved 6/10 versus certainty's 5/10 and matched
+polarization's 6/10. It reduced mean absolute DeltaSigma by 8.6% versus
+certainty and 10.7% versus polarization; mean signed descent fell 23.2% and
+28.2%. The fixed-depth maximum drop fell 39.8% versus certainty and 52.3%
+versus polarization, while fixed-depth roughness fell 4.8% and 16.7%.
+Frontier area/level rose 3.7% over certainty. Wall time was 1.94 times
+certainty and 2.11 times polarization, within the target budget.
+
+Decision: keep `--dynamic-i-backtrack` as the current K=4 winner. It works
+because every release is ranked by the fraction of clusters retaining the
+variable's actual value under the current cavity state, rather than by a score
+frozen on an obsolete residual formula. The result is K-dependent: retain the
+negative K=3 evidence and do not claim a universal policy.
 
 Artifacts:
 
 - `results/idea-006-k3-n300-a4.15/`
 - `results/idea-006-k3-n1000-a4.15/`
+- `results/idea-006-k4-n1000-a9.5-10seeds/`
 
-Implementation: `b064217`. Results: `871f12b`.
+Implementation: `b064217`. K=3 results: `871f12b`. K=4 validation:
+`70e264f`.
