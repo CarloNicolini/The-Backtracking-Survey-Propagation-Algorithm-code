@@ -31,3 +31,17 @@ solving a separate local eigenproblem.
    to rank stability-preserving moves without candidate reconvergence.
 
 The option is `--online-lyapunov`.
+
+## Result
+
+Transporting across topology changes gave fatal-state AUC 0.785 but poor
+agreement with full local rho. Resetting at every reconvergence and updating
+through its existing sweeps cost 2.6 times baseline, yet fatal-state AUC fell
+to 0.62. Two of four fatal checkpoints had online growth below the run median.
+
+Decision: kill the online scalar as a failure trigger. Ordinary SP convergence
+does not provide enough tangent iterations for a reliable dominant
+eigenvalue. Retain full Lyapunov solves at sparse checkpoints and investigate
+whether the dominant mode's local participation predicts post-fix stability.
+
+Artifacts: `results/idea-019-reset-k3-n300-a4.15/`.
