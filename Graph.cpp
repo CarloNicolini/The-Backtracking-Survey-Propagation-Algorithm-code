@@ -48,6 +48,7 @@ double g_damping = 0.0;
 bool g_parisi_exchange = false;
 bool g_parisi_audit = false;
 bool g_dynamic_I_backtrack = false;
+bool g_sign_regret_backtrack = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -311,6 +312,23 @@ double Graph::current_fixation_factor(Vertex* v) {
     if (factor<0.) return 0.;
     if (factor>1.) return 1.;
     return factor;
+}
+
+/*Log advantage of the currently best sign over the sign actually fixed.
+ It is exactly zero while the assignment remains locally preferred.*/
+double Graph::current_fixation_regret(Vertex* v) {
+    double prod_plus=1.,prod_minus=1.;
+    for (unsigned edge=0; edge<v->_I_am_in_cl_at_init.size(); ++edge) {
+        double one_minus=1.-warning_to_fixed(v, edge);
+        if (*v->_bvec_lit[edge]) prod_plus*=one_minus;
+        else prod_minus*=one_minus;
+    }
+    double z=prod_plus+prod_minus-prod_plus*prod_minus;
+    if (z<=ZERO) return HUGE_VAL;
+    double assigned=(v->_who_I_am ? prod_minus : prod_plus)/z;
+    double best=max(prod_plus, prod_minus)/z;
+    if (assigned<=ZERO) return HUGE_VAL;
+    return best>assigned ? log(best/assigned) : 0.;
 }
 
 bool Graph::share_clause(Vertex* a, Vertex* b) {
@@ -691,6 +709,7 @@ void Graph::diag_step() {
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" sign_regret_backtrack="<<g_sign_regret_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
@@ -702,6 +721,7 @@ void Graph::diag_step() {
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" sign_regret_backtrack="<<g_sign_regret_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -711,6 +731,7 @@ void Graph::diag_step() {
                       <<" parisi_exchange="<<g_parisi_exchange
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" sign_regret_backtrack="<<g_sign_regret_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -917,6 +938,7 @@ void Graph::dataset_trials() {
                 <<" parisi_exchange="<<g_parisi_exchange
                 <<" parisi_audit="<<g_parisi_audit
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                <<" sign_regret_backtrack="<<g_sign_regret_backtrack
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -1420,6 +1442,43 @@ void Graph::build(Vertex * &V_to_build) {
 /*public member class Graph. This member computes all operation for backtracking moves.*/
 void Graph::backtrack() {
     //cout<<"I make a backtrack move"<<endl;
+    if (g_sign_regret_backtrack) {
+        unsigned long count=_m_t_m_1+_unit_prop;
+        _unit_prop=0;
+        vector<pair<double, Vertex*> > candidates;
+        for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+             it!=_list_fixed_element.end(); ++it) {
+            if ((*it)->_forced_by_up) continue;
+            double regret=current_fixation_regret(*it);
+            if (regret>0.) candidates.push_back(make_pair(regret, *it));
+        }
+        sort(candidates.begin(), candidates.end(),
+             [](const pair<double, Vertex*>& a,
+                const pair<double, Vertex*>& b) {
+                 return a.first>b.first;
+             });
+        if (candidates.empty()) {
+            --_numb_of_back_moves;/*replace unnecessary release with progress*/
+            ++_numb_of_dec_moves;
+            sort_V_Dec_move();
+            choose_var_to_fix_and_clean();
+            return;
+        }
+        if (count>candidates.size()) count=candidates.size();
+        for (unsigned long i=0; i<count; ++i) {
+            Vertex* v=candidates[i].second;
+            BSP_DEBUG<<"sign-regret release v"<<v->_vertex
+                     <<" regret="<<candidates[i].first<<endl;
+            _list_fixed_element.erase(v->_it_list_fixed_elem);
+            v->_it_list_fixed_elem=_list_fixed_element.end();
+            diag_move("back", v, -1);
+            v->reset_value_default_var_i();
+            build(v);
+        }
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+        return;
+    }
     if (g_dynamic_I_backtrack) {
         unsigned long count=_m_t_m_1+_unit_prop;
         _unit_prop=0;

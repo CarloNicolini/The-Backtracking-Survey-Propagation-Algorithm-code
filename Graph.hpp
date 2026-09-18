@@ -528,6 +528,8 @@ private:
 
     double current_fixation_factor(Vertex* v);
 
+    double current_fixation_regret(Vertex* v);
+
     bool share_clause(Vertex* a, Vertex* b);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
