@@ -49,6 +49,7 @@ bool g_parisi_exchange = false;
 bool g_parisi_audit = false;
 bool g_dynamic_I_backtrack = false;
 bool g_sigma_certified = false;
+bool g_transaction_safe = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -530,6 +531,107 @@ void Graph::apply_certified_step() {
     _cert_replay_pending=_cert_probe_converged;
 }
 
+void Graph::check_certified_replay() {
+    if (!_cert_replay_pending) {
+        _cert_replay_error=0.;
+        return;
+    }
+    _cert_replay_error=fabs(complexity-_cert_probe_sigma);
+    if (_cert_replay_error>1.e-8)
+        BSP_WARN<<"transaction replay error="<<_cert_replay_error<<endl;
+    _cert_replay_pending=false;
+}
+
+/*Preserve the fixed-ratio BSP action schedule, but contain a fatal
+ decimation in a child. Recovery is parameter-free: flip its direction, then
+ walk down the current score ordering until a convergent fix is found; retreat
+ by current I only when every forward proposal fails.*/
+void Graph::prepare_safe_decimation() {
+    _cert_action=0;
+    _cert_fix=NULL;
+    _cert_release=NULL;
+    _cert_P=0.;
+    _cert_probe_converged=false;
+    vector<pair<double, Vertex*> > candidates;
+    for (unsigned i=0; i<_N; ++i)
+        if (!ptrV[i]->_I_am_a_fixed_variable)
+            candidates.push_back(make_pair(ptrV[i]->_sC, ptrV[i]));
+    sort(candidates.begin(), candidates.end(),
+         [](const pair<double, Vertex*>& a, const pair<double, Vertex*>& b) {
+             return a.first>b.first;
+         });
+    if (candidates.empty()) return;
+
+    _cert_fix=candidates[0].second;
+    _cert_P=1.-min(_cert_fix->_sT, _cert_fix->_sF);
+    _cert_fix_dir=(_cert_fix->_sT>_cert_fix->_sF) ? 1 : 0;
+    CertifiedProbe preferred=probe_certified(_cert_fix, _cert_fix_dir, NULL);
+    if (preferred.converged) {
+        _cert_probe_converged=true;
+        _cert_probe_sigma=preferred.sigma;
+        return;
+    }
+
+    CertifiedProbe flipped=probe_certified(_cert_fix, 1-_cert_fix_dir, NULL);
+    if (flipped.converged) {
+        _cert_fix_dir=1-_cert_fix_dir;
+        _cert_probe_converged=true;
+        _cert_probe_sigma=flipped.sigma;
+        return;
+    }
+    for (unsigned i=1; i<candidates.size(); ++i) {
+        Vertex* v=candidates[i].second;
+        int dir=(v->_sT>v->_sF) ? 1 : 0;
+        CertifiedProbe alternative=probe_certified(v, dir, NULL);
+        if (!alternative.converged) continue;
+        _cert_fix=v;
+        _cert_fix_dir=dir;
+        _cert_P=1.-min(v->_sT, v->_sF);
+        _cert_probe_converged=true;
+        _cert_probe_sigma=alternative.sigma;
+        return;
+    }
+
+    double I=1.;
+    for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+         it!=_list_fixed_element.end(); ++it) {
+        Vertex* v=*it;
+        if (v->_forced_by_up) continue;
+        double candidate=current_fixation_factor(v);
+        if (!_cert_release || candidate<I) {
+            _cert_release=v;
+            I=candidate;
+        }
+    }
+    if (_cert_release) {
+        CertifiedProbe release=probe_certified(NULL, -1, _cert_release);
+        if (release.converged && release.sigma>=complexity) {
+            _cert_action=2;
+            _cert_probe_converged=true;
+            _cert_probe_sigma=release.sigma;
+            return;
+        }
+    }
+    BSP_ERROR<<"No convergent transaction-safe decimation or release"<<endl;
+    exit(-1);
+}
+
+void Graph::apply_safe_decimation() {
+    _unit_prop=0;
+    _M_t=0;
+    if (_cert_action==2) {
+        release_certified(_cert_release);
+        --_numb_of_dec_moves;/*surveys() scheduled decimation; replace it*/
+        ++_numb_of_back_moves;
+    } else {
+        decimate_one(_cert_fix, _cert_fix_dir);
+    }
+    stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+    _m_t_m_1=1;
+    _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+    _cert_replay_pending=_cert_probe_converged;
+}
+
 /*Prepare a parameter-free move from Parisi's P_M > I_m criterion. Exchanges
  continue only while the previously realized exchange strictly increased
  complexity; a non-improving response forces the next decimation.*/
@@ -900,6 +1002,7 @@ void Graph::diag_step() {
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
+                      <<" transaction_safe="<<g_transaction_safe
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
@@ -913,6 +1016,7 @@ void Graph::diag_step() {
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
+                      <<" transaction_safe="<<g_transaction_safe
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -923,16 +1027,19 @@ void Graph::diag_step() {
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
+                      <<" transaction_safe="<<g_transaction_safe
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
     }
     unsigned step=_diag_step_idx++;
-    const char* move=g_sigma_certified
-        ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
-        : (g_parisi_exchange
-           ? (_parisi_do_exchange ? "exchange" : "dec")
-           : (fl_bsp ? "back" : "dec"));
+    const char* move=(g_transaction_safe && !fl_bsp && _cert_action==2)
+        ? "back"
+        : (g_sigma_certified
+           ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
+           : (g_parisi_exchange
+              ? (_parisi_do_exchange ? "exchange" : "dec")
+              : (fl_bsp ? "back" : "dec")));
     double predicted=(g_parisi_exchange && _parisi_P>0. && _parisi_I>0.)
         ? log(_parisi_P/_parisi_I) : 0.;
     _diag_step_out<<step<<","<<move<<","
@@ -1133,6 +1240,7 @@ void Graph::dataset_trials() {
                 <<" parisi_audit="<<g_parisi_audit
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" sigma_certified="<<g_sigma_certified
+                <<" transaction_safe="<<g_transaction_safe
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -1156,11 +1264,13 @@ void Graph::dataset_trials() {
         exit(-1);
     }
     double sigma_before=complexity;
-    const char* mv=g_sigma_certified
-        ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
-        : (g_parisi_exchange
-           ? (_parisi_do_exchange ? "exchange" : "dec")
-           : (fl_bsp ? "back" : "dec"));
+    const char* mv=(g_transaction_safe && !fl_bsp && _cert_action==2)
+        ? "back"
+        : (g_sigma_certified
+           ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
+           : (g_parisi_exchange
+              ? (_parisi_do_exchange ? "exchange" : "dec")
+              : (fl_bsp ? "back" : "dec")));
     for (unsigned ci=0; ci<k; ++ci) {
         Vertex* v=cand[ci];
         double sT=v->_sT, sF=v->_sF, sI=v->_sI;

@@ -191,6 +191,10 @@ int main(int argc,  char * const argv[]) {
             g_sigma_certified = true;
             continue;
         }
+        if (a == "--transaction-safe") {
+            g_transaction_safe = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -281,6 +285,11 @@ int main(int argc,  char * const argv[]) {
         BSP_ERROR << "--sigma-certified is exclusive with other experimental schedulers" << endl;
         return 1;
     }
+    if (g_transaction_safe &&
+        (g_sigma_certified || g_parisi_exchange || g_dynamic_I_backtrack)) {
+        BSP_ERROR << "--transaction-safe is exclusive with other experimental schedulers" << endl;
+        return 1;
+    }
     if (!g_nn_path.empty()) {
         if (!bsp_nn_load(g_nn_path)) return 1;
     }
@@ -360,7 +369,8 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_sigma_certified)BSP_INFO<<"START SIGMA-CERTIFIED BSP:"<<endl;
+    if(g_transaction_safe)BSP_INFO<<"START TRANSACTION-SAFE BSP WITH r="<<g_r_bsp<<":"<<endl;
+    else if(g_sigma_certified)BSP_INFO<<"START SIGMA-CERTIFIED BSP:"<<endl;
     else if(g_parisi_exchange)BSP_INFO<<"START PARAMETER-FREE PARISI EXCHANGE BSP:"<<endl;
     else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
@@ -415,6 +425,9 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
+    if(g_transaction_safe)G.check_certified_replay();
+    if(g_transaction_safe && !G.fl_bsp && G.complexity!=0.)
+        G.prepare_safe_decimation();
     if(g_parisi_exchange && G.complexity!=0.)
         G.prepare_parisi_step();/*state-dependent eq. (5) move*/
     if(g_sigma_certified && G.complexity!=0.)
@@ -479,7 +492,7 @@ SP:
         BSP_INFO<<G;/*print on terminal complexity*/
         G.save();
         if(G.complexity==0)goto PARAPHASE; /*go to PARAPHASE for building final solution*/
-        if(G.complexity<-2.) {
+        if(G.complexity<-2. && !(g_transaction_safe && G.safe_will_release())) {
             /*By experience we know that when N is large, e.g. (> 1000), and SP
              gives a negative complexity, with probability equal to one SP will not converge. For this
              reason we have set an exit strategy here.*/
@@ -488,8 +501,12 @@ SP:
             BSP_ERROR<<"I am sorry I quit"<<endl;
             exit(-1);
         }
-        G.sort_V_Dec_move();/*sort for picking up variable nodes with the highest value of s_C*/
-        G.choose_var_to_fix_and_clean();/*fix varaible nodes and clean the graph*/
+        if(g_transaction_safe) {
+            G.apply_safe_decimation();
+        } else {
+            G.sort_V_Dec_move();/*sort for picking up variable nodes with the highest value of s_C*/
+            G.choose_var_to_fix_and_clean();/*fix varaible nodes and clean the graph*/
+        }
         goto SP;/*go to SP*/
 
     } else {
@@ -582,6 +599,8 @@ void help(const char *prog) {
          << "                       during the standard BSP backtracking schedule.\n"
          << "  --sigma-certified Probe decimation in a fork; certify it against\n"
          << "                       log(P), or try one measured Parisi repair.\n"
+         << "  --transaction-safe Preserve the BSP schedule, but reject fatal\n"
+         << "                       decimations in fork-isolated SP probes.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

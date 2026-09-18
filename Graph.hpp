@@ -361,6 +361,14 @@ public:
 
     void apply_certified_step(); /*commit the selected certified move*/
 
+    void prepare_safe_decimation(); /*probe one scheduled BSP decimation*/
+
+    void apply_safe_decimation(); /*commit selected fix or recovery release*/
+
+    void check_certified_replay(); /*compare parent SP with selected child*/
+
+    bool safe_will_release() { return _cert_action==2; }
+
     int minisat_check(const string& path); /*bounded minisat: 1/0/-2/-3/-4*/
 
     int oracle_try(Vertex* v, bool dir); /*tentative fix + oracle + exact undo*/
