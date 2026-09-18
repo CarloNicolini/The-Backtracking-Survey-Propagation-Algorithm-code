@@ -188,6 +188,11 @@ int main(int argc,  char * const argv[]) {
             g_lyapunov_check = true;
             continue;
         }
+        if (a == "--adjoint-check") {
+            g_lyapunov = true;
+            g_adjoint_check = true;
+            continue;
+        }
         if (a.rfind("--lyapunov-step=", 0) == 0) {
             g_lyapunov = true;
             g_lyapunov_step = stol(a.substr(16));
@@ -556,6 +561,7 @@ void help(const char *prog) {
          << "                       exponent at every logged fixed point.\n"
          << "  --lyapunov-step=S Compute it only at diagnostic step S.\n"
          << "  --lyapunov-check  Validate analytic Jv by central differences.\n"
+         << "  --adjoint-check   Validate J-transpose by its inner-product identity.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

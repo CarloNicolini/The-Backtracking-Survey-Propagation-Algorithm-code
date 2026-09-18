@@ -118,6 +118,7 @@ extern double g_damping; /*SP update damping in [0,1), default 0 (off)*/
 extern bool g_dynamic_I_backtrack; /*rank releases by current assignment retention*/
 extern bool g_lyapunov; /*compute the largest SP message-sweep exponent*/
 extern bool g_lyapunov_check; /*finite-difference check of analytic Jv*/
+extern bool g_adjoint_check; /*validate J-transpose by inner-product identity*/
 extern long g_lyapunov_step; /*-1 every fixed point, otherwise one diagnostic step*/
 bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 

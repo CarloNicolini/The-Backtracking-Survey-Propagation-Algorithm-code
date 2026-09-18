@@ -48,6 +48,7 @@ double g_damping = 0.0;
 bool g_dynamic_I_backtrack = false;
 bool g_lyapunov = false;
 bool g_lyapunov_check = false;
+bool g_adjoint_check = false;
 long g_lyapunov_step = -1;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
@@ -502,6 +503,106 @@ void Graph::jacobian_vector_product(const vector<unsigned long>& offsets,
     }
 }
 
+/*Reverse accumulation for the exact transpose of
+ jacobian_vector_product() on regular active-message states.*/
+void Graph::jacobian_transpose_vector_product(
+    const vector<unsigned long>& offsets,
+    const vector<double>& cotangent,
+    vector<double>& next) {
+    next.assign(cotangent.size(), 0.);
+    vector<double> bar_prod_plus(_N, 0.);
+    vector<double> bar_prod_minus(_N, 0.);
+
+    struct Term {
+        unsigned long edge;
+        unsigned label;
+        bool positive;
+        double divisor;
+        double prod_s;
+        double S;
+        double U;
+        double A;
+        double B;
+    };
+
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        Clause& cl=_cl[c];
+        for (unsigned target=0; target<cl._size_cl_init; ++target) {
+            if (!cl._go_forward[target]) continue;
+            vector<Term> terms;
+            vector<double> prefix_A(1, 1.);
+            vector<double> prefix_B(1, 1.);
+            for (unsigned j=0; j<cl._size_cl_init; ++j) {
+                if (j==target || !cl._go_forward[j]) continue;
+                Vertex* v=cl.v_V[j];
+                unsigned label=v->_vertex-1;
+                bool positive=cl.v_lit[j];
+                double prod_s=positive ? v->prod_V_plus : v->prod_V_minus;
+                double divisor=cl.div_s[j];
+                double S=prod_s*divisor;
+                double U=positive ? v->prod_V_minus : v->prod_V_plus;
+                Term term={
+                    offsets[c]+j,label,positive,divisor,prod_s,S,U,
+                    (1.-U)*S,S+U-rho_SP*S*U
+                };
+                terms.push_back(term);
+                prefix_A.push_back(prefix_A.back()*term.A);
+                prefix_B.push_back(prefix_B.back()*term.B);
+            }
+            double numerator=prefix_A.back();
+            double denominator=prefix_B.back();
+            if (denominator<=0.) continue;/*matches the forward Jv branch*/
+            unsigned long output=offsets[c]+target;
+            next[output]+=g_damping*cotangent[output];
+            if (numerator/denominator<ZERO) continue;
+            double bar_numerator=(1.-g_damping)*cotangent[output]
+                                 /denominator;
+            double bar_denominator=-(1.-g_damping)*cotangent[output]
+                                   *numerator
+                                   /(denominator*denominator);
+            double suffix_A=1.;
+            double suffix_B=1.;
+            for (int r=static_cast<int>(terms.size())-1; r>=0; --r) {
+                Term& term=terms[static_cast<unsigned>(r)];
+                double bar_A=bar_numerator*prefix_A[static_cast<unsigned>(r)]
+                             *suffix_A;
+                double bar_B=bar_denominator*prefix_B[static_cast<unsigned>(r)]
+                             *suffix_B;
+                suffix_A*=term.A;
+                suffix_B*=term.B;
+                double bar_S=(1.-term.U)*bar_A
+                             +(1.-rho_SP*term.U)*bar_B;
+                double bar_U=-term.S*bar_A
+                             +(1.-rho_SP*term.S)*bar_B;
+                if (term.positive) {
+                    bar_prod_plus[term.label]+=term.divisor*bar_S;
+                    bar_prod_minus[term.label]+=bar_U;
+                } else {
+                    bar_prod_minus[term.label]+=term.divisor*bar_S;
+                    bar_prod_plus[term.label]+=bar_U;
+                }
+                next[term.edge]+=term.prod_s*term.divisor*term.divisor*bar_S;
+            }
+        }
+    }
+
+    for (unsigned ci=_m; ci<_M; ++ci) {
+        unsigned c=vec_list_cl[ci]->_c;
+        Clause& cl=_cl[c];
+        for (unsigned j=0; j<cl._size_cl_init; ++j) {
+            if (!cl._go_forward[j]) continue;
+            Vertex* v=cl.v_V[j];
+            unsigned label=v->_vertex-1;
+            double bar_product=cl.v_lit[j]
+                ? bar_prod_plus[label] : bar_prod_minus[label];
+            double product=cl.v_lit[j]
+                ? v->prod_V_plus : v->prod_V_minus;
+            next[offsets[c]+j]-=bar_product*product*cl.div_s[j];
+        }
+    }
+}
+
 /*Evaluate one SP sweep from a packed active-message vector without touching
  graph storage. Used only to validate the analytic tangent map.*/
 void Graph::message_sweep(const vector<unsigned long>& offsets,
@@ -551,6 +652,7 @@ void Graph::message_sweep(const vector<unsigned long>& offsets,
  fixed point. This reads messages and products but never mutates solver state.*/
 void Graph::compute_lyapunov_at_fixed_point() {
     _lyapunov_jvp_error=0.;
+    _adjoint_identity_error=0.;
     vector<unsigned long> offsets(_M+1, 0);
     for (unsigned c=0; c<_M; ++c)
         offsets[c+1]=offsets[c]+_cl[c]._size_cl_init;
@@ -578,6 +680,38 @@ void Graph::compute_lyapunov_at_fixed_point() {
     }
     double norm=static_cast<double>(sqrtl(norm2));
     for (unsigned i=0; i<tangent.size(); ++i) tangent[i]/=norm;
+
+    if (g_adjoint_check) {
+        vector<double> cotangent(tangent.size(), 0.);
+        state=_seed^0x85ebca6bU;
+        norm2=0.;
+        for (unsigned ci=_m; ci<_M; ++ci) {
+            unsigned c=vec_list_cl[ci]->_c;
+            for (unsigned j=0; j<_cl[c]._size_cl_init; ++j) {
+                if (!_cl[c]._go_forward[j]) continue;
+                state=1664525U*state+1013904223U;
+                double value=(static_cast<double>(state)+0.5)
+                             /2147483648.0-1.;
+                cotangent[offsets[c]+j]=value;
+                norm2+=static_cast<long double>(value)*value;
+            }
+        }
+        norm=static_cast<double>(sqrtl(norm2));
+        for (unsigned i=0; i<cotangent.size(); ++i) cotangent[i]/=norm;
+        vector<double> Jv;
+        vector<double> JTu;
+        jacobian_vector_product(offsets, tangent, Jv);
+        jacobian_transpose_vector_product(offsets, cotangent, JTu);
+        long double lhs=0.;
+        long double rhs=0.;
+        for (unsigned i=0; i<tangent.size(); ++i) {
+            lhs+=static_cast<long double>(cotangent[i])*Jv[i];
+            rhs+=static_cast<long double>(JTu[i])*tangent[i];
+        }
+        long double scale=max(fabsl(lhs), fabsl(rhs));
+        if (scale<1.e-30L) scale=1.e-30L;
+        _adjoint_identity_error=static_cast<double>(fabsl(lhs-rhs)/scale);
+    }
 
     if (g_lyapunov_check) {
         vector<double> messages(offsets[_M], 0.);
@@ -673,6 +807,7 @@ void Graph::compute_lyapunov() {
         _tight_lyapunov_converged=false;
         _tight_complexity=0.;
         _lyapunov_jvp_error=0.;
+        _adjoint_identity_error=0.;
         return;
     }
     compute_lyapunov_at_fixed_point();
@@ -759,10 +894,11 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" adjoint_check="<<g_adjoint_check
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations,"
-                      <<"lyapunov_jvp_error,"
+                      <<"lyapunov_jvp_error,adjoint_identity_error,"
                       <<"tight_converged,tight_lyapunov_rho,"
                       <<"tight_lyapunov_exponent,tight_lyapunov_iterations,"
                       <<"tight_Sigma\n";
@@ -773,6 +909,7 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" adjoint_check="<<g_adjoint_check
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -782,6 +919,7 @@ void Graph::diag_step() {
                       <<" lyapunov="<<g_lyapunov
                       <<" lyapunov_step="<<g_lyapunov_step
                       <<" lyapunov_check="<<g_lyapunov_check
+                      <<" adjoint_check="<<g_adjoint_check
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -795,6 +933,7 @@ void Graph::diag_step() {
                   <<_last_certitude<<","<<_list_fixed_element.size()<<","
                   <<_lyapunov_rho<<","<<_lyapunov_exponent<<","
                   <<_lyapunov_iterations<<","<<_lyapunov_jvp_error<<","
+                  <<_adjoint_identity_error<<","
                   <<(_tight_lyapunov_converged ? 1 : 0)<<","
                   <<_tight_lyapunov_rho<<","<<_tight_lyapunov_exponent<<","
                   <<_tight_lyapunov_iterations<<","<<_tight_complexity<<endl;
@@ -987,6 +1126,7 @@ void Graph::dataset_trials() {
                 <<" lyapunov="<<g_lyapunov
                 <<" lyapunov_step="<<g_lyapunov_step
                 <<" lyapunov_check="<<g_lyapunov_check
+                <<" adjoint_check="<<g_adjoint_check
                 <<" dataset_step="<<g_dataset_step
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
