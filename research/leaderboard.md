@@ -194,3 +194,37 @@ Artifacts:
 - `results/idea-006-k3-n1000-a4.15/`
 
 Implementation: `b064217`. Results: `871f12b`.
+
+## Idea 007 — Sigma-certified transaction scheduler: recovery kept, control killed
+
+Hypothesis: probe the preferred decimation in a fork and certify its measured
+response against `log(P)`. An anomalous/fatal proposal receives one measured
+Parisi swap; fatal moves then try release, opposite direction, and remaining
+certainty candidates. Only converged proposals are replayed in the parent.
+
+The transaction mechanism passed its safety gate: every accepted child move
+replayed with exactly zero Sigma error, while failed SP runs remained
+child-local. At `N=300`, five seeds, it rescued two formulas and raised SAT
+from 1/5 to 3/5. No parent run died by SP non-convergence; two exhausted all
+certified alternatives and stopped explicitly. Exhaustive failures raised
+wall time about elevenfold, mean pre-terminal worst drop by 9.9%, and
+move-depth roughness by 24.5%.
+
+At `N=1000`, it preserved certainty's 5/5 SAT, reduced worst drop by 3.5%,
+and cut wall time by 55%. However, rapid default decimation increased
+move-depth roughness by 54% and fixed-depth frontier roughness by 33.5%;
+frontier area fell 1.4%.
+
+Decision: keep fork isolation, exact replay, and failure recovery—they are the
+first components to rescue known non-convergent trajectories. Kill the
+always-progress certification law as the primary optimizer. The next
+controller must explicitly finance costly net fixation with measured release
+credits, rather than treating low move count as success.
+
+Artifacts:
+
+- `results/idea-007-smoke-compare-k3-n80-a4.0/`
+- `results/idea-007-recovery-k3-n300-a4.15/`
+- `results/idea-007-recovery-k3-n1000-a4.15/`
+
+Implementation: `c8ff796`. Recovery ladder: `1edf603`. Results: `af6f313`.
