@@ -17,8 +17,11 @@ If the proposal is anomalous or non-convergent, compute the validated current
 `I(k)` and probe one nonlocal Parisi swap. Commit it only when SP converges,
 fixed cardinality is unchanged, and measured Sigma increases. If forward SP
 is fatal and the swap fails, probe the release alone and retreat only when its
-measured Sigma does not decrease. Failed probes die in children, leaving the
-parent at its last converged state.
+measured Sigma does not decrease. If no repair is available, try the opposite
+direction and then walk down the certainty ordering until the first convergent
+forward proposal. This ladder is activated only after a fatal preferred move;
+it has no candidate-count parameter. Failed probes die in children, leaving
+the parent at its last converged state.
 
 This is algorithmic meta-optimization: the solver observes the global response
 of its own proposed action and changes control flow. It has no candidate-count

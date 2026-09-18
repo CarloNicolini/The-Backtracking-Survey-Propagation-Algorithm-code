@@ -471,6 +471,40 @@ void Graph::prepare_certified_step() {
             return;
         }
     }
+
+    CertifiedProbe flipped_probe=probe_certified(
+        _cert_fix, 1-_cert_fix_dir, NULL);
+    if (flipped_probe.converged) {
+        _cert_fix_dir=1-_cert_fix_dir;
+        _cert_action=0;
+        _cert_probe_converged=true;
+        _cert_probe_sigma=flipped_probe.sigma;
+        return;
+    }
+
+    vector<pair<double, Vertex*> > alternatives;
+    for (unsigned i=0; i<_N; ++i) {
+        Vertex* v=ptrV[i];
+        if (!v->_I_am_a_fixed_variable && v!=_cert_fix)
+            alternatives.push_back(make_pair(1.-min(v->_sT, v->_sF), v));
+    }
+    sort(alternatives.begin(), alternatives.end(),
+         [](const pair<double, Vertex*>& a, const pair<double, Vertex*>& b) {
+             return a.first>b.first;
+         });
+    for (unsigned i=0; i<alternatives.size(); ++i) {
+        Vertex* v=alternatives[i].second;
+        int dir=(v->_sT>v->_sF) ? 1 : 0;
+        CertifiedProbe alternative=probe_certified(v, dir, NULL);
+        if (!alternative.converged) continue;
+        _cert_fix=v;
+        _cert_fix_dir=dir;
+        _cert_P=alternatives[i].first;
+        _cert_action=0;
+        _cert_probe_converged=true;
+        _cert_probe_sigma=alternative.sigma;
+        return;
+    }
     BSP_ERROR<<"No convergent certified fix, swap, or release proposal"<<endl;
     exit(-1);
 }
