@@ -259,3 +259,27 @@ Artifacts:
 
 Implementation: `5c872ea`. Backtrack isolation: `0baf9ad`. Certified fallback:
 `1309f18`. Results: `ae6cda9`.
+
+## Idea 011 — SP contraction stability: contraction killed, eta signal promoted
+
+Hypothesis: estimate the local SP spectral radius from the ratio of the final
+two maximum message residuals and use it as a parameter-free trigger for
+transaction safety.
+
+Instrumentation preserved all five baseline trajectories and outcomes
+exactly. The four fatal-action checkpoints had contraction values
+`{0.788, 0.639, 0.604, 0.658}`. Their pairwise discrimination against normal
+states was only AUC 0.705; none showed the expected universal approach to one.
+The extrapolated residual improved AUC only to 0.734.
+
+An unplanned but stronger signal was the number of SP iterations `eta`, with
+AUC 0.976. Comparing current eta to its historical running RMS caught all four
+fatal checkpoints while flagging 14–40% of states on these development seeds.
+
+Decision: kill contraction as the trigger. Promote the parameter-free
+`eta > running RMS(eta)` rule to a held-out experiment; use it to activate
+transaction probes selectively rather than always.
+
+Artifacts: `results/idea-011-k3-n300-a4.15/`.
+
+Implementation: `82ccc67`. Results: `0afca5a`.
