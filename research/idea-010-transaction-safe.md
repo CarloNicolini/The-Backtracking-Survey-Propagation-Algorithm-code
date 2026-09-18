@@ -18,8 +18,9 @@ their Sigma must match exactly.
 
 Scheduled backtracking moves use the same transaction rule. Probe the legacy
 release first; if it does not converge, try other fixed variables ordered by
-current `I(k)`. If every release fails, consume the backtracking slot as a
-no-op and retain the last converged parent state.
+current `I(k)`. If every release fails, replace the backtracking slot with a
+certified forward move. An unchanged retry is unsafe because the configured
+SP tolerance marks an approximate, not exact, fixed point.
 
 This is a safety layer around the existing dynamics, not a replacement
 schedule or score. Therefore ordinary trajectories should preserve certainty's

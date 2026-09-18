@@ -669,7 +669,8 @@ void Graph::prepare_safe_backtrack() {
         _cert_probe_sigma=alternative.sigma;
         return;
     }
-    _cert_release=NULL;/*retain the last converged parent state*/
+    _cert_release=NULL;
+    prepare_safe_decimation();/*an approximate fixed point cannot safely no-op*/
 }
 
 void Graph::apply_safe_backtrack() {
@@ -678,6 +679,15 @@ void Graph::apply_safe_backtrack() {
         _M_t=0;
         release_certified(_cert_release);
         stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+        _cert_replay_pending=_cert_probe_converged;
+    } else {
+        _M_t=0;
+        decimate_one(_cert_fix, _cert_fix_dir);
+        --_numb_of_back_moves;/*surveys() scheduled backtrack; replace it*/
+        ++_numb_of_dec_moves;
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        _m_t_m_1=1;
         _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
         _cert_replay_pending=_cert_probe_converged;
     }
@@ -1085,7 +1095,7 @@ void Graph::diag_step() {
     }
     unsigned step=_diag_step_idx++;
     const char* move=g_transaction_safe
-        ? (fl_bsp ? (_cert_action==2 ? "back" : "noop")
+        ? (fl_bsp ? (_cert_action==2 ? "back" : "dec")
                   : (_cert_action==2 ? "back" : "dec"))
         : (g_sigma_certified
            ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
@@ -1317,7 +1327,7 @@ void Graph::dataset_trials() {
     }
     double sigma_before=complexity;
     const char* mv=g_transaction_safe
-        ? (fl_bsp ? (_cert_action==2 ? "back" : "noop")
+        ? (fl_bsp ? (_cert_action==2 ? "back" : "dec")
                   : (_cert_action==2 ? "back" : "dec"))
         : (g_sigma_certified
            ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
