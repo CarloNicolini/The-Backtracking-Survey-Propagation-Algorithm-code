@@ -29,3 +29,25 @@ collapse.
 The first remote experiment uses random 4-SAT at N=20, alpha=9.7 over
 multiple seeds. This is a mechanistic enumeration smoke test, not evidence
 about asymptotic algorithmic performance.
+
+## Results
+
+Among 100 formulas, 66 are satisfiable and fully enumerable.
+
+- Two-state critical-clause bias `b=1,t=0.9` lowers mean whitening-core
+  fraction by 0.0173 (approximate 95% interval `[-0.0298,-0.0048]`) with mean
+  ESS 0.926.
+- Supported-variable bias `b=0.8,t=1` lowers the core in 22 formulas, raises
+  it in none, and leaves 44 unchanged; mean reduction is 0.0081 with ESS
+  0.990.
+- `b=0.6,t=0.9` gives mean reduction 0.0284 with ESS 0.880.
+
+The factorized two-state surrogate passes its first gate, but the
+supported-variable term is more sign-consistent and supports implementing the
+four-state forcing-bit model. These are finite-N mechanistic results and do
+not establish an asymptotic BSP improvement.
+
+Artifacts:
+
+- `results/idea-025-k4-n20-a9.7.tsv`
+- `results/idea-025-k4-n20-a9.7-seeds21-100.tsv`
