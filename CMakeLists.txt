@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(BSP
   VERSION 2018.0
   DESCRIPTION "Backtracking Survey Propagation for random K-SAT"
-  LANGUAGES CXX
+  LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 11)
@@ -19,14 +19,27 @@ endif()
 # Tune for the build machine CPU (best local performance; turn off for portable binaries).
 option(BSP_NATIVE_ARCH "Optimize for the host CPU (-march=native / equivalent)" ON)
 
+set(BSP_NN_SOURCES
+  NnScorer.cpp
+  third_party/genann/genann.c
+)
+
 add_executable(bsp
   main.cpp
   Graph.cpp
   Vertex.cpp
   walksat.cpp
+  ${BSP_NN_SOURCES}
+)
+
+add_executable(bsp_train
+  bsp_train.cpp
+  ${BSP_NN_SOURCES}
 )
 
 target_include_directories(bsp PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(bsp_train PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+set_target_properties(bsp_train PROPERTIES OUTPUT_NAME "bsp-train")
 
 # ---------------------------------------------------------------------------
 # Compiler / linker optimization flags
@@ -101,7 +114,12 @@ endif()
 
 set_target_properties(bsp PROPERTIES OUTPUT_NAME "main")
 
-install(TARGETS bsp RUNTIME DESTINATION bin)
+if(UNIX AND NOT APPLE)
+  target_link_libraries(bsp PRIVATE m)
+  target_link_libraries(bsp_train PRIVATE m)
+endif()
+
+install(TARGETS bsp bsp_train RUNTIME DESTINATION bin)
 
 message(STATUS "BSP build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "BSP C++ compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")

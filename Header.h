@@ -50,6 +50,7 @@
 #include <time.h>
 #include <iomanip>
 #include <list>
+#include <sstream>
 #include "random.h"
 #include "Logger.hpp"
 
@@ -88,6 +89,49 @@ const double _R_BSP=0.9;/*r values for BSP, it goes from [0, 1).  When it is equ
 #ifdef WALKSAT
 int WalkSat(vector <vector<bool> > & sol,int argc, char * argv[]); // WalkSat function
 #endif
+
+/*Runtime decimation-scorer selection. -1 keeps the compiled-in __H macro
+ (legacy behavior, CERT by default); 0=CERT, 1=POL, 2=GAMMA, 3=I_C.
+ GAMMA scores b*|sT-sF|^g_scorer_gamma, interpolating certainty (g=0)
+ and polarization-like rankings. Set via --scorer=... (see main.cpp).*/
+extern int g_scorer_id;
+extern double g_scorer_gamma;
+double bsp_score(double a, double b, double c); /*a=sT,b=sF,c=sI*/
+bool bsp_parse_scorer(const string& spec); /*"cert","pol","i_c","gamma:<g>"*/
+string bsp_scorer_name(); /*short name of the active scorer, for logging*/
+
+/*Per-step diagnostic logging (Phase 1). Off unless --diag=PREFIX is given.*/
+extern string g_diag_prefix; /*output prefix for _steps.csv / _vars.csv */
+extern unsigned g_diag_every; /*log vars + residuals every K steps, default 1*/
+extern bool g_dump_residuals; /*also dump PREFIX_res_s<step>.cnf files*/
+
+/*Runtime overrides for the BSP backtracking ratio r and the RNG seed.
+ Defaults reproduce legacy behavior (_R_BSP and /dev/urandom).*/
+extern double g_r_bsp; /*backtracking ratio, must stay in [0, 1)*/
+extern long g_fixed_seed; /*>=1 fixes the RNG seed, -1 keeps /dev/urandom*/
+
+/*Phase 2 decimation controls. Defaults reproduce legacy behavior.*/
+extern double g_bsp_theta; /*min direction margin |sT-sF|/(sT+sF) to fix, default 0 (off)*/
+extern bool g_veto; /*veto co-decimating vars sharing a clause, default off*/
+extern double g_epsilon; /*SP convergence threshold, default epsilon*/
+extern double g_damping; /*SP update damping in [0,1), default 0 (off)*/
+bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
+
+/*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/
+extern string g_dataset_prefix; /*output prefix for _dataset.csv*/
+extern unsigned g_dataset_k; /*shortlist size per step, default 50*/
+extern unsigned g_dataset_every; /*trial cadence in SP steps, default 1*/
+extern bool g_oracle; /*exact SAT-oracle label per trial via minisat, default off*/
+extern string g_minisat_path; /*minisat binary, default "minisat"*/
+extern unsigned g_oracle_timeout; /*per-trial minisat seconds, default 10 (0 = unbounded)*/
+/*Oracle-guided decimation (exact 1-step lookahead, POSIX). Both off by default.*/
+extern bool g_oracle_dir; /*check both dirs per chosen var, take a SAT one*/
+extern unsigned g_oracle_pick; /*scan top-K for SAT-preserving (var,dir), 0 = off*/
+extern unsigned g_lookahead_k; /*top-K complexity lookahead, 0 = off*/
+extern string g_nn_path; /*GenANN weights from bsp-train; empty = off*/
+extern bool g_nn_veto; /*veto mode: bury vars scoring below cutoff, else keep bias*/
+extern double g_nn_cutoff; /*veto threshold on predicted DeltaSigma*/
+const int BSP_NN_NFEAT = 15;
 
 #endif /* Header_h */
 

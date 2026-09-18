@@ -38,6 +38,7 @@
 #include "Header.h"
 #include "Vertex.hpp"
 #include "Graph.hpp"
+#include "NnScorer.hpp"
 #define UNIX 1
 #if UNIX
 #define random() rand()
@@ -103,6 +104,124 @@ int main(int argc,  char * const argv[]) {
             bsp::set_log_level(level);
             continue;
         }
+        if (a.rfind("--scorer=", 0) == 0) {
+            if (!bsp_parse_scorer(a.substr(9))) {
+                BSP_ERROR << "Unknown scorer in " << a
+                          << " (expected cert|pol|i_c|gamma:<g>)" << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--diag=", 0) == 0) {
+            g_diag_prefix = a.substr(7);
+            continue;
+        }
+        if (a == "--dump-residuals") {
+            g_dump_residuals = true;
+            continue;
+        }
+        if (a.rfind("--diag-every=", 0) == 0) {
+            g_diag_every = static_cast<unsigned>(stoul(a.substr(13)));
+            if (g_diag_every == 0) g_diag_every = 1;
+            continue;
+        }
+        if (a.rfind("--r=", 0) == 0) {
+            g_r_bsp = stod(a.substr(4));
+            if (!(g_r_bsp >= 0.0 && g_r_bsp < 1.0)) {
+                BSP_ERROR << "r must be in [0, 1), got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--seed=", 0) == 0) {
+            g_fixed_seed = stol(a.substr(7));
+            if (g_fixed_seed < 1) {
+                BSP_ERROR << "seed must be >= 1, got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--theta=", 0) == 0) {
+            g_bsp_theta = stod(a.substr(8));
+            if (!(g_bsp_theta >= 0.0 && g_bsp_theta <= 1.0)) {
+                BSP_ERROR << "theta must be in [0, 1], got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a == "--veto") {
+            g_veto = true;
+            continue;
+        }
+        if (a.rfind("--eps=", 0) == 0) {
+            g_epsilon = stod(a.substr(6));
+            if (!(g_epsilon > 0.0)) {
+                BSP_ERROR << "eps must be > 0, got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--damping=", 0) == 0) {
+            g_damping = stod(a.substr(10));
+            if (!(g_damping >= 0.0 && g_damping < 1.0)) {
+                BSP_ERROR << "damping must be in [0, 1), got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--dataset=", 0) == 0) {
+            g_dataset_prefix = a.substr(10);
+            continue;
+        }
+        if (a.rfind("--dataset-k=", 0) == 0) {
+            g_dataset_k = static_cast<unsigned>(stoul(a.substr(12)));
+            if (g_dataset_k == 0) g_dataset_k = 1;
+            continue;
+        }
+        if (a.rfind("--dataset-every=", 0) == 0) {
+            g_dataset_every = static_cast<unsigned>(stoul(a.substr(16)));
+            if (g_dataset_every == 0) g_dataset_every = 1;
+            continue;
+        }
+        if (a == "--oracle=off") {
+            g_oracle = false;
+            continue;
+        }
+        if (a == "--oracle" || a == "--oracle=on") {
+            g_oracle = true;
+            continue;
+        }
+        if (a.rfind("--minisat=", 0) == 0) {
+            g_minisat_path = a.substr(10);
+            continue;
+        }
+        if (a.rfind("--oracle-timeout=", 0) == 0) {
+            g_oracle_timeout = static_cast<unsigned>(stoul(a.substr(17)));
+            continue;
+        }
+        if (a == "--oracle-dir") {
+            g_oracle_dir = true;
+            continue;
+        }
+        if (a.rfind("--oracle-pick=", 0) == 0) {
+            g_oracle_pick = static_cast<unsigned>(stoul(a.substr(14)));
+            continue;
+        }
+        if (a.rfind("--nn=", 0) == 0) {
+            g_nn_path = a.substr(5);
+            continue;
+        }
+        if (a.rfind("--nn-veto=", 0) == 0) {
+            g_nn_veto = true;
+            g_nn_cutoff = stod(a.substr(10));
+            continue;
+        }
         cleaned_args.push_back(a);
     }
 
@@ -121,6 +240,17 @@ int main(int argc,  char * const argv[]) {
     if (cleaned_args[1] == "-w" && cleaned_args.size() < 5) {
         help(cleaned_args[0].c_str());
         return 1;
+    }
+    if (g_dump_residuals && g_diag_prefix.empty()) {
+        BSP_ERROR << "--dump-residuals requires --diag=PREFIX" << endl;
+        return 1;
+    }
+    if (g_oracle_pick > 0) {
+        BSP_ERROR << "--oracle-pick is not implemented yet (use --oracle-dir)" << endl;
+        return 1;
+    }
+    if (!g_nn_path.empty()) {
+        if (!bsp_nn_load(g_nn_path)) return 1;
     }
 
     vector<char *> av;
@@ -198,8 +328,9 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(_R_BSP!=0.)BSP_INFO<<"START BSP WITH r="<<_R_BSP<<":"<<endl;
+    if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
+    BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     /*Check if we have to use unit propagation*/
     G.unit_propagation();
 
@@ -250,6 +381,9 @@ SP:
 
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
+    G.diag_step();/*log SP fixed point (no-op unless --diag)*/
+    G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
+    G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
 
     /*The backtracking survey propagation (BSP) algorithm proceeds similarly to survey inspired decimation (SID), by alternating decimation or backtracking steps on a fraction f of variables, in order to keep the algorithm efficient. The choice between a decimation or a backtracking step is taken accordingly to a stochastic rule, where the parameter r ∈ [0,1) represents the ratio between backtracking steps to decimation steps [1]. When r=0 one obtains survey inspired decimation (SID), while when r!=0 one works with backtracking survey propagation. In this code r=_R_BSP into Header.h file.
      */
@@ -365,6 +499,33 @@ void help(const char *prog) {
          << "                       N     = number of variables\n"
          << "  -l <formula.cnf>    Load a CNF formula from file and solve it.\n"
          << "  -h, --help          Show this help message.\n"
+         << "  --scorer=SPEC       Decimation scorer: cert|pol|i_c|gamma:<g>.\n"
+         << "                       Default keeps the compiled-in scorer (CERT).\n"
+         << "  --diag=PREFIX       Write PREFIX_steps.csv / PREFIX_vars.csv\n"
+         << "                       per-SP-fixed-point diagnostics (off by default).\n"
+         << "  --diag-every=K      Log vars + residuals every K steps (default 1).\n"
+         << "  --dump-residuals    Also dump PREFIX_res_s<step>.cnf (needs --diag).\n"
+         << "  --r=R             Backtracking ratio in [0, 1) (default 0.9;\n"
+         << "                       0 gives SID without backtracking).\n"
+         << "  --seed=S          Fix the RNG seed S >= 1 for reproducible runs.\n"
+         << "  --theta=T         Fix only vars with direction margin\n"
+         << "                       |sT-sF|/(sT+sF) >= T in [0, 1] (default 0).\n"
+         << "  --veto            Veto co-decimating vars sharing a clause.\n"
+         << "  --eps=E           SP convergence threshold (default 0.01).\n"
+         << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
+         << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
+         << "                       DeltaSigma trials (off by default, POSIX).\n"
+         << "  --dataset-k=K     Shortlist size per step (default 50).\n"
+         << "  --dataset-every=S Trial cadence in SP steps (default 1).\n"
+         << "  --oracle / --oracle=on  Label each trial residual with minisat.\n"
+         << "  --oracle=off       Skip the exact minisat label (default).\n"
+         << "  --minisat=PATH     Minisat binary (default minisat).\n"
+         << "  --oracle-timeout=S Per-trial minisat seconds (default 10, 0=off).\n"
+         << "  --oracle-dir      Resolve each decimation direction by minisat.\n"
+         << "  --oracle-pick=K   Scan top-K for a SAT-preserving move (0=off).\n"
+         << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"
+         << "  --nn-veto=C       Veto mode: bury vars scoring below C,\n"
+         << "                       keep hand-crafted bias otherwise (needs --nn).\n"
          << "\n"
          << "Logging options (do not change the algorithm):\n"
          << "  -q, --quiet         Warnings and errors only\n"

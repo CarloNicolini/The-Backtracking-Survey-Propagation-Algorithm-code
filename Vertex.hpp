@@ -43,7 +43,7 @@
 /*Here anyone can create its own bias __H(*)*/
 
 #ifdef POL
-#define __H(a,b,c) = abs(a-b) /*polarization*/
+#define __H(a,b,c) abs((a)-(b)) /*polarization*/
 #endif
 
 #ifdef CERT
@@ -51,6 +51,7 @@
 #endif
 
 #ifdef P_M
+/*NOTE: max(1.-b,1.-a) is algebraically identical to CERT (1.-min(a,b))*/
 #define __H(a,b,c)  max(1.-b,1.-a) /*new certitude max(1.-s_F,1.-s_T)*/
 #endif
 
@@ -73,6 +74,7 @@ public:
         _degree_i=0;/*variable node degree*/
         _who_I_am=false;/*value of variable node*/
         _I_am_a_fixed_variable=false;/*tell if a variables has beeen fixed*/
+        _forced_by_up=false;/*fixed by unit propagation, not by a scored choice*/
         complexity_variable=0.;/*variable node complexity*/
         prod_V_plus=0.;/*products un-negated literal messages*/
         prod_V_minus=0.;/*product negated literal messages*/
@@ -80,6 +82,7 @@ public:
         _sI=0.;/*survey sI variable node*/
         _sF=0.;/*survey sF variable node*/
         _sC=0.;/*certitude*/
+        _sNN=0.0/0.0;/*NN prediction (NaN = none yet / abstained)*/
         _I_am_white=false;/*white variable*/
     };
 
@@ -146,6 +149,7 @@ public:
     double _sI; /*survey of i indeterminate*/
     double _sF; /*survey of i false*/
     double _sC; /*certitude*/
+    double _sNN; /*NN predicted DeltaSigma (NaN if none/abstained)*/
     double prod_V_plus; /*product (1-message) in V_plus*/
     double prod_V_minus; /*product (1-message) in V_minus*/
     double complexity_variable;/*variable node complexity*/
@@ -154,6 +158,7 @@ public:
     unsigned int _i; /*counter index vectors*/
     int _degree_i; /*degree of i*/
     bool _I_am_a_fixed_variable; /*fixed variable during decimation*/
+    bool _forced_by_up; /*true if this fix came from unit propagation*/
     bool _who_I_am; /*variable node value after fixing during deciamtion*/
     bool _I_am_white; /*I am a white variable*/
 
@@ -178,6 +183,7 @@ inline void Vertex::fix_var_i() { /*fix variable node to rue or false*/
 inline void Vertex::reset_value_default_var_i() {
     _who_I_am=false;/*value of variable node*/
     _I_am_a_fixed_variable=false;/*tell if a variables has beeen fixed*/
+    _forced_by_up=false;
 }
 
 
@@ -223,7 +229,7 @@ inline double Vertex::S(double &a, double &b, double &c) { /*compute sT,sF*/
 
 /*public member which describe how to compute the variable node certitude*/
 inline double Vertex::S_C() { /*compute certitude survey*/
-    return __H(_sT, _sF, _sI);
+    return bsp_score(_sT, _sF, _sI);
 }
 
 #endif /* Vertex_hpp */

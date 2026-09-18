@@ -29,6 +29,65 @@
 
 #include "Vertex.hpp"
 
+/*Runtime decimation-scorer selection (see Header.h). Default -1 reproduces
+ the legacy compiled-in __H macro behavior exactly.*/
+int g_scorer_id = -1;
+double g_scorer_gamma = 1.0;
+
+/*Score a variable for (de)selection from its surveys: a=sT, b=sF, c=sI.*/
+double bsp_score(double a, double b, double c) {
+    double bias = 1.0 - std::min(a, b); /*CERT*/
+    double pol = std::fabs(a - b); /*POL*/
+    switch (g_scorer_id) {
+        case 0: return bias;
+        case 1: return pol;
+        case 2: return bias * std::pow(pol, g_scorer_gamma);
+        case 3: return c; /*I_C*/
+        default: return __H(a, b, c); /*legacy compiled-in macro*/
+    }
+}
+
+/*Parse a --scorer=... spec: "cert", "pol", "i_c" or "gamma:<g>", g>=0.*/
+bool bsp_parse_scorer(const string& spec) {
+    if (spec == "cert") { g_scorer_id = 0; return true; }
+    if (spec == "pol") { g_scorer_id = 1; return true; }
+    if (spec == "i_c") { g_scorer_id = 3; return true; }
+    if (spec.compare(0, 6, "gamma:") == 0) {
+        try {
+            g_scorer_gamma = std::stod(spec.substr(6));
+        } catch (...) {
+            return false;
+        }
+        if (!(g_scorer_gamma >= 0.0)) return false;
+        g_scorer_id = 2;
+        return true;
+    }
+    return false;
+}
+
+/*Short name of the active scorer, for logging.*/
+string bsp_scorer_name() {
+    switch (g_scorer_id) {
+        case 0: return "cert";
+        case 1: return "pol";
+        case 3: return "i_c";
+        case 2: {
+            ostringstream o;
+            o << "gamma:" << g_scorer_gamma;
+            return o.str();
+        }
+        default: return "macro-default";
+    }
+}
+
+/*Direction-margin gate (Phase 2): fix only if |sT-sF|/(sT+sF) >= g_bsp_theta.
+ Fully unconstrained vars (sT+sF==0) have margin 0. theta=0 passes all. */
+bool bsp_pass_margin(double sT, double sF) {
+    double denom = sT + sF;
+    double margin = (denom > 0.0) ? (fabs(sT - sF) / denom) : 0.0;
+    return margin >= g_bsp_theta;
+}
+
 /***********************************************************************************/
 /***********************************************************************************/
 /***********************************************************************************/

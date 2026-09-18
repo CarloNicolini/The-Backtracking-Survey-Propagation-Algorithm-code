@@ -262,6 +262,14 @@ public:
         _N_t=0;/*number of variables un-fixed set to 0*/
         _M_t=0;/*number of clauses un-fixed set to 0*/
         _m_t_m_1=0;
+        _diag_step_idx=0;/*diagnostic step counter*/
+        _diag_header_done=false;/*diagnostic CSV headers written*/
+        _ds_header_done=false;/*dataset CSV header written*/
+        _in_trial=false;/*trial-child flag*/
+        _oracle_disabled=false;/*oracle auto-disable flag*/
+        _oracle_timeouts=0;/*consecutive minisat timeouts*/
+        _oracle_timeouts_total=0;/*total minisat timeouts*/
+        _oracle_tmp_ctr=0;/*oracle temp-file counter*/
         _counter_conv=0;/*counter convergence surveys set to 0*/
         complexity_clauses=0.;/*clause complexity set to 0*/
         complexity_variables=0.;/*variable complexity set to 0*/
@@ -312,6 +320,20 @@ public:
 
     void surveys(); /*compute surveys for each variable node*/
 
+    void diag_step(); /*log one SP fixed point (Phase 1 diagnostics)*/
+
+    void diag_move(const char* action, Vertex* v, int dir); /*log one fix/release*/
+
+    void dataset_trials(); /*tentative-fix DeltaSigma trials (Phase 3 dataset)*/
+
+    void apply_nn_scores(); /*overwrite _sC with predicted DeltaSigma if NN loaded*/
+
+    void fill_nn_features(Vertex* v, double* f); /*15-d local feature vector*/
+
+    int minisat_check(const string& path); /*bounded minisat: 1/0/-2/-3/-4*/
+
+    int oracle_try(Vertex* v, bool dir); /*tentative fix + oracle + exact undo*/
+
     void backtrack();
 
     void get_V(vector<Vertex> &V) { /*copy of V addresses*/
@@ -322,11 +344,17 @@ public:
 
     void print_on_file_residual_formula();/*print on file residual formula in CNF form*/
 
+    void print_residual_to(const string& path);/*print residual formula to path*/
+
     void sort_V_Dec_move(); /*sort ptrV for decimation move*/
 
     void sort_V_Back_move(); /*sort ptrV for backtracking move*/
 
     void choose_var_to_fix_and_clean(); /*choose a variable to fix and clean the graph*/
+
+    void decimate_one(Vertex* v, int force_dir=-1); /*fix one variable (-1: SP rule)*/
+
+    int oracle_dir(Vertex* v); /*oracle-resolved direction, -1 = use SP rule*/
 
     void clean(Vertex * &V_to_clean); /*clean the graph lists of unsitisfied clause*/
 
@@ -402,6 +430,18 @@ private:
     unsigned int _unit_prop;/*unit propagation counter*/
     unsigned int _m; /*satisfied clauses counter*/
     unsigned int _m_t_m_1; /*satisfied clauses counter at time t-1*/
+    ofstream _diag_step_out;/*per-step diagnostic CSV stream*/
+    ofstream _diag_var_out;/*per-variable diagnostic CSV stream*/
+    ofstream _diag_move_out;/*per-move diagnostic CSV stream*/
+    ofstream _ds_out;/*dataset CSV stream*/
+    bool _ds_header_done;/*dataset CSV header written*/
+    bool _in_trial;/*true inside a dataset trial child: suppress diag writes*/
+    bool _oracle_disabled;/*oracle auto-disabled after repeated timeouts*/
+    unsigned _oracle_timeouts;/*consecutive minisat timeouts on this run*/
+    unsigned _oracle_timeouts_total;/*total minisat timeouts on this run*/
+    unsigned _oracle_tmp_ctr;/*unique temp-file counter for oracle checks*/
+    unsigned int _diag_step_idx;/*diagnostic step counter*/
+    bool _diag_header_done;/*diagnostic CSV headers written*/
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -420,7 +460,8 @@ private:
     }
 
     void WellRandomInitialization() { /*initialization random number generator*/
-        _seed=GetRandom();/*call and store seed*/
+        if (g_fixed_seed >= 0) _seed=static_cast<unsigned>(g_fixed_seed);/*reproducible runs*/
+        else _seed=GetRandom();/*call and store seed*/
         if (_seed < 1) exit(-1);/*check if seed is ok*/
         srandom(_seed);/*initialize default random number generator*/
         unsigned int init[INITLEN];/*store first 32 random number*/
@@ -450,6 +491,10 @@ private:
 
     double _Pr_S(Vertex *V, bool b, double &s);
 
+    bool vetoed(Vertex* v, const vector<Vertex*>& sel);
+
+    void note_oracle_result(int r); /*timeout counting + auto-disable*/
+
     double __pu();
     double __norm();
 
@@ -462,6 +507,12 @@ private:
     struct _Vertex_smaller_labeled_vertex_pred {/*predicate for sort on a vector of Vertex*/
         bool operator()(Vertex * x, Vertex * y) {
             return x->_vertex < y->_vertex;
+        }
+    };
+
+    struct _Vertex_is_fixed_pred {/*predicate: fixed variables first*/
+        bool operator()(Vertex * x) {
+            return x->_I_am_a_fixed_variable;
         }
     };
 
@@ -479,7 +530,7 @@ inline double Graph::_Pr_S(Vertex *V, bool b, double &s) { /*product of sitisfie
 
 
 inline bool Graph::_conv(double &a, double &b) {
-    return (abs(a-b)>epsilon) ? true:false;
+    return (abs(a-b)>g_epsilon) ? true:false;
 }
 
 inline double Graph::Div_s(double &s) {

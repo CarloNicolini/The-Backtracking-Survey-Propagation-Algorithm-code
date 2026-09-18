@@ -26,6 +26,37 @@
 //
 
 #include "Graph.hpp"
+#include "NnScorer.hpp"
+#ifndef _WIN32
+#include <sys/mman.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <csignal>
+#include <cerrno>
+#endif
+
+/*Phase 1 diagnostic options (see Header.h).*/
+string g_diag_prefix;
+unsigned g_diag_every = 1;
+bool g_dump_residuals = false;
+double g_r_bsp = _R_BSP;
+long g_fixed_seed = -1;
+double g_bsp_theta = 0.0;
+bool g_veto = false;
+double g_epsilon = epsilon;
+double g_damping = 0.0;
+/*Phase 3 dataset options (see Header.h).*/
+string g_dataset_prefix;
+unsigned g_dataset_k = 50;
+unsigned g_dataset_every = 1;
+bool g_oracle = false;
+string g_minisat_path = "minisat";
+unsigned g_oracle_timeout = 10;
+bool g_oracle_dir = false;
+unsigned g_oracle_pick = 0;
+string g_nn_path;
+bool g_nn_veto = false;
+double g_nn_cutoff = 0.0;
 
 /***********************************************************************************/
 /***********************************************************************************/
@@ -185,6 +216,8 @@ void Graph::unit_propagation(unsigned int  &c) { /*fix the variable into clause 
     _list_fixed_element.push_back(cp);/*store the Vertex in the listt of fixed element*/
     cp->_it_list_fixed_elem=--_list_fixed_element.end();/*save its address into the varibale node*/
     cp->_I_am_a_fixed_variable=true;/*fix the variable*/
+    cp->_forced_by_up=true;
+    diag_move("up", cp, cp->_who_I_am ? 1 : 0);
     /*clean the graph*/
     /*
      Clean the graph means:
@@ -194,6 +227,51 @@ void Graph::unit_propagation(unsigned int  &c) { /*fix the variable into clause 
      */
     clean(cp);
     _N_t=_N-static_cast<unsigned int>(_list_fixed_element.size());/*update the number of un-fixed variable nodes*/
+}
+
+/*public member class Graph. Fixes one variable during decimation: stores it in
+ the fixed list, sets its value, logs the move and cleans the graph.
+ force_dir 0/1 overrides the SP rule; with --oracle-dir the direction is
+ resolved by exact SAT checks (SP-preferred first, flipped if fatal).*/
+void Graph::decimate_one(Vertex* v, int force_dir) {
+    int dir=force_dir;
+    if (dir < 0 && g_oracle_dir && !_oracle_disabled) dir=oracle_dir(v);
+    _list_fixed_element.push_back(v);/*store the variable node into fixed element list*/
+    v->_it_list_fixed_elem=--_list_fixed_element.end();/*save its address into the varibale node*/
+    v->_I_am_a_fixed_variable=true;/*fix the variable*/
+    if (dir < 0) v->fix_var_i();/*SP rule*/
+    else v->_who_I_am=(dir==1);/*forced direction*/
+    diag_move("dec", v, v->_who_I_am ? 1 : 0);
+    if(_last_certitude>v->_sC)_last_certitude=v->_sC;/*store last certitude*/
+
+    /*clean the graph*/
+    /*
+     Clean the graph means:
+
+     1) erasing from the factor graph all satisfied clauses;
+     2) erasing literals associated to variable i, which are present in clauses not satisfied by the variable node assignement.
+     */
+    clean(v);
+    v->_degree_i=0;/*set to 0 the degree of the variable node*/
+}
+
+/*public member class Graph. True if v shares an unsatisfied clause with any
+ variable already selected in sel (factor-graph distance 2 veto, Phase 2).
+ NOTE: selected vars were just fixed and erased from V, so membership is
+ tested on cpV (original members); satisfied clauses are skipped.*/
+bool Graph::vetoed(Vertex* v, const vector<Vertex*>& sel) {
+    for (unsigned j=0; j<v->_I_am_in_cl_at_init.size(); ++j) {
+        unsigned c=*real(v->_I_am_in_cl_at_init[j]);
+        if (!_cl[c]._I_am_in_list_unsat) continue;
+        for (unsigned m=0; m<_cl[c].cpV.size(); ++m) {
+            for (unsigned k=0; k<sel.size(); ++k)
+                if (_cl[c].cpV[m]==sel[k]) {
+                    BSP_DEBUG<<"veto: v"<<v->_vertex<<" shares clause "<<c<<endl;
+                    return true;
+                }
+        }
+    }
+    return false;
 }
 
 /*public member class Graph which helps us to fix the variables that have the highest value of certitude*/
@@ -208,27 +286,25 @@ void Graph::choose_var_to_fix_and_clean() {
     if (_size<=_size_init) {
         _size=1+_size_init;
     }
+    unsigned int _batch=_size-_size_init;/*decimation width of this move*/
+    vector<Vertex*> _veto_sel;
+    _veto_sel.reserve(_batch);
     unsigned int _counter_dec_var=0;
-    for (unsigned int i=_size_init; i<_size; ++i) {
-        _list_fixed_element.push_back(ptrV[i]);/*store the variable node into fixed element list*/
-        ptrV[i]->_it_list_fixed_elem=--_list_fixed_element.end();/*save its address into the varibale node*/
-        ptrV[i]->_I_am_a_fixed_variable=true;/*fix the variable*/
-        ptrV[i]->fix_var_i();/*set the variable to the value predicted by the rule described in main.cpp*/
-        if(_last_certitude>ptrV[i]->_sC)_last_certitude=ptrV[i]->_sC;/*store last certitude*/
-
-        /*clean the graph*/
-        /*
-         Clean the graph means:
-
-         1) erasing from the factor graph all satisfied clauses;
-         2) erasing literals associated to variable i, which are present in clauses not satisfied by the variable node assignement.
-         */
-        clean(ptrV[i]);
+    for (unsigned int i=_size_init; i<_N && _counter_dec_var<_batch; ++i) {
+        if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;/*theta skip*/
+        if (g_veto && vetoed(ptrV[i], _veto_sel)) continue;/*distance-2 veto*/
+        decimate_one(ptrV[i]);
+        _veto_sel.push_back(ptrV[i]);
         _counter_dec_var++;
-        //cout<<_m_t_m_1<<" "<<i<<endl;
-        //cout<<"il grado e': "<<ptrV[i]->_degree_i<<endl;
-        ptrV[i]->_degree_i=0;/*set to 0 the degree of the variable node*/
     }
+    if (_counter_dec_var==0) {
+        /*nothing passed the gates: legacy top-1 fallback to guarantee progress*/
+        BSP_WARN<<"theta/veto skipped all unfixed vars: legacy top-1 fallback"<<endl;
+        decimate_one(ptrV[_size_init]);
+        _counter_dec_var=1;
+    }
+    /*skips may scatter fixes: restore the fixed-first ptrV partition*/
+    stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
 
     _m_t_m_1=_counter_dec_var;
     _N_t=_N-static_cast<unsigned int>(_list_fixed_element.size());/*update the number of un-fixed variable nodes*/
@@ -278,7 +354,7 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
     if(complexity_variables==0.) complexity=0;
-    if((_numb_of_back_moves/_numb_of_dec_moves)<_R_BSP) {
+    if((_numb_of_back_moves/_numb_of_dec_moves)<g_r_bsp) {
         ++_numb_of_back_moves;
         fl_bsp=true;/*update values for BSP ratio choice.*/
         //if(complexity<1.e-6 and complexity>0)fl_bsp=false; /*The algorithm is close to call walksat, and for safety reasons it makes only decimations*/
@@ -287,6 +363,411 @@ void Graph::surveys() { /*compute surveys for each variable node*/
         ++_numb_of_dec_moves;
         fl_bsp=false;
     }
+}
+
+/*public member class Graph. Logs one SP fixed point for Phase 1 diagnostics.
+ No-op unless --diag=PREFIX was given. Called after surveys(), so fl_bsp
+ already holds this step's decimation-vs-backtracking decision. Fixed
+ variables are logged with their stale surveys plus fixed=1.*/
+void Graph::diag_step() {
+    if (g_diag_prefix.empty()) return;
+    if (!_diag_header_done) {
+        if (_N > 20000 && g_diag_every < 10)
+            BSP_WARN<<"--diag-every="<<g_diag_every<<" with N="<<_N
+                    <<": per-variable log will be huge"<<endl;
+        _diag_step_out.open((g_diag_prefix + "_steps.csv").c_str());
+        _diag_var_out.open((g_diag_prefix + "_vars.csv").c_str());
+        _diag_move_out.open((g_diag_prefix + "_moves.csv").c_str());
+        if (!_diag_step_out || !_diag_var_out || !_diag_move_out) {
+            BSP_ERROR<<"Cannot open diagnostic output with prefix "<<g_diag_prefix<<endl;
+            exit(-1);
+        }
+        _diag_step_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
+                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
+                      <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
+        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
+        _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
+                     <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
+                      <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
+        _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
+        _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
+                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
+                      <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
+        _diag_move_out<<"step,action,vertex,dir\n";
+        _diag_header_done=true;
+    }
+    unsigned step=_diag_step_idx++;
+    _diag_step_out<<step<<","<<(fl_bsp ? "back" : "dec")<<","
+                  <<_N_t<<","<<_M_t<<","
+                  <<setprecision(10)<<complexity<<","
+                  <<(complexity/static_cast<double>(_N))<<","
+                  <<_time_conv_print<<","<<_unit_prop<<","
+                  <<_last_certitude<<","<<_list_fixed_element.size()<<endl;
+    if (step % g_diag_every != 0) return;
+    for (unsigned i=0; i<_N; ++i) {
+        Vertex *v=ptrV[i];
+        _diag_var_out<<step<<","<<v->_vertex<<","
+                     <<(v->_I_am_a_fixed_variable ? 1 : 0)<<","
+                     <<(v->_who_I_am ? 1 : 0)<<","
+                     <<setprecision(10)<<v->_sT<<","<<v->_sF<<","<<v->_sI<<","
+                     <<v->_sC<<","<<fabs(v->_sT-v->_sF)<<","
+                     <<v->_degree_i<<","<<v->_sNN<<"\n";
+    }
+    _diag_var_out<<flush;
+    if (g_dump_residuals) {
+        ostringstream name;
+        name<<g_diag_prefix<<"_res_s"<<step<<".cnf";
+        print_residual_to(name.str());
+    }
+}
+
+/*public member class Graph. Logs one variable fix (dec/up) or release (back)
+ for Phase 1 diagnostics. dir is 1/0 for fixes, -1 for releases. The step is
+ _diag_step_idx-1 because moves execute after their SP fixed point was logged.
+ Pre-SP unit propagations are skipped (headers not written yet).*/
+void Graph::diag_move(const char* action, Vertex* v, int dir) {
+    if (_in_trial) return;/*trial children must not touch shared file offsets*/
+    if (g_diag_prefix.empty() || !_diag_header_done) return;
+    _diag_move_out<<(_diag_step_idx-1)<<","<<action<<","<<v->_vertex<<","<<dir<<endl;
+}
+
+#ifndef _WIN32
+/*SIGALRM plumbing for bounding minisat (minisat_check callers).*/
+static volatile sig_atomic_t s_oracle_alarm = 0;
+static void oracle_alarm_handler(int) {
+    s_oracle_alarm = 1;
+}
+#endif
+
+/*public member class Graph. Runs minisat on a residual CNF file, bounded by
+ g_oracle_timeout seconds. Returns 1 SAT, 0 UNSAT, -2 timeout, -3 fork
+ failure/crash, -4 minisat binary missing. POSIX only.*/
+int Graph::minisat_check(const string& path) {
+#ifdef _WIN32
+    (void)path;
+    return -3;
+#else
+    pid_t gpid=fork();
+    if (gpid < 0) return -3;
+    if (gpid==0) {
+        int dn=open("/dev/null", O_WRONLY);
+        if (dn>=0) { dup2(dn, STDOUT_FILENO); dup2(dn, STDERR_FILENO); }
+        execlp(g_minisat_path.c_str(), "minisat",
+               path.c_str(), "/dev/null", (char*)NULL);
+        _exit(127);/*exec failed: minisat missing*/
+    }
+    int gst=0;
+    bool have_status=false;
+    struct sigaction sa_new, sa_old;
+    bool sa_saved=false;
+    if (g_oracle_timeout > 0) {
+        s_oracle_alarm=0;
+        sa_new.sa_handler=oracle_alarm_handler;
+        sigemptyset(&sa_new.sa_mask);
+        sa_new.sa_flags=0;/*no SA_RESTART: waitpid must EINTR*/
+        sigaction(SIGALRM, &sa_new, &sa_old);
+        sa_saved=true;
+        alarm(g_oracle_timeout);
+    }
+    while (true) {
+        pid_t w=waitpid(gpid, &gst, 0);
+        if (w==gpid) { have_status=true; break; }
+        if (errno==EINTR && !s_oracle_alarm) continue;/*stray signal*/
+        break;/*timeout (alarm) or hard error*/
+    }
+    if (g_oracle_timeout > 0) {
+        alarm(0);
+        if (sa_saved) sigaction(SIGALRM, &sa_old, NULL);
+    }
+    if (!have_status) {
+        kill(gpid, SIGKILL);
+        int dummy=0;
+        while (waitpid(gpid, &dummy, 0) < 0 && errno==EINTR) { /*retry*/ }
+        return -2;
+    }
+    if (WIFEXITED(gst) && WEXITSTATUS(gst)==127) return -4;
+    if (WIFEXITED(gst) && (WEXITSTATUS(gst)==10 || WEXITSTATUS(gst)==20))
+        return (WEXITSTATUS(gst)==10) ? 1 : 0;
+    return -3;
+#endif
+}
+
+/*public member class Graph. Tentatively fixes v to dir, minisat-checks the
+ residual, then undoes the fix exactly (no SP runs between, so clean/build
+ are perfectly symmetric). Returns minisat_check's code. Parent-side only.*/
+int Graph::oracle_try(Vertex* v, bool dir) {
+    _list_fixed_element.push_back(v);
+    v->_it_list_fixed_elem=--_list_fixed_element.end();
+    v->_I_am_a_fixed_variable=true;
+    v->_who_I_am=dir;
+    clean(v);
+    v->_degree_i=0;
+    unsigned mt_save=_M_t;
+    _M_t=static_cast<unsigned>(_cl_list.size());
+    ostringstream tmp;
+    tmp<<"oracle_try_"<<(int)getpid()<<"_"<<(_oracle_tmp_ctr++)<<".cnf";
+    print_residual_to(tmp.str());
+    int r=minisat_check(tmp.str());
+    unlink(tmp.str().c_str());
+    _M_t=mt_save;
+    _list_fixed_element.erase(v->_it_list_fixed_elem);
+    v->_it_list_fixed_elem=_list_fixed_element.end();
+    v->reset_value_default_var_i();
+    build(v);
+    return r;
+}
+
+/*public member class Graph. Exact direction resolution: minisat-check both
+ residual outcomes, take a SAT direction (SP-preferred on ties). Returns
+ -1 to use the SP rule when both agree or the oracle is unusable.*/
+int Graph::oracle_dir(Vertex* v) {
+    bool sp=v->_sT > v->_sF;
+    int r_sp=oracle_try(v, sp);
+    if (r_sp==-4) {
+        BSP_ERROR<<"minisat not found at '"<<g_minisat_path<<"'"<<endl;
+        exit(-1);
+    }
+    note_oracle_result(r_sp);
+    int r_flip=oracle_try(v, !sp);
+    if (r_flip==-4) {
+        BSP_ERROR<<"minisat not found at '"<<g_minisat_path<<"'"<<endl;
+        exit(-1);
+    }
+    note_oracle_result(r_flip);
+    bool sp_sat=(r_sp==1), flip_sat=(r_flip==1);
+    if (sp_sat && !flip_sat) return sp ? 1 : 0;
+    if (flip_sat && !sp_sat) return sp ? 0 : 1;
+    return -1;
+}
+
+/*public member class Graph. Timeout accounting shared by dataset trials
+ and oracle-guided decimation: auto-disable after 3 consecutive or 10 total.*/
+void Graph::note_oracle_result(int r) {
+    if (r==-2) {
+        ++_oracle_timeouts;
+        ++_oracle_timeouts_total;
+        if (!_oracle_disabled &&
+            (_oracle_timeouts>=3 || _oracle_timeouts_total>=10)) {
+            _oracle_disabled=true;
+            BSP_WARN<<"oracle auto-disabled after repeated minisat timeouts"<<endl;
+        }
+    } else _oracle_timeouts=0;
+}
+
+/*public member class Graph. Runs tentative-fix trials for the Phase 3
+ DeltaSigma dataset. For each shortlisted unfixed variable and each direction,
+ a forked child fixes it, optionally checks the trial residual with an exact
+ SAT oracle (minisat), reconverges SP and reports through shared memory; the
+ parent is undisturbed so no undo is needed. Labels per trial: oracle SAT flag
+ (exact fatality gate: 1/0, -2 on oracle timeout), 1-step DeltaSigma
+ (gradation), SP-converged flag.
+ The oracle runs BEFORE SP so its result survives SP death in the child.
+ Minisat is bounded by g_oracle_timeout seconds per trial and auto-disables
+ for the run after repeated timeouts (K=4 near threshold can be
+ exponentially hard for DPLL).
+ No-op unless --dataset=PREFIX was given. POSIX only (fork/mmap).*/
+void Graph::dataset_trials() {
+    if (g_dataset_prefix.empty()) return;
+#ifdef _WIN32
+    BSP_ERROR<<"--dataset needs fork/mmap (POSIX); not supported on Windows"<<endl;
+    exit(-1);
+#else
+    if (complexity==0. || _N_t==0) return;
+    /*0-based SP-step index, aligned with diag_step()'s numbering for joins*/
+    unsigned step=static_cast<unsigned>(_numb_of_dec_moves+_numb_of_back_moves-3.);
+    if (step % g_dataset_every != 0) return;
+    if (!_ds_header_done) {
+        _ds_out.open((g_dataset_prefix + "_dataset.csv").c_str());
+        if (!_ds_out) {
+            BSP_ERROR<<"Cannot open dataset output with prefix "<<g_dataset_prefix<<endl;
+            exit(-1);
+        }
+        _ds_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
+                <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
+                <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
+        _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
+               <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
+               <<"Sigma_before,Sigma_per_N,step_frac,eta_before,r,"
+               <<"converged,crashed,sat_oracle,delta_sigma,eta_after\n";
+        _ds_header_done=true;
+    }
+    /*shortlist: top-K unfixed by active score (index copy, ptrV untouched)*/
+    vector<Vertex*> cand;
+    cand.reserve(_N_t);
+    for (unsigned i=0; i<_N; ++i)
+        if (!ptrV[i]->_I_am_a_fixed_variable) cand.push_back(ptrV[i]);
+    unsigned k = g_dataset_k < cand.size() ? g_dataset_k : (unsigned)cand.size();
+    if (k==0) return;
+    partial_sort(cand.begin(), cand.begin()+k, cand.end(), _Vertex_greater_pred());
+    /*shared report area: [converged, delta_sigma, eta_after, sat_oracle]*/
+    double* tout = (double*)mmap(NULL, 4*sizeof(double), PROT_READ|PROT_WRITE,
+                                 MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (tout==MAP_FAILED) {
+        BSP_ERROR<<"mmap failed for dataset trial"<<endl;
+        exit(-1);
+    }
+    double sigma_before=complexity;
+    const char* mv = fl_bsp ? "back" : "dec";
+    for (unsigned ci=0; ci<k; ++ci) {
+        Vertex* v=cand[ci];
+        double sT=v->_sT, sF=v->_sF, sI=v->_sI;
+        double bias=1.-(sT<sF?sT:sF);
+        double abspol=fabs(sT-sF);
+        double margin=(sT+sF>0.) ? abspol/(sT+sF) : 0.;
+        unsigned n_inc=0,len1=0,len2=0,len3=0,len4p=0;
+        for (unsigned j=0; j<v->_I_am_in_cl_at_init.size(); ++j) {
+            unsigned c=*real(v->_I_am_in_cl_at_init[j]);
+            if (!_cl[c]._I_am_in_list_unsat) continue;
+            ++n_inc;
+            unsigned L=(unsigned)_cl[c].size();
+            if (L<=1) ++len1;
+            else if (L==2) ++len2;
+            else if (L==3) ++len3;
+            else ++len4p;
+        }
+        ostringstream tail;
+        tail<<setprecision(10)<<sT<<","<<sF<<","<<sI<<","<<bias<<","<<v->_sC<<","
+            <<abspol<<","<<margin<<","<<v->prod_V_plus<<","<<v->prod_V_minus<<","
+            <<v->_degree_i<<","<<n_inc<<","<<len1<<","<<len2<<","<<len3<<","<<len4p<<","
+            <<sigma_before<<","<<(sigma_before/static_cast<double>(_N))<<","
+            <<(static_cast<double>(_N-_N_t)/static_cast<double>(_N))<<","
+            <<_time_conv_print<<","<<g_r_bsp;
+        for (int dir=0; dir<=1; ++dir) {
+            tout[0]=0; tout[1]=0; tout[2]=0; tout[3]=-1;
+            /*Flush before fork: children inherit stdio buffers, and a child
+             dying via exit(-1) in SP would otherwise flush a stale copy
+             over the parent's file at the shared offset.*/
+            _ds_out<<flush;
+            _diag_step_out<<flush;
+            _diag_var_out<<flush;
+            _diag_move_out<<flush;
+            cout<<flush;
+            cerr<<flush;
+            fflush(NULL);
+            pid_t pid=fork();
+            if (pid < 0) {
+                BSP_ERROR<<"fork failed for dataset trial"<<endl;
+                exit(-1);
+            }
+            if (pid==0) {
+                /*child: fix v to dir, oracle-check, reconverge, report. Never returns.*/
+                close(STDOUT_FILENO); close(STDERR_FILENO);
+                _in_trial=true;
+                _list_fixed_element.push_back(v);
+                v->_it_list_fixed_elem=--_list_fixed_element.end();
+                v->_I_am_a_fixed_variable=true;
+                v->_who_I_am=(dir==1);
+                if (_last_certitude>v->_sC) _last_certitude=v->_sC;
+                clean(v);
+                v->_degree_i=0;
+                if (g_oracle && !_oracle_disabled) {
+                    /*exact SAT label on the trial residual, before SP*/
+                    ostringstream tmp;
+                    tmp<<g_dataset_prefix<<"_or_"<<(int)getpid()<<".cnf";
+                    _M_t=static_cast<unsigned>(_cl_list.size());
+                    print_residual_to(tmp.str());
+                    int sat=minisat_check(tmp.str());
+                    if (sat==-4) _exit(126);/*minisat missing*/
+                    if (sat==-3) _exit(43);/*minisat crashed: unknown, skip SP*/
+                    tout[3]=sat;/*1, 0 or -2 (timeout)*/
+                }
+                stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+                convergence_messages();/*fatal exit(-1) on failure -> converged=0*/
+                surveys();/*side effects are child-local*/
+                tout[0]=1; tout[1]=complexity-sigma_before;
+                tout[2]=(double)_time_conv_print;
+                _exit(0);
+            }
+            int status=0;
+            while (waitpid(pid, &status, 0) < 0 && errno==EINTR) { /*retry*/ }
+            if (WIFEXITED(status) && WEXITSTATUS(status)==126) {
+                BSP_ERROR<<"minisat not found at '"<<g_minisat_path
+                         <<"'; use --minisat=PATH or --oracle=off"<<endl;
+                exit(-1);
+            }
+            if (g_oracle) {
+                ostringstream tmp;
+                tmp<<g_dataset_prefix<<"_or_"<<(int)pid<<".cnf";
+                unlink(tmp.str().c_str());
+            }
+            int converged=(WIFEXITED(status) && WEXITSTATUS(status)==0) ? 1 : 0;
+            int crashed=(!converged && WIFSIGNALED(status)) ? 1 : 0;
+            note_oracle_result((int)tout[3]);
+            _ds_out<<step<<","<<mv<<","<<v->_vertex<<","<<dir<<","<<tail.str()<<","
+                    <<converged<<","<<crashed<<","<<(int)tout[3]<<","
+                    <<setprecision(10)<<(converged?tout[1]:0.)<<","
+                    <<(converged?(int)tout[2]:-1)<<"\n";
+        }
+    }
+    _ds_out<<flush;
+    munmap(tout, 4*sizeof(double));
+#endif
+}
+
+/*Fill the 15-d feature vector used by bsp-train / GenANN inference.
+ Layout matches tools that parse PREFIX_dataset.csv: surveys, bias, products,
+ degree, incident unsat count, mean remaining clause length, Sigma/N, step
+ fraction, r, and the assignment direction that fix_var_i() would pick.*/
+void Graph::fill_nn_features(Vertex* v, double* f) {
+    double sT=v->_sT, sF=v->_sF, sI=v->_sI;
+    double abspol=fabs(sT-sF);
+    double den=sT+sF;
+    unsigned n_inc=0, len_sum=0;
+    for (unsigned j=0; j<v->_I_am_in_cl_at_init.size(); ++j) {
+        unsigned c=*real(v->_I_am_in_cl_at_init[j]);
+        if (!_cl[c]._I_am_in_list_unsat) continue;
+        ++n_inc;
+        len_sum += (unsigned)_cl[c].size();
+    }
+    f[0]=sT;
+    f[1]=sF;
+    f[2]=sI;
+    f[3]=1.0-((sT<sF)?sT:sF);
+    f[4]=abspol;
+    f[5]=(den>0.0)? abspol/den : 0.0;
+    f[6]=v->prod_V_plus;
+    f[7]=v->prod_V_minus;
+    f[8]=static_cast<double>(v->_degree_i);
+    f[9]=static_cast<double>(n_inc);
+    f[10]=(n_inc>0)? (static_cast<double>(len_sum)/n_inc) : 0.0;
+    f[11]=complexity/static_cast<double>(_N);
+    f[12]=static_cast<double>(_N-_N_t)/static_cast<double>(_N);
+    f[13]=g_r_bsp;
+    f[14]=(sT>sF)? 1.0 : 0.0;
+}
+
+/*Overwrite unfixed _sC with predicted future complexity when a weights file
+ is loaded (rank mode). In veto mode (--nn-veto=C) only bury vars scoring
+ below C, keeping the hand-crafted bias otherwise. Out-of-distribution
+ inputs always keep the hand-crafted score. The raw prediction (or NaN on
+ abstention) is kept in _sNN for logging.*/
+void Graph::apply_nn_scores() {
+    if (!bsp_nn_ready()) return;
+    unsigned n=0, kept=0, buried=0;
+    for (unsigned i=0; i<_N; ++i) {
+        Vertex* v=ptrV[i];
+        if (v->_I_am_a_fixed_variable) continue;
+        double x[BSP_NN_NFEAT];
+        fill_nn_features(v, x);
+        double y=0.0/0.0;
+        ++n;
+        if (!bsp_nn_predict(x, y)) { v->_sNN=y; continue; }
+        v->_sNN=y;
+        if (g_nn_veto) {
+            if (y < g_nn_cutoff) { v->_sC=-1e100; ++buried; }
+        } else {
+            v->_sC=y;
+            ++kept;
+        }
+    }
+    if (g_nn_veto)
+        BSP_INFO<<"NN veto buried "<<buried<<"/"<<n<<" unfixed variables"<<endl;
+    else
+        BSP_INFO<<"NN scorer applied to "<<kept<<"/"<<n<<" unfixed variables"<<endl;
 }
 
 
@@ -382,7 +863,7 @@ START:
                         goto START;
                     }
                     _cl[C].old_s[i]=_cl[C].update[i];
-                    _cl[C].update[i]=_new;/*update new message value*/
+                    _cl[C].update[i]=_new+(_cl[C].old_s[i]-_new)*g_damping;/*damped update, legacy when 0*/
                     if(_counter_conv==0) {
                         if(_conv(_cl[C].update[i], _cl[C].old_s[i])) {
                             ++_counter_conv;
@@ -612,10 +1093,13 @@ void Graph::backtrack() {
 
     unsigned long _size=_m_t_m_1+_unit_prop;
     _unit_prop=0;
-    _m_t_m_1=0;
+    /*NOTE: _m_t_m_1 intentionally keeps the last decimation batch size, so a
+     backtrack following another backtrack still releases a full batch instead
+     of (almost) nothing. A single backtrack after a decimation is unaffected.*/
     unsigned long _size_init=_list_fixed_element.size();
+    if (_size > _size_init) _size = _size_init;
     for (unsigned long i=_size_init; i>_size_init-_size;) {
-        if((ptrV[--i])->_sC != 1.) { // se sto usando NN questo if deve essere >0 altrimenti !=1
+        if(!ptrV[--i]->_forced_by_up) {
             /*build the graph*/
             /*
              build the graph means:
@@ -626,6 +1110,7 @@ void Graph::backtrack() {
 
             _list_fixed_element.erase(ptrV[i]->_it_list_fixed_elem);/*erase the variable node in fixed element list*/
             ptrV[i]->_it_list_fixed_elem = _list_fixed_element.end(); /*set the iterator to _list_fixed_element.end() by default*/
+            diag_move("back", ptrV[i], -1);
             ptrV[i]->reset_value_default_var_i();/*reset values into the node*/
             build(ptrV[i]);/*build clauses*/
 
@@ -647,18 +1132,9 @@ void Graph::backtrack() {
 /***********************************************************************************/
 /***********************************************************************************/
 
-/*public member class Graph. This member prints on file the residual CNF formula.*/
-void Graph::print_on_file_residual_formula() {
-    ostringstream seed;
-    seed<<_seed;/*real seed of the graph in the residual formula title*/
-    const string s=seed.str();
-    const string title="residualformula_seed";
-    const string txt=".cnf";
-    string rf=directory;
-    rf+=title;
-    rf+=s;
-    rf+=txt;
-    ofstream outfile(rf.c_str());
+/*public member class Graph. This member prints the residual CNF formula to path.*/
+void Graph::print_residual_to(const string& path) {
+    ofstream outfile(path.c_str());
     if (!outfile) {
         BSP_ERROR<<"Error file output does not exist"<<endl;
         exit(-1);
@@ -670,7 +1146,20 @@ void Graph::print_on_file_residual_formula() {
             outfile<<_cl[(*i)->_c];/*print on file cluases*/
         }
     }
+}
 
+/*public member class Graph. This member prints on file the residual CNF formula.*/
+void Graph::print_on_file_residual_formula() {
+    ostringstream seed;
+    seed<<_seed;/*real seed of the graph in the residual formula title*/
+    const string s=seed.str();
+    const string title="residualformula_seed";
+    const string txt=".cnf";
+    string rf=directory;
+    rf+=title;
+    rf+=s;
+    rf+=txt;
+    print_residual_to(rf);
 }
 
 /*public member class graph. This member calls WalkSAT function and computes the solution for the residual formula.
@@ -969,7 +1458,7 @@ void Graph::print() {
     str+=txt;
     ofstream outfilecomp_(str.c_str(), ios_base::app);
     for (unsigned i=0; i<_v_Nt.size(); ++i) {
-        outfilecomp_<<_v_Nt[i]<<" "<<_v_M_t[i]<<" "<<_v_c[i]<<" "<<_v_time[i]<<" "<<_N<<" "<<_R_BSP<<endl;
+        outfilecomp_<<_v_Nt[i]<<" "<<_v_M_t[i]<<" "<<_v_c[i]<<" "<<_v_time[i]<<" "<<_N<<" "<<g_r_bsp<<endl;
     }
 
 }
@@ -1100,6 +1589,7 @@ void Graph::read_from_file_graph() { /*read an instance given as INPUT*/
         int ogg2, ogg3;
         bool flag=false;
         int var1;
+        int _clen=0;/*current clause length, for _K inference*/
         /*read file and store variables in _ivec*/
         /* A CNF formula is composed by by +- numbers. 0 identifies the end of a clause*/
         while (!infile.eof()) {
@@ -1124,11 +1614,16 @@ void Graph::read_from_file_graph() { /*read an instance given as INPUT*/
             }
             if (flag) {
                 infile>>var1;
-                if(infile.eof())break;
+                if(!infile)break;/*eof or parse failure (e.g. appended 2nd formula): stop*/
                 _ivec.push_back(var1);
+                if (var1==0) {/*end of clause: track max length as _K*/
+                    if (_clen>0 && static_cast<unsigned>(_clen)>_K) _K=static_cast<unsigned>(_clen);
+                    _clen=0;
+                } else _clen++;
             }
         }
         vector<long int>(_ivec).swap(_ivec);
+        _alpha=static_cast<double>(_M)/static_cast<double>(_N);/*density from header*/
     }
 }
 
