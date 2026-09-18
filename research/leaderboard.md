@@ -228,3 +228,34 @@ Artifacts:
 - `results/idea-007-recovery-k3-n1000-a4.15/`
 
 Implementation: `c8ff796`. Recovery ladder: `1edf603`. Results: `af6f313`.
+
+## Idea 010 — transaction-safe legacy BSP: recovery kept, always-on mode killed
+
+Hypothesis: preserve the legacy schedule and score, but probe every scheduled
+fix and release in a fork. A fatal fix searches direction/variable
+alternatives; a fatal release searches current-I alternatives, then converts
+the slot to a certified forward move.
+
+The safety layer is effective. It improved the N=80 smoke set from certainty's
+3/5 to 4/5 SAT. At `N=300`, it improved SAT from 1/5 to 3/5 and eliminated
+parent-side SP non-convergence; two seeds exhausted every proposal and stopped
+explicitly. All accepted child moves replayed with zero Sigma error.
+
+It does not meet the complete objective as an always-on policy. At N=300,
+move-depth roughness rose 9.1%, fixed-depth roughness rose 1.9%, worst drop
+rose 21.9%, and frontier area/level fell 23.1% as rescued runs reached deeper
+states. Mean wall time rose from 0.44 s to 22.4 s because exhaustive recovery
+is expensive. A no-op fallback was also disproved: restarting an approximate
+epsilon-fixed point can itself fail to converge.
+
+Decision: keep fork isolation and fatal-move recovery as a safety component,
+but kill always-on certification. Future use must trigger it from a
+parameter-free stability signal rather than probing every ordinary move.
+
+Artifacts:
+
+- `results/idea-010-smoke-k3-n80-a4.0/`
+- `results/idea-010-final-k3-n300-a4.15/`
+
+Implementation: `5c872ea`. Backtrack isolation: `0baf9ad`. Certified fallback:
+`1309f18`. Results: `ae6cda9`.
