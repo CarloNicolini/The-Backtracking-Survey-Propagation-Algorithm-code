@@ -22,3 +22,28 @@ predicts the next complexity drop and terminal non-convergence.
 
 No move policy will be implemented unless the proxy has predictive value on
 held-out seeds.
+
+## Results
+
+At matched fixed depths 25 and 50, mean `sI` separates the observed SAT and
+failed runs with AUC 1.0 both on development seeds 1–5 and held-out seeds
+6–15. At the same depths, Sigma gives AUC 0.89–0.91. Successful trajectories
+have mean `sI` higher by roughly 0.06–0.12 before the terminal paramagnetic
+jump.
+
+The candidate oracle shows that one-step flexibility change is not an
+independent greedy objective: its correlation with one-step DeltaSigma is
+0.88 at a normal checkpoint and 0.80 at the fatal checkpoint. Maximizing
+post-fix mean `sI` incurs much larger complexity drops; at the fatal checkpoint
+that move also lacks a tightly converged SP fixed point.
+
+Decision: keep mean `sI` as a global state/early-outcome observable, but reject
+direct flexibility-maximizing decimation. The full Zhao-Zhou flexibility
+measure may still add information beyond this SP proxy and requires its own
+derivation.
+
+Artifacts:
+
+- `results/idea-022-k3-n300-a4.15/`
+- `results/idea-022-candidates-normal/`
+- `results/idea-022-candidates-fatal/`
