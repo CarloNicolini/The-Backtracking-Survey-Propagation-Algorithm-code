@@ -47,6 +47,7 @@ double g_epsilon = epsilon;
 double g_damping = 0.0;
 bool g_dynamic_I_backtrack = false;
 bool g_lyapunov = false;
+long g_lyapunov_step = -1;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -566,6 +567,18 @@ void Graph::compute_lyapunov_at_fixed_point() {
  fork, the tighter fixed point reached from it. The parent BSP trajectory is
  untouched by the refinement.*/
 void Graph::compute_lyapunov() {
+    if (g_lyapunov_step>=0 &&
+        _diag_step_idx!=static_cast<unsigned>(g_lyapunov_step)) {
+        _lyapunov_rho=0.;
+        _lyapunov_exponent=-HUGE_VAL;
+        _lyapunov_iterations=0;
+        _tight_lyapunov_rho=0.;
+        _tight_lyapunov_exponent=-HUGE_VAL;
+        _tight_lyapunov_iterations=0;
+        _tight_lyapunov_converged=false;
+        _tight_complexity=0.;
+        return;
+    }
     compute_lyapunov_at_fixed_point();
     _tight_lyapunov_rho=0.;
     _tight_lyapunov_exponent=-HUGE_VAL;
@@ -648,6 +661,7 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" lyapunov="<<g_lyapunov
+                      <<" lyapunov_step="<<g_lyapunov_step
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"lyapunov_rho,lyapunov_exponent,lyapunov_iterations,"
@@ -659,6 +673,7 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" lyapunov="<<g_lyapunov
+                      <<" lyapunov_step="<<g_lyapunov_step
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -666,6 +681,7 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" lyapunov="<<g_lyapunov
+                      <<" lyapunov_step="<<g_lyapunov_step
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -866,6 +882,7 @@ void Graph::dataset_trials() {
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" lyapunov="<<g_lyapunov
+                <<" lyapunov_step="<<g_lyapunov_step
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

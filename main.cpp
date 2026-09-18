@@ -183,6 +183,15 @@ int main(int argc,  char * const argv[]) {
             g_lyapunov = true;
             continue;
         }
+        if (a.rfind("--lyapunov-step=", 0) == 0) {
+            g_lyapunov = true;
+            g_lyapunov_step = stol(a.substr(16));
+            if (g_lyapunov_step < 0) {
+                BSP_ERROR << "lyapunov step must be >= 0" << endl;
+                return 1;
+            }
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -532,6 +541,7 @@ void help(const char *prog) {
          << "                       Parisi I(k), rather than stale fixation scores.\n"
          << "  --lyapunov        Compute the largest SP message-sweep Lyapunov\n"
          << "                       exponent at every logged fixed point.\n"
+         << "  --lyapunov-step=S Compute it only at diagnostic step S.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
