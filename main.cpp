@@ -179,6 +179,10 @@ int main(int argc,  char * const argv[]) {
             g_parisi_exchange = true;
             continue;
         }
+        if (a == "--parisi-audit") {
+            g_parisi_audit = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -255,6 +259,10 @@ int main(int argc,  char * const argv[]) {
     }
     if (g_oracle_pick > 0) {
         BSP_ERROR << "--oracle-pick is not implemented yet (use --oracle-dir)" << endl;
+        return 1;
+    }
+    if (g_parisi_audit && !g_parisi_exchange) {
+        BSP_ERROR << "--parisi-audit requires --parisi-exchange" << endl;
         return 1;
     }
     if (!g_nn_path.empty()) {
@@ -391,6 +399,7 @@ SP:
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
     if(g_parisi_exchange)G.prepare_parisi_step();/*state-dependent eq. (5) move*/
+    if(g_parisi_audit)G.audit_parisi_release();/*expensive estimator validation*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
     G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
@@ -538,6 +547,8 @@ void help(const char *prog) {
          << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
          << "  --parisi-exchange Choose decimation or an iso-size fix/release\n"
          << "                       exchange from Parisi's P_max > I_min rule.\n"
+         << "  --parisi-audit    Fork one exact release trial per exchange\n"
+         << "                       opportunity for I_min validation.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

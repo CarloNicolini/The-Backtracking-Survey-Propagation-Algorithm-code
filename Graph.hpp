@@ -282,6 +282,8 @@ public:
         _parisi_fix_dir=0;
         _parisi_P=0.;
         _parisi_I=1.;
+        _parisi_release_gain=0.;
+        _parisi_release_converged=false;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -338,6 +340,8 @@ public:
     void fill_nn_features(Vertex* v, double* f); /*15-d local feature vector*/
 
     void prepare_parisi_step(); /*choose decimation or eq. (5) exchange*/
+
+    void audit_parisi_release(); /*measure one exact release response in a fork*/
 
     void apply_parisi_step(); /*apply the prepared parameter-free move*/
 
@@ -462,6 +466,8 @@ private:
     int _parisi_fix_dir;/*direction selected for _parisi_fix*/
     double _parisi_P;/*retained-cluster fraction predicted for fixing*/
     double _parisi_I;/*retained-cluster fraction of the current fixation*/
+    double _parisi_release_gain;/*audited Sigma_after_release-Sigma*/
+    bool _parisi_release_converged;/*whether the audited release found an SP point*/
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;

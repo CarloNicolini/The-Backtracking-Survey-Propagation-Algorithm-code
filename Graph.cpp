@@ -46,6 +46,7 @@ bool g_veto = false;
 double g_epsilon = epsilon;
 double g_damping = 0.0;
 bool g_parisi_exchange = false;
+bool g_parisi_audit = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -329,6 +330,8 @@ void Graph::prepare_parisi_step() {
     _parisi_release=NULL;
     _parisi_P=0.;
     _parisi_I=1.;
+    _parisi_release_gain=0.;
+    _parisi_release_converged=false;
     for (unsigned i=0; i<_N; ++i) {
         Vertex* v=ptrV[i];
         if (v->_I_am_a_fixed_variable) continue;
@@ -356,6 +359,60 @@ void Graph::prepare_parisi_step() {
     BSP_DEBUG<<"Parisi move="<<(_parisi_do_exchange ? "exchange" : "dec")
              <<" P_M="<<_parisi_P<<" I_m="<<_parisi_I
              <<" predicted_dSigma="<<log(_parisi_P/_parisi_I)<<endl;
+}
+
+/*Ground-truth check for the selected I_min candidate. A fork releases only
+ that variable and fully reconverges SP; the parent remains unchanged.*/
+void Graph::audit_parisi_release() {
+    if (!_parisi_release) return;
+#ifdef _WIN32
+    BSP_ERROR<<"--parisi-audit needs fork/mmap (POSIX); not supported on Windows"<<endl;
+    exit(-1);
+#else
+    double* result=(double*)mmap(NULL, 2*sizeof(double), PROT_READ|PROT_WRITE,
+                                 MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (result==MAP_FAILED) {
+        BSP_ERROR<<"mmap failed for Parisi release audit"<<endl;
+        exit(-1);
+    }
+    result[0]=0.;
+    result[1]=0.;
+    _ds_out<<flush;
+    _diag_step_out<<flush;
+    _diag_var_out<<flush;
+    _diag_move_out<<flush;
+    cout<<flush;
+    cerr<<flush;
+    fflush(NULL);
+    pid_t pid=fork();
+    if (pid<0) {
+        munmap(result, 2*sizeof(double));
+        BSP_ERROR<<"fork failed for Parisi release audit"<<endl;
+        exit(-1);
+    }
+    if (pid==0) {
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        _in_trial=true;
+        _list_fixed_element.erase(_parisi_release->_it_list_fixed_elem);
+        _parisi_release->_it_list_fixed_elem=_list_fixed_element.end();
+        _parisi_release->reset_value_default_var_i();
+        build(_parisi_release);
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        convergence_messages();
+        surveys();
+        result[0]=complexity;
+        result[1]=1.;
+        _exit(0);
+    }
+    int status=0;
+    while (waitpid(pid, &status, 0)<0 && errno==EINTR) {}
+    _parisi_release_converged=WIFEXITED(status) && WEXITSTATUS(status)==0
+                              && result[1]>0.;
+    if (_parisi_release_converged)
+        _parisi_release_gain=result[0]-complexity;
+    munmap(result, 2*sizeof(double));
+#endif
 }
 
 void Graph::apply_parisi_step() {
@@ -628,14 +685,17 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" lookahead_k="<<g_lookahead_k
                       <<" parisi_exchange="<<g_parisi_exchange
+                      <<" parisi_audit="<<g_parisi_audit
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
-                      <<"P_max,I_min,predicted_delta_sigma\n";
+                      <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
+                      <<"actual_release_gain,release_converged\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" lookahead_k="<<g_lookahead_k
                       <<" parisi_exchange="<<g_parisi_exchange
+                      <<" parisi_audit="<<g_parisi_audit
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -643,6 +703,7 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" lookahead_k="<<g_lookahead_k
                       <<" parisi_exchange="<<g_parisi_exchange
+                      <<" parisi_audit="<<g_parisi_audit
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -659,7 +720,10 @@ void Graph::diag_step() {
                   <<(complexity/static_cast<double>(_N))<<","
                   <<_time_conv_print<<","<<_unit_prop<<","
                   <<_last_certitude<<","<<_list_fixed_element.size()<<","
-                  <<_parisi_P<<","<<_parisi_I<<","<<predicted<<endl;
+                  <<_parisi_P<<","<<_parisi_I<<","<<predicted<<","
+                  <<(_parisi_I>0. ? -log(_parisi_I) : HUGE_VAL)<<","
+                  <<_parisi_release_gain<<","
+                  <<(_parisi_release_converged ? 1 : 0)<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -844,6 +908,7 @@ void Graph::dataset_trials() {
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" lookahead_k="<<g_lookahead_k
                 <<" parisi_exchange="<<g_parisi_exchange
+                <<" parisi_audit="<<g_parisi_audit
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

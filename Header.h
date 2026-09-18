@@ -119,6 +119,7 @@ bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 
 /*Parameter-free Parisi exchange dynamics (eq. 5), off by default.*/
 extern bool g_parisi_exchange;
+extern bool g_parisi_audit; /*fork one release trial for estimator validation*/
 
 /*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/
 extern string g_dataset_prefix; /*output prefix for _dataset.csv*/
