@@ -294,6 +294,12 @@ public:
         _cert_probe_converged=false;
         _cert_replay_pending=false;
         _cert_replay_error=0.;
+        _finance_fix2=NULL;
+        _finance_fix2_dir=0;
+        _finance_direct_sigma=0.;
+        _finance_compound_sigma=0.;
+        _finance_direct_cost=0.;
+        _finance_compound_cost=0.;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -358,6 +364,8 @@ public:
     bool parisi_will_exchange() { return _parisi_do_exchange; }
 
     void prepare_certified_step(); /*probe and select a Sigma-certified move*/
+
+    void prepare_financed_step(); /*choose direct or release-one/fix-two move*/
 
     void apply_certified_step(); /*commit the selected certified move*/
 
@@ -483,7 +491,7 @@ private:
     double _parisi_I;/*retained-cluster fraction of the current fixation*/
     double _parisi_release_gain;/*audited Sigma_after_release-Sigma*/
     bool _parisi_release_converged;/*whether the audited release found an SP point*/
-    int _cert_action;/*0=fix, 1=swap, 2=release*/
+    int _cert_action;/*0=fix, 1=swap, 2=release, 3=self-financing compound*/
     Vertex* _cert_fix;
     Vertex* _cert_release;
     int _cert_fix_dir;
@@ -492,6 +500,12 @@ private:
     bool _cert_probe_converged;
     bool _cert_replay_pending;
     double _cert_replay_error;
+    Vertex* _finance_fix2;
+    int _finance_fix2_dir;
+    double _finance_direct_sigma;
+    double _finance_compound_sigma;
+    double _finance_direct_cost;
+    double _finance_compound_cost;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
@@ -559,7 +573,8 @@ private:
         CertifiedProbe() : converged(false), sigma(0.), fixed(0) {}
     };
 
-    CertifiedProbe probe_certified(Vertex* fix, int dir, Vertex* release);
+    CertifiedProbe probe_certified(Vertex* fix, int dir, Vertex* release,
+                                   Vertex* fix2=NULL, int dir2=-1);
 
     void release_certified(Vertex* v);
 

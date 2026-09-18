@@ -49,6 +49,7 @@ bool g_parisi_exchange = false;
 bool g_parisi_audit = false;
 bool g_dynamic_I_backtrack = false;
 bool g_sigma_certified = false;
+bool g_self_financing = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -334,12 +335,15 @@ void Graph::release_certified(Vertex* v) {
 /*Probe one fix, release, or swap in a fork. Fatal SP exits remain child-local,
  and the parent stays at its last converged fixed point.*/
 Graph::CertifiedProbe Graph::probe_certified(Vertex* fix, int dir,
-                                              Vertex* release) {
+                                              Vertex* release,
+                                              Vertex* fix2, int dir2) {
     CertifiedProbe probe;
 #ifdef _WIN32
     (void)fix;
     (void)dir;
     (void)release;
+    (void)fix2;
+    (void)dir2;
     BSP_ERROR<<"--sigma-certified needs fork/mmap (POSIX); not supported on Windows"<<endl;
     exit(-1);
 #else
@@ -371,6 +375,7 @@ Graph::CertifiedProbe Graph::probe_certified(Vertex* fix, int dir,
         _in_trial=true;
         if (release) release_certified(release);
         if (fix) decimate_one(fix, dir);
+        if (fix2) decimate_one(fix2, dir2);
         stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
         convergence_messages();
         surveys();
@@ -509,10 +514,124 @@ void Graph::prepare_certified_step() {
     exit(-1);
 }
 
+/*Compare two measured proposals with positive net fixation: the best direct
+ fix, and a compound release-one/fix-two move whose release supplies
+ complexity credit. Both are probed from the same parent fixed point.*/
+void Graph::prepare_financed_step() {
+    if (_cert_replay_pending) {
+        _cert_replay_error=fabs(complexity-_cert_probe_sigma);
+        if (_cert_replay_error>1.e-8)
+            BSP_WARN<<"self-financing replay error="<<_cert_replay_error<<endl;
+        _cert_replay_pending=false;
+    } else _cert_replay_error=0.;
+
+    _cert_action=0;
+    _cert_fix=NULL;
+    _cert_release=NULL;
+    _finance_fix2=NULL;
+    _cert_P=0.;
+    _cert_probe_converged=false;
+    _finance_direct_sigma=0.;
+    _finance_compound_sigma=0.;
+    _finance_direct_cost=HUGE_VAL;
+    _finance_compound_cost=HUGE_VAL;
+
+    for (unsigned i=0; i<_N; ++i) {
+        Vertex* v=ptrV[i];
+        if (v->_I_am_a_fixed_variable) continue;
+        double P=1.-min(v->_sT, v->_sF);
+        if (!_cert_fix || P>_cert_P) {
+            _cert_fix=v;
+            _cert_P=P;
+        }
+    }
+    if (!_cert_fix) return;
+    _cert_fix_dir=(_cert_fix->_sT>_cert_fix->_sF) ? 1 : 0;
+
+    double I=1.;
+    for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+         it!=_list_fixed_element.end(); ++it) {
+        Vertex* v=*it;
+        if (v->_forced_by_up || share_clause(_cert_fix, v)) continue;
+        double candidate=current_fixation_factor(v);
+        if (!_cert_release || candidate<I) {
+            _cert_release=v;
+            I=candidate;
+        }
+    }
+    if (_cert_release) {
+        double best_P=0.;
+        for (unsigned i=0; i<_N; ++i) {
+            Vertex* v=ptrV[i];
+            if (v->_I_am_a_fixed_variable || v==_cert_fix) continue;
+            if (share_clause(v, _cert_fix) || share_clause(v, _cert_release))
+                continue;
+            double P=1.-min(v->_sT, v->_sF);
+            if (!_finance_fix2 || P>best_P) {
+                _finance_fix2=v;
+                best_P=P;
+            }
+        }
+        if (_finance_fix2)
+            _finance_fix2_dir=(_finance_fix2->_sT>_finance_fix2->_sF) ? 1 : 0;
+    }
+
+    unsigned fixed_before=static_cast<unsigned>(_list_fixed_element.size());
+    CertifiedProbe direct=probe_certified(_cert_fix, _cert_fix_dir, NULL);
+    if (direct.converged && direct.fixed>fixed_before) {
+        _finance_direct_sigma=direct.sigma;
+        _finance_direct_cost=(complexity-direct.sigma)
+                             /static_cast<double>(direct.fixed-fixed_before);
+    }
+    if (direct.converged && direct.sigma==0.) {
+        _cert_probe_converged=true;
+        _cert_probe_sigma=direct.sigma;
+        return;
+    }
+
+    CertifiedProbe compound;
+    if (_cert_release && _finance_fix2) {
+        compound=probe_certified(_cert_fix, _cert_fix_dir, _cert_release,
+                                 _finance_fix2, _finance_fix2_dir);
+        if (compound.converged && compound.fixed>fixed_before) {
+            _finance_compound_sigma=compound.sigma;
+            _finance_compound_cost=(complexity-compound.sigma)
+                                   /static_cast<double>(
+                                       compound.fixed-fixed_before);
+        }
+    }
+    if (compound.converged && compound.sigma==0.) {
+        _cert_action=3;
+        _cert_probe_converged=true;
+        _cert_probe_sigma=compound.sigma;
+        return;
+    }
+    if (compound.converged && compound.fixed>fixed_before &&
+        (!direct.converged || _finance_compound_cost<_finance_direct_cost)) {
+        _cert_action=3;
+        _cert_probe_converged=true;
+        _cert_probe_sigma=compound.sigma;
+        return;
+    }
+    if (direct.converged) {
+        _cert_probe_converged=true;
+        _cert_probe_sigma=direct.sigma;
+        return;
+    }
+
+    prepare_certified_step();/*rare hard-event recovery ladder*/
+}
+
 void Graph::apply_certified_step() {
     _unit_prop=0;
     _M_t=0;
-    if (_cert_action==1) {
+    if (_cert_action==3) {
+        release_certified(_cert_release);
+        decimate_one(_cert_fix, _cert_fix_dir);
+        decimate_one(_finance_fix2, _finance_fix2_dir);
+        ++_numb_of_back_moves;
+        _numb_of_dec_moves+=2.;
+    } else if (_cert_action==1) {
         release_certified(_cert_release);
         decimate_one(_cert_fix, _cert_fix_dir);
         ++_numb_of_back_moves;
@@ -860,7 +979,7 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
     if(complexity_variables==0.) complexity=0;
-    if(g_parisi_exchange || g_sigma_certified) {
+    if(g_parisi_exchange || g_sigma_certified || g_self_financing) {
         fl_bsp=false;
         return;/*an experimental scheduler makes the state-dependent decision*/
     }
@@ -900,11 +1019,13 @@ void Graph::diag_step() {
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
+                      <<" self_financing="<<g_self_financing
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
                       <<"P_max,I_min,predicted_delta_sigma,predicted_release_gain,"
                       <<"actual_release_gain,release_converged,"
-                      <<"certified_sigma,replay_error\n";
+                      <<"certified_sigma,replay_error,direct_sigma,compound_sigma,"
+                      <<"direct_cost,compound_cost\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -913,6 +1034,7 @@ void Graph::diag_step() {
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
+                      <<" self_financing="<<g_self_financing
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -923,13 +1045,15 @@ void Graph::diag_step() {
                       <<" parisi_audit="<<g_parisi_audit
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" sigma_certified="<<g_sigma_certified
+                      <<" self_financing="<<g_self_financing
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
     }
     unsigned step=_diag_step_idx++;
-    const char* move=g_sigma_certified
-        ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
+    const char* move=(g_sigma_certified || g_self_financing)
+        ? (_cert_action==3 ? "compound"
+           : (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec")))
         : (g_parisi_exchange
            ? (_parisi_do_exchange ? "exchange" : "dec")
            : (fl_bsp ? "back" : "dec"));
@@ -945,7 +1069,9 @@ void Graph::diag_step() {
                   <<(_parisi_I>0. ? -log(_parisi_I) : HUGE_VAL)<<","
                   <<_parisi_release_gain<<","
                   <<(_parisi_release_converged ? 1 : 0)<<","
-                  <<_cert_probe_sigma<<","<<_cert_replay_error<<endl;
+                  <<_cert_probe_sigma<<","<<_cert_replay_error<<","
+                  <<_finance_direct_sigma<<","<<_finance_compound_sigma<<","
+                  <<_finance_direct_cost<<","<<_finance_compound_cost<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -1133,6 +1259,7 @@ void Graph::dataset_trials() {
                 <<" parisi_audit="<<g_parisi_audit
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" sigma_certified="<<g_sigma_certified
+                <<" self_financing="<<g_self_financing
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -1156,8 +1283,9 @@ void Graph::dataset_trials() {
         exit(-1);
     }
     double sigma_before=complexity;
-    const char* mv=g_sigma_certified
-        ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
+    const char* mv=(g_sigma_certified || g_self_financing)
+        ? (_cert_action==3 ? "compound"
+           : (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec")))
         : (g_parisi_exchange
            ? (_parisi_do_exchange ? "exchange" : "dec")
            : (fl_bsp ? "back" : "dec"));
