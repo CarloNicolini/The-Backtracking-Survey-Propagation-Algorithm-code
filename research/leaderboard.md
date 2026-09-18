@@ -167,7 +167,7 @@ Artifacts:
 Implementation: `d5e6db0`. Release audit: `501e9cb`. Lyapunov refinement:
 `71ccef2`. Results: `679ace9`.
 
-## Idea 006 — current-I backtracking: K=4 winner, K=3 rejected
+## Idea 006 — current-I backtracking: target-scale winner
 
 Hypothesis: preserve the standard `r=0.9` BSP schedule and change only release
 selection from stale fixation-time `_sC` to the validated current `I(k)`.
@@ -195,18 +195,31 @@ the observed alpha ceiling. It still reduced mean absolute DeltaSigma by 9.1%
 versus certainty and 5.0% versus polarization; fixed-depth roughness fell
 10.4% and 12.6%, at 1.34 times certainty's wall time.
 
-Decision: keep `--dynamic-i-backtrack` as the current K=4 winner. It works
+Target K=3 validation also succeeds once the requested reliable size is used.
+At `N=10000`, `alpha=4.2`, seeds 1–5, current-I solved 5/5 versus certainty's
+4/5 and matched polarization and `gamma=0.01`. It had the lowest mean signed
+descent (26.0% below certainty, 44.2% below polarization, and 30.2% below
+gamma) and the lowest fixed-depth roughness (17.7%, 0.3%, and 21.8% lower).
+Its fixed-depth maximum drop fell 17.9% versus certainty and 56.3% versus
+gamma. Mean absolute DeltaSigma was 12.1% below certainty and 11.4% below
+polarization, though 5.8% above gamma. Wall time was only 5.8% above
+certainty. The finite-size K=3/N=1000 regression therefore does not survive
+at the physically appropriate N.
+
+Decision: keep `--dynamic-i-backtrack` as the target-scale winner. It works
 because every release is ranked by the fraction of clusters retaining the
 variable's actual value under the current cavity state, rather than by a score
-frozen on an obsolete residual formula. The result is K-dependent: retain the
-negative K=3 evidence and do not claim a universal policy.
+frozen on an obsolete residual formula. Retain the negative small-N evidence:
+the policy relies on the same locally tree-like limit as SP itself.
 
 Artifacts:
 
 - `results/idea-006-k3-n300-a4.15/`
 - `results/idea-006-k3-n1000-a4.15/`
+- `results/idea-006-k3-n10000-a4.2-5seeds-comparison/`
 - `results/idea-006-k4-n1000-a9.5-10seeds/`
 - `results/idea-006-k4-n1000-a9.7-5seeds/`
 
 Implementation: `b064217`. K=3 results: `871f12b`. K=4 validation:
 `70e264f`; harder-density validation: `77af8a1`.
+K=3 target validation: `3cf30e6`.
