@@ -365,6 +365,10 @@ public:
 
     void apply_safe_decimation(); /*commit selected fix or recovery release*/
 
+    void prepare_safe_backtrack(); /*probe scheduled release and alternatives*/
+
+    void apply_safe_backtrack(); /*commit a convergent release or no-op*/
+
     void check_certified_replay(); /*compare parent SP with selected child*/
 
     bool safe_will_release() { return _cert_action==2; }

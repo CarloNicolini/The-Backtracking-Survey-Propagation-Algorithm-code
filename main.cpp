@@ -426,8 +426,10 @@ SP:
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
     if(g_transaction_safe)G.check_certified_replay();
-    if(g_transaction_safe && !G.fl_bsp && G.complexity!=0.)
-        G.prepare_safe_decimation();
+    if(g_transaction_safe && G.complexity!=0.) {
+        if(G.fl_bsp)G.prepare_safe_backtrack();
+        else G.prepare_safe_decimation();
+    }
     if(g_parisi_exchange && G.complexity!=0.)
         G.prepare_parisi_step();/*state-dependent eq. (5) move*/
     if(g_sigma_certified && G.complexity!=0.)
@@ -437,6 +439,12 @@ SP:
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
     G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
+
+    if(g_transaction_safe && G.complexity==0) {
+        BSP_INFO<<G;
+        G.save();
+        goto PARAPHASE;
+    }
 
     if(g_sigma_certified) {
         BSP_INFO<<G;
@@ -530,7 +538,8 @@ SP:
 
 
 
-        G.backtrack();/*bactrack move*/
+        if(g_transaction_safe)G.apply_safe_backtrack();
+        else G.backtrack();/*bactrack move*/
         goto SP;/*go to SP*/
     }
 

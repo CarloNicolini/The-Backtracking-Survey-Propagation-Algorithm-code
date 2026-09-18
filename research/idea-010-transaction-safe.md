@@ -16,6 +16,11 @@ Failed proposals cannot corrupt the parent because they terminate inside
 copy-on-write children. Accepted proposals are replayed in the parent and
 their Sigma must match exactly.
 
+Scheduled backtracking moves use the same transaction rule. Probe the legacy
+release first; if it does not converge, try other fixed variables ordered by
+current `I(k)`. If every release fails, consume the backtracking slot as a
+no-op and retain the last converged parent state.
+
 This is a safety layer around the existing dynamics, not a replacement
 schedule or score. Therefore ordinary trajectories should preserve certainty's
 move-depth and fixed-depth smoothness, while the first fatal move becomes a

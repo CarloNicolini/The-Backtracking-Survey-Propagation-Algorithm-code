@@ -632,6 +632,57 @@ void Graph::apply_safe_decimation() {
     _cert_replay_pending=_cert_probe_converged;
 }
 
+void Graph::prepare_safe_backtrack() {
+    _cert_action=4;/*no-op unless a release is certified*/
+    _cert_release=NULL;
+    _cert_probe_converged=false;
+    vector<pair<double, Vertex*> > stale_order;
+    for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+         it!=_list_fixed_element.end(); ++it)
+        if (!(*it)->_forced_by_up)
+            stale_order.push_back(make_pair((*it)->_sC, *it));
+    sort(stale_order.begin(), stale_order.end());
+    if (stale_order.empty()) return;
+
+    _cert_release=stale_order[0].second;
+    CertifiedProbe legacy=probe_certified(NULL, -1, _cert_release);
+    if (legacy.converged) {
+        _cert_action=2;
+        _cert_probe_converged=true;
+        _cert_probe_sigma=legacy.sigma;
+        return;
+    }
+
+    vector<pair<double, Vertex*> > current_order;
+    for (unsigned i=1; i<stale_order.size(); ++i) {
+        Vertex* v=stale_order[i].second;
+        current_order.push_back(make_pair(current_fixation_factor(v), v));
+    }
+    sort(current_order.begin(), current_order.end());
+    for (unsigned i=0; i<current_order.size(); ++i) {
+        Vertex* v=current_order[i].second;
+        CertifiedProbe alternative=probe_certified(NULL, -1, v);
+        if (!alternative.converged) continue;
+        _cert_release=v;
+        _cert_action=2;
+        _cert_probe_converged=true;
+        _cert_probe_sigma=alternative.sigma;
+        return;
+    }
+    _cert_release=NULL;/*retain the last converged parent state*/
+}
+
+void Graph::apply_safe_backtrack() {
+    _unit_prop=0;
+    if (_cert_action==2) {
+        _M_t=0;
+        release_certified(_cert_release);
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+        _cert_replay_pending=_cert_probe_converged;
+    }
+}
+
 /*Prepare a parameter-free move from Parisi's P_M > I_m criterion. Exchanges
  continue only while the previously realized exchange strictly increased
  complexity; a non-improving response forces the next decimation.*/
@@ -1033,8 +1084,9 @@ void Graph::diag_step() {
         _diag_header_done=true;
     }
     unsigned step=_diag_step_idx++;
-    const char* move=(g_transaction_safe && !fl_bsp && _cert_action==2)
-        ? "back"
+    const char* move=g_transaction_safe
+        ? (fl_bsp ? (_cert_action==2 ? "back" : "noop")
+                  : (_cert_action==2 ? "back" : "dec"))
         : (g_sigma_certified
            ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
            : (g_parisi_exchange
@@ -1264,8 +1316,9 @@ void Graph::dataset_trials() {
         exit(-1);
     }
     double sigma_before=complexity;
-    const char* mv=(g_transaction_safe && !fl_bsp && _cert_action==2)
-        ? "back"
+    const char* mv=g_transaction_safe
+        ? (fl_bsp ? (_cert_action==2 ? "back" : "noop")
+                  : (_cert_action==2 ? "back" : "dec"))
         : (g_sigma_certified
            ? (_cert_action==1 ? "swap" : (_cert_action==2 ? "back" : "dec"))
            : (g_parisi_exchange
