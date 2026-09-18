@@ -256,3 +256,32 @@ Artifacts:
 - `results/idea-008-k3-n300-a4.15/`
 
 Implementation: `71bd2af`. Results: `a945282`.
+
+## Idea 009 — SP fixed-point branch consensus: killed
+
+Hypothesis: construct an independently initialized SP replica and decimate
+only variables whose preferred direction agrees across both fixed points,
+ranking by worst-case assignment retention.
+
+The alternate state was measurable. In the N=80 smoke run every replica
+converged, mean branch distance was 0.0329, and directional agreement reached
+as low as 52.7%. At `N=300`, however, the four failed seeds were nearly
+single-branch: mean distance was about 0.003 and mean agreement exceeded
+99.6%. The sole successful seed had by far the largest branch distance
+(0.0977).
+
+Across five N=300 seeds, outcomes remained 1/5 SAT. Consensus reduced mean
+worst drop by 4.9%, but increased move-depth roughness by 1.7%, fixed-depth
+roughness by 34.3%, reduced frontier area by 2.0%, and cost 16.7 times more
+than certainty.
+
+Decision: kill. Fixed-point multiplicity does not explain the observed
+non-convergences on these seeds, and full random restart is too expensive as
+an always-on signal. Do not tune the replica count.
+
+Artifacts:
+
+- `results/idea-009-smoke-k3-n80-a4.0/`
+- `results/idea-009-k3-n300-a4.15/`
+
+Implementation: `685de8f`. Results: `17faa56`.
