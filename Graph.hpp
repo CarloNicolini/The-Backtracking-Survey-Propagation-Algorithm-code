@@ -324,7 +324,7 @@ public:
 
     void update_complexity_clauses(); /*update clauses complexity*/
 
-    void convergence_messages(); /*compute fix points all messages*/
+    void convergence_messages(unsigned max_iterations=t_max); /*compute fix points all messages*/
 
     void surveys(); /*compute surveys for each variable node*/
 

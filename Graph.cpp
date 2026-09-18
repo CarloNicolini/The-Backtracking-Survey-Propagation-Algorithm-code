@@ -599,7 +599,7 @@ void Graph::compute_lyapunov() {
         _in_trial=true;
         unsigned fixed_before=static_cast<unsigned>(_list_fixed_element.size());
         g_epsilon=ZERO;
-        convergence_messages();
+        convergence_messages(8*t_max);
         surveys();
         if (_list_fixed_element.size()!=fixed_before) _exit(42);
         compute_lyapunov_at_fixed_point();
@@ -1083,7 +1083,7 @@ void Graph::unit_propagation() {
  b) a contradiction is found : exit FAILURE;
  c) no convergence is found after t_max iteration: exit FAILURE
  */
-void Graph::convergence_messages() { /*compute convergence messages for message passing algorithm*/
+void Graph::convergence_messages(unsigned max_iterations) { /*compute convergence messages for message passing algorithm*/
     bool conv_f=false;
     unsigned long i,l, __k;
     unsigned int C;
@@ -1106,7 +1106,7 @@ START:
     }
     update_products();
     /*convergence*/
-    for (unsigned int t=0; t<t_max; ++t) {
+    for (unsigned int t=0; t<max_iterations; ++t) {
         conv_f=false;
         _counter_conv=0;/*set counter convergence to zero*/
         complexity_clauses=0.;/*set clauses complexity to zero*/
