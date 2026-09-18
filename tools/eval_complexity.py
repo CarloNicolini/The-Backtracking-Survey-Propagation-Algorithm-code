@@ -56,6 +56,23 @@ def summarize_curve(rows):
     has_terminal_zero = bool(sigma) and sigma[-1] == 0.0
     shape_deltas = deltas[:-1] if has_terminal_zero else deltas
     auc = sum((before + after) / 2 for before, after in zip(sigma, sigma[1:]))
+    frontier = {}
+    for row in rows:
+        fixed = int(row["n_fixed"])
+        value = float(row["Sigma"])
+        frontier[fixed] = max(value, frontier.get(fixed, value))
+    fixed_points = sorted(frontier.items())
+    fixed_slopes = [
+        (before[1] - after[1]) / (after[0] - before[0])
+        for before, after in zip(fixed_points, fixed_points[1:])
+    ]
+    fixed_span = (
+        fixed_points[-1][0] - fixed_points[0][0] if len(fixed_points) > 1 else 0
+    )
+    fixed_auc = sum(
+        (after[0] - before[0]) * (before[1] + after[1]) / 2
+        for before, after in zip(fixed_points, fixed_points[1:])
+    )
     return {
         "steps": transitions,
         "sigma_initial": sigma[0] if sigma else 0.0,
@@ -78,6 +95,28 @@ def summarize_curve(rows):
         ),
         "auc_sigma": auc,
         "auc_per_step": auc / transitions if transitions else 0.0,
+        "max_fixed": fixed_points[-1][0] if fixed_points else 0,
+        "fixed_frontier_max_drop": max(fixed_slopes, default=0.0),
+        "fixed_frontier_mean_drop": (
+            (fixed_points[0][1] - fixed_points[-1][1]) / fixed_span
+            if fixed_span
+            else 0.0
+        ),
+        "fixed_frontier_roughness": (
+            sum(
+                abs(slope) * (after[0] - before[0])
+                for slope, before, after in zip(
+                    fixed_slopes, fixed_points, fixed_points[1:]
+                )
+            )
+            / fixed_span
+            if fixed_span
+            else 0.0
+        ),
+        "fixed_frontier_auc": fixed_auc,
+        "fixed_frontier_auc_per_level": (
+            fixed_auc / fixed_span if fixed_span else 0.0
+        ),
         "eta_mean": (
             sum(float(row["eta"]) for row in rows) / len(rows) if rows else 0.0
         ),
@@ -156,6 +195,12 @@ def write_summary(path, records):
         "mean_abs_delta_preterminal",
         "auc_sigma",
         "auc_per_step",
+        "max_fixed",
+        "fixed_frontier_max_drop",
+        "fixed_frontier_mean_drop",
+        "fixed_frontier_roughness",
+        "fixed_frontier_auc",
+        "fixed_frontier_auc_per_level",
         "eta_mean",
         "wall_seconds",
     ]
@@ -185,6 +230,9 @@ def write_aggregate(path, records):
         "mean_abs_delta",
         "mean_abs_delta_preterminal",
         "mean_auc_per_step",
+        "mean_fixed_frontier_max_drop",
+        "mean_fixed_frontier_roughness",
+        "mean_fixed_frontier_auc_per_level",
         "mean_steps",
         "mean_wall_seconds",
     ]
@@ -208,6 +256,15 @@ def write_aggregate(path, records):
                     group, "mean_abs_delta_preterminal"
                 ),
                 "mean_auc_per_step": mean(group, "auc_per_step"),
+                "mean_fixed_frontier_max_drop": mean(
+                    group, "fixed_frontier_max_drop"
+                ),
+                "mean_fixed_frontier_roughness": mean(
+                    group, "fixed_frontier_roughness"
+                ),
+                "mean_fixed_frontier_auc_per_level": mean(
+                    group, "fixed_frontier_auc_per_level"
+                ),
                 "mean_steps": mean(group, "steps"),
                 "mean_wall_seconds": mean(group, "wall_seconds"),
             }
@@ -219,12 +276,12 @@ def write_aggregate(path, records):
     return aggregate
 
 
-def write_svg(path, records, n):
+def write_svg(path, records, n, x_field="step", x_label="SP transition"):
     curves = []
     for record in records:
         rows = read_curve(record["curve"]) if record["curve"].exists() else []
         points = [
-            (int(row["step"]), float(row["Sigma"]) / n)
+            (int(row[x_field]), float(row["Sigma"]) / n)
             for row in rows
         ]
         if points:
@@ -273,7 +330,7 @@ def write_svg(path, records, n):
         [
             f'<text x="{left + plot_width / 2}" y="{height - 22}" '
             'text-anchor="middle" font-family="sans-serif" font-size="16">'
-            "SP transition</text>",
+            f"{html.escape(x_label)}</text>",
             f'<text x="22" y="{top + plot_height / 2}" text-anchor="middle" '
             'transform="rotate(-90 22 '
             f'{top + plot_height / 2})" font-family="sans-serif" font-size="16">'
@@ -340,6 +397,13 @@ def main():
     write_summary(args.out / "summary.tsv", records)
     aggregate = write_aggregate(args.out / "aggregate.tsv", records)
     write_svg(args.out / "sigma_curves.svg", records, args.n)
+    write_svg(
+        args.out / "sigma_vs_fixed.svg",
+        records,
+        args.n,
+        x_field="n_fixed",
+        x_label="fixed variables",
+    )
     for row in aggregate:
         print(
             f"{row['config']}: sat={row['sat']}/{row['runs']} "
