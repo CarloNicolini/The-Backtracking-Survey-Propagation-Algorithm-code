@@ -190,6 +190,11 @@ versus polarization, while fixed-depth roughness fell 4.8% and 16.7%.
 Frontier area/level rose 3.7% over certainty. Wall time was 1.94 times
 certainty and 2.11 times polarization, within the target budget.
 
+At the harder `alpha=9.7`, all methods failed 0/5, so current-I did not raise
+the observed alpha ceiling. It still reduced mean absolute DeltaSigma by 9.1%
+versus certainty and 5.0% versus polarization; fixed-depth roughness fell
+10.4% and 12.6%, at 1.34 times certainty's wall time.
+
 Decision: keep `--dynamic-i-backtrack` as the current K=4 winner. It works
 because every release is ranked by the fraction of clusters retaining the
 variable's actual value under the current cavity state, rather than by a score
@@ -201,6 +206,7 @@ Artifacts:
 - `results/idea-006-k3-n300-a4.15/`
 - `results/idea-006-k3-n1000-a4.15/`
 - `results/idea-006-k4-n1000-a9.5-10seeds/`
+- `results/idea-006-k4-n1000-a9.7-5seeds/`
 
 Implementation: `b064217`. K=3 results: `871f12b`. K=4 validation:
-`70e264f`.
+`70e264f`; harder-density validation: `77af8a1`.
