@@ -194,3 +194,23 @@ Artifacts:
 - `results/idea-006-k3-n1000-a4.15/`
 
 Implementation: `b064217`. Results: `871f12b`.
+
+## Idea 014 — adiabatic two-stage Parisi exchange: killed
+
+Hypothesis: release current `I_min`, reconverge SP, choose the replacement from
+the updated state, then force a net-progress decimation. This separates the
+two nonlinear halves of Parisi's exchange.
+
+At N=300, five seeds, the controller solved 0/5; the sole certainty success
+reached the trivial SP phase but WalkSAT failed. Mean worst drop fell 7.7%,
+but move-depth roughness rose 25.7%. The intervening equilibration therefore
+does not preserve enough release credit to improve the future trajectory.
+
+Decision: kill. The failure of both simultaneous and two-stage exchanges
+shows that minimum `I(k)` identifies easy releases, not necessarily mistaken
+assignments. The next release rule should target sign regret
+`log(P_current_best/I_assigned)` instead.
+
+Artifacts: `results/idea-014-k3-n300-a4.15/`.
+
+Implementation: `03da3fe`. Results: `3c4b3bc`.
