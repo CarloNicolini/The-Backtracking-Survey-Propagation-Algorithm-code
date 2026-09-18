@@ -175,6 +175,10 @@ int main(int argc,  char * const argv[]) {
             }
             continue;
         }
+        if (a == "--dynamic-i-backtrack") {
+            g_dynamic_I_backtrack = true;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -328,7 +332,9 @@ int main(int argc,  char * const argv[]) {
      Vertex.cpp files.*/
 
     G.split_and_collect_information();/*split and collect information into graph G*/
-    if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
+    if(g_dynamic_I_backtrack)
+        BSP_INFO<<"START DYNAMIC-I BSP WITH r="<<g_r_bsp<<":"<<endl;
+    else if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     /*Check if we have to use unit propagation*/
@@ -513,6 +519,8 @@ void help(const char *prog) {
          << "  --veto            Veto co-decimating vars sharing a clause.\n"
          << "  --eps=E           SP convergence threshold (default 0.01).\n"
          << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
+         << "  --dynamic-i-backtrack Rank releases by current assignment-specific\n"
+         << "                       Parisi I(k), rather than stale fixation scores.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

@@ -45,6 +45,7 @@ double g_bsp_theta = 0.0;
 bool g_veto = false;
 double g_epsilon = epsilon;
 double g_damping = 0.0;
+bool g_dynamic_I_backtrack = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -255,6 +256,54 @@ void Graph::decimate_one(Vertex* v, int force_dir) {
     v->_degree_i=0;/*set to 0 the degree of the variable node*/
 }
 
+/*Reconstruct the current cavity warning from one incident clause to a fixed
+ variable. Active clauses contain the edge-excluding divisor. In a satisfied
+ clause the live messages are zero, so neighbor products are already cavity
+ products and need no divisor.*/
+double Graph::warning_to_fixed(Vertex* v, unsigned edge) {
+    unsigned c=*real(v->_I_am_in_cl_at_init[edge]);
+    unsigned pos=*imag(v->_I_am_in_cl_at_init[edge]);
+    Clause& cl=_cl[c];
+    for (unsigned j=0; j<cl._size_cl_init; ++j)
+        if (j!=pos && !cl._go_forward[j] && cl._vb[j])
+            return 0.;/*another fixed literal satisfies the clause*/
+
+    double warning=1.;
+    double normalization=1.;
+    for (unsigned j=0; j<cl._size_cl_init; ++j) {
+        if (j==pos || !cl._go_forward[j]) continue;
+        Vertex* u=cl.v_V[j];
+        double prod_u=cl.v_lit[j] ? u->prod_V_minus : u->prod_V_plus;
+        double divisor=cl._I_am_in_list_unsat ? cl.div_s[j] : 1.;
+        double prod_s=(cl.v_lit[j] ? u->prod_V_plus : u->prod_V_minus)
+                      *divisor;
+        warning*=(1.-prod_u)*prod_s;
+        normalization*=prod_s+prod_u-prod_s*prod_u;
+    }
+    if (normalization<=ZERO) return 1.;
+    double eta=warning/normalization;
+    if (eta<0.) return 0.;
+    if (eta>1.) return 1.;
+    return eta;
+}
+
+/*Parisi's current I(k): the fraction of current clusters retaining fixed
+ variable k at its actual assigned value.*/
+double Graph::current_fixation_factor(Vertex* v) {
+    double prod_plus=1.,prod_minus=1.;
+    for (unsigned edge=0; edge<v->_I_am_in_cl_at_init.size(); ++edge) {
+        double one_minus=1.-warning_to_fixed(v, edge);
+        if (*v->_bvec_lit[edge]) prod_plus*=one_minus;
+        else prod_minus*=one_minus;
+    }
+    double z=prod_plus+prod_minus-prod_plus*prod_minus;
+    if (z<=ZERO) return 0.;
+    double factor=(v->_who_I_am ? prod_minus : prod_plus)/z;
+    if (factor<0.) return 0.;
+    if (factor>1.) return 1.;
+    return factor;
+}
+
 /*public member class Graph. True if v shares an unsatisfied clause with any
  variable already selected in sel (factor-graph distance 2 veto, Phase 2).
  NOTE: selected vars were just fixed and erased from V, so membership is
@@ -385,16 +434,19 @@ void Graph::diag_step() {
         _diag_step_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                      <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -588,6 +640,7 @@ void Graph::dataset_trials() {
         _ds_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                 <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
+                <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
@@ -1089,6 +1142,32 @@ void Graph::build(Vertex * &V_to_build) {
 /*public member class Graph. This member computes all operation for backtracking moves.*/
 void Graph::backtrack() {
     //cout<<"I make a backtrack move"<<endl;
+    if (g_dynamic_I_backtrack) {
+        unsigned long count=_m_t_m_1+_unit_prop;
+        _unit_prop=0;
+        vector<pair<double, Vertex*> > candidates;
+        candidates.reserve(_list_fixed_element.size());
+        for (list<Vertex*>::iterator it=_list_fixed_element.begin();
+             it!=_list_fixed_element.end(); ++it) {
+            if (!(*it)->_forced_by_up)
+                candidates.push_back(make_pair(current_fixation_factor(*it), *it));
+        }
+        sort(candidates.begin(), candidates.end());
+        if (count>candidates.size()) count=candidates.size();
+        for (unsigned long i=0; i<count; ++i) {
+            Vertex* v=candidates[i].second;
+            BSP_DEBUG<<"dynamic-I release v"<<v->_vertex
+                     <<" I="<<candidates[i].first<<endl;
+            _list_fixed_element.erase(v->_it_list_fixed_elem);
+            v->_it_list_fixed_elem=_list_fixed_element.end();
+            diag_move("back", v, -1);
+            v->reset_value_default_var_i();
+            build(v);
+        }
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        _N_t=_N-static_cast<unsigned>(_list_fixed_element.size());
+        return;
+    }
     sort_V_Back_move(); /*sort the elements in ptV vector, the ones in position 0, _m-1; in ascending order*/
 
     unsigned long _size=_m_t_m_1+_unit_prop;
