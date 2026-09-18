@@ -166,3 +166,31 @@ Artifacts:
 
 Implementation: `d5e6db0`. Release audit: `501e9cb`. Lyapunov refinement:
 `71ccef2`. Results: `679ace9`.
+
+## Idea 006 — current-I backtracking under the legacy schedule: killed
+
+Hypothesis: preserve the standard `r=0.9` BSP schedule and change only release
+selection from stale fixation-time `_sC` to the validated current `I(k)`.
+
+At `N=300`, five seeds, outcomes were unchanged at 1/5 SAT. Dynamic-I reduced
+mean worst drop by 4.8%, but increased per-transition roughness by 4.6%,
+reduced fixed-depth frontier area by 1.8%, and added 19.6% wall time.
+
+At `N=1000`, five seeds, dynamic-I solved 4/5 versus certainty's 5/5. It
+reduced mean worst drop by 6.7% and fixed-depth frontier roughness by 23.2%,
+but increased move-depth roughness by 2.5%, reduced frontier area by 1.5%, and
+added 26.7% wall time.
+
+Decision: kill the direct substitution. The estimator identifies releases
+that increase Sigma locally, but the fixed `r=0.9` schedule demands too many
+releases whether or not a profitable replacement exists. The next controller
+should gate release by `P_max > I_min`, reconverge after releasing, then choose
+the replacement from the updated state instead of applying both changes
+simultaneously.
+
+Artifacts:
+
+- `results/idea-006-k3-n300-a4.15/`
+- `results/idea-006-k3-n1000-a4.15/`
+
+Implementation: `b064217`. Results: `871f12b`.
