@@ -24,3 +24,17 @@ most-stable move, and the first stable move in retention order.
 No policy is implemented unless participation predicts the signed post-fix
 stability response. A large mode component alone is ambiguous: removing it
 may stabilize the map, while shortening its clauses may destabilize it.
+
+## Result
+
+At the normal checkpoint, neighborhood participation has Spearman correlation
+0.20 with post-fix rho; incoming participation has 0.14. At the fatal
+checkpoint the correlations are -0.06 and -0.02. Degree is equally weak.
+
+The fatal certainty variable has low participation, while both high- and
+low-participation moves can be stable. Right-mode energy therefore does not
+predict the signed effect of fixing a variable.
+
+Decision: kill this proxy. The next mathematically justified quantity is the
+biorthogonal left-right sensitivity `w_e * v_e`, or more generally the
+adjoint response `w^T delta(J_i) v`.
