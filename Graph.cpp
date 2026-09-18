@@ -321,9 +321,9 @@ bool Graph::share_clause(Vertex* a, Vertex* b) {
     return false;
 }
 
-/*Prepare a parameter-free move from Parisi's P_M > I_m criterion. At most
- one iso-cardinality exchange is allowed between two decimations, guaranteeing
- progress while making the realized backtracking rate state-dependent.*/
+/*Prepare a parameter-free move from Parisi's P_M > I_m criterion. Exchanges
+ continue only while the previously realized exchange strictly increased
+ complexity; a non-improving response forces the next decimation.*/
 void Graph::prepare_parisi_step() {
     _parisi_do_exchange=false;
     _parisi_fix=NULL;
@@ -343,7 +343,9 @@ void Graph::prepare_parisi_step() {
     }
     if (!_parisi_fix) return;
     _parisi_fix_dir=(_parisi_fix->_sT>_parisi_fix->_sF) ? 1 : 0;
-    if (!_parisi_exchanged_at_level) {
+    bool exchange_improved=!_parisi_exchanged_at_level
+                           || complexity>_parisi_sigma_before_exchange;
+    if (exchange_improved) {
         for (list<Vertex*>::iterator it=_list_fixed_element.begin();
              it!=_list_fixed_element.end(); ++it) {
             Vertex* v=*it;
@@ -420,6 +422,7 @@ void Graph::apply_parisi_step() {
     _unit_prop=0;
     _M_t=0;
     if (_parisi_do_exchange) {
+        _parisi_sigma_before_exchange=complexity;
         _list_fixed_element.erase(_parisi_release->_it_list_fixed_elem);
         _parisi_release->_it_list_fixed_elem=_list_fixed_element.end();
         diag_move("back", _parisi_release, -1);

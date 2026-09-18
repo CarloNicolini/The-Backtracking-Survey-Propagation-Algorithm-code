@@ -15,10 +15,11 @@ and the predicted complexity change is
 Otherwise decimate `P_max` and make progress.
 
 This changes BSP from a scheduled decimation/backtracking mixture into a
-state-feedback optimizer. At most one exchange is allowed between two
-decimations, which guarantees progress without a backtracking-ratio parameter.
-Pairs sharing a clause are excluded because Parisi's gain argument assumes
-weakly correlated moves.
+state-feedback optimizer. Exchanges continue while the measured complexity
+strictly increases; the first non-improving exchange forces a decimation.
+Thus Sigma acts as a Lyapunov acceptance signal without a backtracking-ratio
+parameter. Pairs sharing a clause are excluded because Parisi's gain argument
+assumes weakly correlated moves.
 
 ## Dynamic I(k)
 
@@ -45,5 +46,5 @@ state acquires small `I(k)` and is released.
    to repair early mistakes.
 
 Kill the idea if the local `I(k)` estimator does not predict release gains, if
-exchanges systematically lower Sigma, or if progress stalls despite the
-one-exchange invariant.
+exchanges systematically lower Sigma, or if monotone exchange relaxation
+stalls progress.

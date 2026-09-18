@@ -277,6 +277,7 @@ public:
         _unit_prop=0;/*unit propagation counter set to 0*/
         _parisi_do_exchange=false;
         _parisi_exchanged_at_level=false;
+        _parisi_sigma_before_exchange=0.;
         _parisi_fix=NULL;
         _parisi_release=NULL;
         _parisi_fix_dir=0;
@@ -460,7 +461,8 @@ private:
     unsigned int _diag_step_idx;/*diagnostic step counter*/
     bool _diag_header_done;/*diagnostic CSV headers written*/
     bool _parisi_do_exchange;/*prepared action: exchange instead of decimation*/
-    bool _parisi_exchanged_at_level;/*guarantee progress after one exchange*/
+    bool _parisi_exchanged_at_level;/*previous prepared move was an exchange*/
+    double _parisi_sigma_before_exchange;/*Lyapunov check for that exchange*/
     Vertex* _parisi_fix;/*best currently-free variable P_M*/
     Vertex* _parisi_release;/*worst current fixation I_m*/
     int _parisi_fix_dir;/*direction selected for _parisi_fix*/
