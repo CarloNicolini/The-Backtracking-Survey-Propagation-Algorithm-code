@@ -46,6 +46,7 @@ bool g_veto = false;
 double g_epsilon = epsilon;
 double g_damping = 0.0;
 bool g_dynamic_I_backtrack = false;
+bool g_sigma_feedback = false;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -403,6 +404,34 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
     if(complexity_variables==0.) complexity=0;
+    if(g_sigma_feedback) {
+        bool choose_backtrack=false;
+        _feedback_drop=0.;
+        _feedback_mean_drop=_feedback_decimations
+            ? _feedback_drop_sum/static_cast<double>(_feedback_decimations)
+            : 0.;
+        if (_feedback_initialized) {
+            _feedback_drop=_feedback_last_sigma-complexity;
+            if (_feedback_last_action==0) {
+                double positive_drop=max(_feedback_drop, 0.);
+                choose_backtrack=_feedback_decimations>0
+                    && positive_drop>_feedback_mean_drop
+                    && !_list_fixed_element.empty();
+                _feedback_drop_sum+=positive_drop;
+                ++_feedback_decimations;
+                _feedback_mean_drop=_feedback_drop_sum
+                    /static_cast<double>(_feedback_decimations);
+            }
+        } else {
+            _feedback_initialized=true;
+        }
+        fl_bsp=choose_backtrack;
+        _feedback_last_action=fl_bsp ? 1 : 0;
+        _feedback_last_sigma=complexity;
+        if(fl_bsp) ++_numb_of_back_moves;
+        else ++_numb_of_dec_moves;
+        return;
+    }
     if((_numb_of_back_moves/_numb_of_dec_moves)<g_r_bsp) {
         ++_numb_of_back_moves;
         fl_bsp=true;/*update values for BSP ratio choice.*/
@@ -435,18 +464,22 @@ void Graph::diag_step() {
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" sigma_feedback="<<g_sigma_feedback
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
+        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,"
+                      <<"feedback_drop,feedback_mean_drop\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" sigma_feedback="<<g_sigma_feedback
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" sigma_feedback="<<g_sigma_feedback
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -457,7 +490,8 @@ void Graph::diag_step() {
                   <<setprecision(10)<<complexity<<","
                   <<(complexity/static_cast<double>(_N))<<","
                   <<_time_conv_print<<","<<_unit_prop<<","
-                  <<_last_certitude<<","<<_list_fixed_element.size()<<endl;
+                  <<_last_certitude<<","<<_list_fixed_element.size()<<","
+                  <<_feedback_drop<<","<<_feedback_mean_drop<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -641,6 +675,7 @@ void Graph::dataset_trials() {
                 <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                <<" sigma_feedback="<<g_sigma_feedback
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

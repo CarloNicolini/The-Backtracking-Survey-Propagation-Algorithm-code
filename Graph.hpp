@@ -275,6 +275,13 @@ public:
         complexity_variables=0.;/*variable complexity set to 0*/
         complexity=0.;/*total complexity set to 0*/
         _unit_prop=0;/*unit propagation counter set to 0*/
+        _feedback_initialized=false;
+        _feedback_last_action=0;
+        _feedback_last_sigma=0.;
+        _feedback_drop=0.;
+        _feedback_mean_drop=0.;
+        _feedback_drop_sum=0.;
+        _feedback_decimations=0;
         WellRandomInitialization();/*Initialization seed random number generator*/
     };
 
@@ -442,6 +449,13 @@ private:
     unsigned _oracle_tmp_ctr;/*unique temp-file counter for oracle checks*/
     unsigned int _diag_step_idx;/*diagnostic step counter*/
     bool _diag_header_done;/*diagnostic CSV headers written*/
+    bool _feedback_initialized;
+    int _feedback_last_action;/*0=decimation, 1=backtracking*/
+    double _feedback_last_sigma;
+    double _feedback_drop;
+    double _feedback_mean_drop;
+    double _feedback_drop_sum;
+    unsigned _feedback_decimations;
     unsigned int _time_conv_print; /*convergence time*/
     int _argc;/*copy of argc*/
     unsigned long s;
