@@ -1,0 +1,15 @@
+build*/
+build-*/
+*.o
+*.a
+Formula_CNF*.cnf
+residualformula_*.cnf
+residualformula_seed*.cnf
+Solution_tot*.txt
+Sol_SP_*.txt
+Surveys*.dat
+Value_Anal_Compl*.txt
+whitening*.txt
+outfile
+oracle_try_*.cnf
+*_or_*.cnf

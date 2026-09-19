@@ -52,15 +52,15 @@ if(MSVC)
     /W3
     /EHsc
     /MP
-    $<$<CONFIG:Release,RelWithDebInfo>:/O2;/Ob2;/Oi;/Ot;/Oy;/Gw;/Gy;/fp:fast>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/O2;/Ob2;/Oi;/Ot;/Oy;/Gw;/Gy;/fp:fast>
     $<$<CONFIG:Debug>:/Od;/Zi>
   )
   target_link_options(bsp PRIVATE
-    $<$<CONFIG:Release,RelWithDebInfo>:/OPT:REF;/OPT:ICF>
+    $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/OPT:REF;/OPT:ICF>
   )
   if(BSP_NATIVE_ARCH AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64|x64)$")
     target_compile_options(bsp PRIVATE
-      $<$<CONFIG:Release,RelWithDebInfo>:/arch:AVX2>)
+      $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:/arch:AVX2>)
   endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   # Linux (and Homebrew) g++
@@ -71,9 +71,9 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   )
   if(BSP_NATIVE_ARCH)
     target_compile_options(bsp PRIVATE
-      $<$<CONFIG:Release,RelWithDebInfo>:-march=native>)
+      $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>)
     target_link_options(bsp PRIVATE
-      $<$<CONFIG:Release,RelWithDebInfo>:-march=native>)
+      $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>)
   endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # macOS AppleClang / LLVM Clang
@@ -87,7 +87,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     check_cxx_compiler_flag("-march=native" BSP_HAS_MARCH_NATIVE)
     if(BSP_HAS_MARCH_NATIVE)
       target_compile_options(bsp PRIVATE
-        $<$<CONFIG:Release,RelWithDebInfo>:-march=native>)
+        $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>)
     endif()
   endif()
 else()
