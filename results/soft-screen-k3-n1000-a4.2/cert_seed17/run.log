@@ -1,0 +1,7 @@
+START ALGORITHM:
+I am going to build an instance with N: 1000 variables and 4200 clauses with a clause density equal to 4.2
+START BSP WITH r=0.9:
+Decimation scorer: cert
+END UNIT PROPAGATION
+SP does not find any fixed points -> SP does not converge.
+I am sorry I quit :(
