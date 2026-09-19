@@ -140,3 +140,29 @@ Risultati (20 run/cella, truncation frazionaria):
 
 Confronto diretto energie (a) vs (c-surrogate) vs (d) come costo di rollout H=2-5.
 Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
+
+## E4a — Energie trial a 1 passo (implementato, pilot in corso, branch `cursor/soft-e4-energy-67c3`)
+
+- Esteso lookahead E2: `TrialResult += eta_after`, `--energy=sigma|eta|hybrid`.
+  sigma = max Σ residua (E2-identico), eta = min costo SP post-fix (tie-break Σ),
+  hybrid = gate eta (≤min+2) poi max Σ. Log per-trial `PREFIX_trials.csv`.
+- Verifiche: tutte le energie risolvono smoke N=80; `--energy=sigma` è
+  **bitwise-identico** al binario E2 (K3-N300 seed 2) → pilot congiunto valido.
+- Pilot congiunto E2+E4a (tmux soft-e2e4-pilot): K3-N1000-a4.15 seeds 1,2,
+  cert + look-{sigma,eta,hybrid}, timeout 2400s/run. NOTA: lookahead costa
+  ~250x il greedy (trial morti bruciano 1024 iterazioni) → seeds 1-2 prima,
+  estendere a segnale visto. E2 è risposto da look-sigma (upper bound energia a).
+- 2026-09-19: cert 1-2 sat veloci (~6s); look-sigma seed 1 in corso.
+
+## E4b — Rollout Gibbs su punti fragili (disegnato, `research/soft-e4b-design.md` su branch e4)
+
+- v1 (profondità): trigger eta (`eta_last ≥ T_eta`, da calibrare sui trial log E4a),
+  rollout greedy H=2-3, M=1, energie ℓ^a/ℓ^d/ℓ^hyb, gate hard su morte SP.
+  Controlli: trigger+H=1 (=E4a), random-su-trigger, greedy. Kill: no rescues.
+- v2 (Gibbs vera): merge E3 nei rollout (M=4 stocastici), sweep λ risk-sensitive→mean.
+  Richiede v1 positiva (H>1 batte H=1).
+- Energia (c) y-finito: NON in v1/v2 finché i messaggi non sono verificati.
+  Lead C1: `rho_SP` interpola già SP↔BP in `__norm()`, MA la formula di complessità
+  è inconsistente per rho≠1 (termine variabile senza rho) → serve verifica analitica
+  (derivare SP(m) corretta, confrontare rho=0 con BP indipendente). Lead C2: messaggi
+  a 4 stati (da idea-025). Entrambi sono progetti veri, non scorciatoie.
