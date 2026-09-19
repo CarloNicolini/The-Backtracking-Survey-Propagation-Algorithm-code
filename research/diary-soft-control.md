@@ -154,11 +154,20 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   estendere a segnale visto. E2 è risposto da look-sigma (upper bound energia a).
 - 2026-09-19: cert 1-2 sat veloci (~6s); look-sigma seed 1 in corso.
 
-## E4b — Rollout Gibbs su punti fragili (disegnato, `research/soft-e4b-design.md` su branch e4)
+## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
-- v1 (profondità): trigger eta (`eta_last ≥ T_eta`, da calibrare sui trial log E4a),
+Disegno: `research/soft-e4b-design.md` su branch e4.
+- v1 (profondità): trigger eta (`eta_last ≥ T_eta`),
   rollout greedy H=2-3, M=1, energie ℓ^a/ℓ^d/ℓ^hyb, gate hard su morte SP.
   Controlli: trigger+H=1 (=E4a), random-su-trigger, greedy. Kill: no rescues.
+- v1 IMPLEMENTATA 2026-09-19: `--rollout-h=H --rollout-eta=T` (default T=15;
+  distribuzione eta E0: mediana 3, p99 10, max 610 → T=15 ≈ top 0.3% step,
+  T=8 ≈ top ~1%). H≤1 bit-identico a E4a (verificato N=80 seed 3, incluso
+  modo di fallimento). Trial log + colonna h. Binario build-e4b (pilot-safe).
+- Teaser N=80 seed 3 (H=1-eta FALLISCE con SP-nonconv): H=3-eta SALVA a
+  trigger 0/5/8 ma non 15; H=3-sigma FALLISCE a tutti i trigger. Energia e
+  profondità e copertura fattorizzano pulito. Caveat: N=80, un seed —
+  deve sopravvivere a N=1000 (pilot E4b dopo chiusura E2E4).
 - v2 (Gibbs vera): merge E3 nei rollout (M=4 stocastici), sweep λ risk-sensitive→mean.
   Richiede v1 positiva (H>1 batte H=1).
 - Energia (c) y-finito: NON in v1/v2 finché i messaggi non sono verificati.
