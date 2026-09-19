@@ -265,6 +265,7 @@ public:
         _diag_step_idx=0;/*diagnostic step counter*/
         _diag_header_done=false;/*diagnostic CSV headers written*/
         _ds_header_done=false;/*dataset CSV header written*/
+        _trial_header_done=false;/*trial CSV header written*/
         _in_trial=false;/*trial-child flag*/
         _oracle_disabled=false;/*oracle auto-disable flag*/
         _oracle_timeouts=0;/*consecutive minisat timeouts*/
@@ -435,6 +436,8 @@ private:
     ofstream _diag_move_out;/*per-move diagnostic CSV stream*/
     ofstream _ds_out;/*dataset CSV stream*/
     bool _ds_header_done;/*dataset CSV header written*/
+    ofstream _trial_out;/*lookahead-trial CSV stream (E4a)*/
+    bool _trial_header_done;/*trial CSV header written*/
     bool _in_trial;/*true inside a dataset trial child: suppress diag writes*/
     bool _oracle_disabled;/*oracle auto-disabled after repeated timeouts*/
     unsigned _oracle_timeouts;/*consecutive minisat timeouts on this run*/
@@ -499,6 +502,16 @@ private:
 
     bool complexity_lookahead(Vertex*& best_v, int& best_dir,
                               double& best_sigma);
+
+    struct TrialResult {
+        double sigma;
+        int eta_after; /*child SP iterations to reconverge (-1 if unset)*/
+        int complete;
+    };
+
+    void trial_log(int best_ti, const vector<Vertex*>& vars,
+                   const vector<int>& dirs, const vector<int>& conv,
+                   TrialResult* results, unsigned n);
 
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 

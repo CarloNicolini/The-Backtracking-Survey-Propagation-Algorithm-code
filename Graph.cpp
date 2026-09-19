@@ -341,10 +341,6 @@ bool Graph::complexity_lookahead(Vertex*& best_v, int& best_dir,
             candidates.push_back(ptrV[i]);
     if (candidates.empty()) return false;
 
-    struct TrialResult {
-        double sigma;
-        int complete;
-    };
     unsigned ntrials=2*static_cast<unsigned>(candidates.size());
     TrialResult* results=(TrialResult*)mmap(
         NULL, ntrials*sizeof(TrialResult), PROT_READ|PROT_WRITE,
@@ -361,6 +357,7 @@ bool Graph::complexity_lookahead(Vertex*& best_v, int& best_dir,
     _diag_step_out<<flush;
     _diag_var_out<<flush;
     _diag_move_out<<flush;
+    _trial_out<<flush;
     cout<<flush;
     cerr<<flush;
     fflush(NULL);
@@ -372,6 +369,7 @@ bool Graph::complexity_lookahead(Vertex*& best_v, int& best_dir,
             unsigned ti=2*ci+attempt;
             int dir=(attempt==0) ? preferred : 1-preferred;
             results[ti].sigma=0.;
+            results[ti].eta_after=-1;
             results[ti].complete=0;
             trial_vars[ti]=v;
             trial_dirs[ti]=dir;
@@ -395,6 +393,7 @@ bool Graph::complexity_lookahead(Vertex*& best_v, int& best_dir,
                 convergence_messages();
                 surveys();
                 results[ti].sigma=complexity;
+                results[ti].eta_after=(int)_time_conv_print;
                 results[ti].complete=1;
                 _exit(0);
             }
@@ -403,22 +402,81 @@ bool Graph::complexity_lookahead(Vertex*& best_v, int& best_dir,
     }
 
     bool found=false;
+    int best_ti=-1;
+    vector<int> conv(ntrials, 0);
     for (unsigned ti=0; ti<ntrials; ++ti) {
         int status=0;
         while (waitpid(pids[ti], &status, 0)<0 && errno==EINTR) {}
-        if (!WIFEXITED(status) || WEXITSTATUS(status)!=0 ||
-            !results[ti].complete)
-            continue;
-        if (!found || results[ti].sigma>best_sigma) {
-            best_v=trial_vars[ti];
-            best_dir=trial_dirs[ti];
-            best_sigma=results[ti].sigma;
-            found=true;
+        if (WIFEXITED(status) && WEXITSTATUS(status)==0 && results[ti].complete)
+            conv[ti]=1;
+    }
+    if (g_energy_id==0) {
+        /*sigma: max residual Sigma (legacy E2 path, bit-identical choice)*/
+        for (unsigned ti=0; ti<ntrials; ++ti) {
+            if (!conv[ti]) continue;
+            if (!found || results[ti].sigma>best_sigma) {
+                best_ti=(int)ti;
+                best_sigma=results[ti].sigma;
+                found=true;
+            }
+        }
+    } else {
+        int min_eta=0;
+        bool have=false;
+        for (unsigned ti=0; ti<ntrials; ++ti) {
+            if (!conv[ti]) continue;
+            if (!have || results[ti].eta_after<min_eta) {
+                min_eta=results[ti].eta_after;
+                have=true;
+            }
+        }
+        /*eta: min post-fix SP cost, tie-break max Sigma. hybrid: same but
+         the gate admits trials within min_eta+2, then max Sigma.*/
+        int gate=(g_energy_id==2) ? min_eta+2 : min_eta;
+        for (unsigned ti=0; ti<ntrials; ++ti) {
+            if (!conv[ti] || results[ti].eta_after>gate) continue;
+            if (!found || results[ti].sigma>best_sigma) {
+                best_ti=(int)ti;
+                best_sigma=results[ti].sigma;
+                found=true;
+            }
         }
     }
+    if (found) {
+        best_v=trial_vars[best_ti];
+        best_dir=trial_dirs[best_ti];
+    }
+    trial_log(best_ti, trial_vars, trial_dirs, conv, results, ntrials);
     munmap(results, ntrials*sizeof(TrialResult));
     return found;
 #endif
+}
+
+/*Log one row per lookahead trial (E4a). No-op unless --diag=PREFIX is given.
+ step follows the diag_move convention (moves run after their SP point).*/
+void Graph::trial_log(int best_ti, const vector<Vertex*>& vars,
+                      const vector<int>& dirs, const vector<int>& conv,
+                      TrialResult* results, unsigned n) {
+    if (_in_trial) return;
+    if (g_diag_prefix.empty()) return;
+    if (!_trial_header_done) {
+        _trial_out.open((g_diag_prefix + "_trials.csv").c_str());
+        if (!_trial_out) {
+            BSP_ERROR<<"Cannot open trial output with prefix "<<g_diag_prefix<<endl;
+            exit(-1);
+        }
+        _trial_out<<"# scorer="<<bsp_scorer_name()<<" energy="<<bsp_energy_name()
+                  <<" K="<<_K<<" N="<<_N<<" M="<<_M<<" seed="<<_seed
+                  <<" r="<<g_r_bsp<<" lookahead_k="<<g_lookahead_k<<"\n";
+        _trial_out<<"step,vertex,dir,converged,sigma_after,eta_after,chosen\n";
+        _trial_header_done=true;
+    }
+    unsigned step=(_diag_step_idx>0) ? _diag_step_idx-1 : 0;
+    for (unsigned ti=0; ti<n; ++ti) {
+        _trial_out<<step<<","<<vars[ti]->_vertex<<","<<dirs[ti]<<","<<conv[ti]<<","
+                  <<setprecision(10)<<results[ti].sigma<<","<<results[ti].eta_after
+                  <<","<<((int)ti==best_ti ? 1 : 0)<<"\n";
+    }
 }
 
 /*public member class Graph which helps us to fix the variables that have the highest value of certitude*/
@@ -546,21 +604,21 @@ void Graph::diag_step() {
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
-                      <<" lookahead_k="<<g_lookahead_k
+                      <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
-                      <<" lookahead_k="<<g_lookahead_k
+                      <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
-                      <<" lookahead_k="<<g_lookahead_k
+                      <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -755,7 +813,7 @@ void Graph::dataset_trials() {
                 <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
-                <<" lookahead_k="<<g_lookahead_k
+                <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

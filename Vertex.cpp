@@ -88,6 +88,24 @@ bool bsp_pass_margin(double sT, double sF) {
     return margin >= g_bsp_theta;
 }
 
+/*Lookahead trial energy (E4a). Default 0=sigma reproduces legacy lookahead.*/
+int g_energy_id = 0;
+
+bool bsp_parse_energy(const string& spec) {
+    if (spec == "sigma") { g_energy_id = 0; return true; }
+    if (spec == "eta") { g_energy_id = 1; return true; }
+    if (spec == "hybrid") { g_energy_id = 2; return true; }
+    return false;
+}
+
+string bsp_energy_name() {
+    switch (g_energy_id) {
+        case 1: return "eta";
+        case 2: return "hybrid";
+        default: return "sigma";
+    }
+}
+
 /***********************************************************************************/
 /***********************************************************************************/
 /***********************************************************************************/
