@@ -175,6 +175,15 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   (4 run × ~20-25min). Vera replica del teaser. Se H3-eta-t0 salva e H3-sigma-t0
   no → profondità+energia confermate a N=1000. Se entrambi falliscono → orizzonte
   H=3 insufficiente o meccanismo N80 = rumore.
+- RESCUE2 VERDETTO 2026-09-19 sera: H3-eta-t0 0/2, H3-sigma-t0 0/2 (tutti sp-nonconv,
+  ~450-530s). Teaser N80 MORTO a N=1000. h=3 confermato attivo, conv_rate 0.70-0.81,
+  energie in disaccordo 39-62% — eppure tutti muoiono alle stesse profondità (~5700/
+  4500 step ≈ greedy). Variazioni near-sighted (energia×profondità) non cambiano il
+  destino su questi seed. 16 fallimenti totali su s1/s3 (greedy+T×3+H1×2+H3×3).
+  Aperte: (i) s1/s3 sono SAT? (minisat installato, check in corso — timeout 15min
+  su s1, istanza dura per DPLL); (ii) mismatch dinamiche rollout (no backtrack nel
+  rollout vs r=0.9 fuori) → retest pulito proposto: SID (r=0) + H=3 dove rollout
+  e realtà coincidono.
 
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
