@@ -52,8 +52,20 @@ e viene mergiato/aggiornato a ogni chiusura esperimento.
 - [x] 2026-09-19: build OK con `CXX=g++-13` (clang di default non linka libstdc++).
 - [x] 2026-09-19: smoke `--diag` OK (steps/moves/vars CSV).
 - [x] Pilot K3 N=300 a={4.0,4.15} seeds=1-5, configs cert/pol/gamma:0.01/dynamic-I.
-- [ ] Pilot K4 N=1000 a={9.5} seeds=1-5, stessi configs.
-- [ ] Tabella baseline α_a(N) preliminare.
+- [x] Pilot K4 N=1000 a={9.5} seeds=1-5, stessi configs.
+- [x] Tabella baseline α_a(N) preliminare (sotto).
+
+### Baseline preliminare (seeds 1-5, r=0.9)
+
+| Cella | cert | pol | gamma:0.01 | dynI |
+|---|---|---|---|---|
+| K3-N300-a4.0 | 2/5 | 4/5 | 3/5 | 4/5 |
+| K3-N300-a4.15 | 1/5 | 1/5 | 1/5 | 1/5 |
+| K4-N1000-a9.5 | 2/5 (3 sp-nc) | 3/5 (2 sp-nc) | 2/5 (3 sp-nc) | 3/5 (1 sp-nc + 1 ws-fail) |
+
+K4-dettagli: dynI ha la roughness più bassa (0.0321 vs 0.0386 cert) ma wall medio
+62s vs ~25s per una coda walksat da 150s (seed 4). pol risolve 3/5 con meno passi
+medi (7236 vs 9036 cert): più aggressivo, più ruvido (0.0414).
 
 ### Osservazioni
 - N=50 smoke mostra `ERROR - incorrect problem format` in walksat su residuo vuoto:
@@ -70,24 +82,54 @@ e viene mergiato/aggiornato a ogni chiusura esperimento.
   servono N>=1000 per K3). Curve Σ: mean_abs_delta ~0.013-0.016, max_drop ~0.45.
 
 ### Feedback / decisioni
-- (da compilare dopo i pilot)
+- E0/K3 confermano prior leaderboard → harness valido, si procede.
+- N=300 non separa le policy a 4.15: pilot decisionali a N>=1000 (K3), N=1000 (K4).
 
-## E1 — Caratterizzazione del crollo (prossimo)
+## E1 — Caratterizzazione del crollo (risultati preliminari K3, branch `cursor/soft-e1-collapse-67c3`)
 
-Obiettivo: AUC di (firme a t → fallimento). Firme: dΣ/dt, η_conv, frazione low-margin,
-ρ̂ se loggabile a costo zero. Output: soglia critica operativa per attivare E3/E4.
+Strumento: `tools/collapse_signatures.py` (AUC di firma-su-prefisso → fallimento finale).
 
-## E2 — Oracolo ΔΣ 1-passo (prossimo)
+Risultati (20 run/cella, truncation frazionaria):
+- **eta_max (max iterazioni SP nel prefisso): AUC 0.92 (a=4.0) e 1.00 (a=4.15)
+  già a f=0.1.** Lo sforzo di convergenza SP predice il destino quasi subito.
+  → segnale di stabilità (energia candidata d) confermato come early warning.
+- **sigma_frac (Σ_trunc/Σ_0): AUC 0.76→0.91 (a=4.0), 0.84→1.00 (a=4.15).**
+  Il livello di Σ trattenuta è predittivo, ma più tardi di eta.
+  → energia (a) porta informazione, ma eta arriva prima.
+- drop_max/roughness: deboli a 4.0 early (AUC~0.4-0.5), forti a 4.15 late (~0.9):
+  la ruvidezza di Σ è firma tardiva, non preallarme.
+- slope (discesa media): ~chance. Separano gli estremi, non la media.
+- back_frac: rumoroso.
 
-Riuso `--lookahead-k` (idea-001) ma: N=1000 (non 300), batch L=1, confronto paired.
-Domanda: upper bound di energia (a) a 1 passo. Kill se Δp_succ ≈ 0.
+### Feedback / decisioni
+- Implicazione per il controllo: un trigger eta-based per attivare policy soft
+  (E3/E4) solo quando SP fatica è ora motivato empiricamente, non solo teorico.
+- Caveat: n=20/cella; confermare su K4 + più seed prima di fissare soglie.
+- Prossimo: estendere firme a ρ̂ (contrazione messaggi) se loggabile a costo zero.
 
-## E3 — Boltzmann su score esistenti (prossimo)
+## E2 — Oracolo ΔΣ 1-passo (port completato, pilot da lanciare, branch `cursor/soft-e2-oracle-67c3`)
 
-Nuovo flag `--temperature=T --shortlist=K`: π(i) ∝ exp(score_i/T).
-Sweep T logaritmico + limiti T→0 (regressione) e T→∞ (controllo negativo).
-Prima solo scelta variabile a L=1, poi direzione. Domanda: quanta parte del
-problema è "durezza" vs "score sbagliato".
+- Port di 1a933cf (idea-001) sull'harness dynamic-I: cherry-pick + risoluzione
+  conflitti banali (tenute entrambe le chiavi diag). Build OK.
+- Smoke N=80: ASSIGNMENT FOUND con --lookahead-k=4. Il flag mancava nel branch
+  final-dynamic-I (solo dichiarazione in Header.h), ora funzionante.
+- Pilot previsto: K3-N1000-a4.15 + K4-N1000-a9.5, seeds paired vs cert, L=1.
+  Atteso costoso (~100x): lanciare dopo chiusura E0/K4 per non contendere CPU.
+
+## E3 — Boltzmann su score esistenti (implementato, sweep in corso, branch `cursor/soft-e3-boltzmann-67c3`)
+
+- Implementazione: `boltzmann_pick()` + `--temperature=T --shortlist=K`
+  (default K=10), L=1, direzione da regola SP, RNG seedato.
+- Verifica: T=0 produce curva Σ **bitwise-identica** al legacy (K3-N300-a4.0 seed 1).
+- Sweep in corso (tmux soft-e3-sweep): K3-N300-a4.15 seeds 1-5,
+  T ∈ {0.005, 0.01, 0.05, 0.1, 0.5} vs greedy.
+- Nota di disegno: score cert/pol in [0,1] → T~0.01-0.1 è la scala interessante;
+  T=0.5 è controllo "quasi-uniforme", ci si attende degrado.
+- 2026-09-19 sweep K3-N300-a4.15: TUTTI 1/5 come greedy (null atteso a N=300).
+- 2026-09-19 sweep K3-N1000-a4.15 seeds 1-5: greedy 5/5 (soffitto, nessun headroom),
+  T001 4/5 (1 walksat-fail + coda 103s), T005 5/5, T01 5/5. Nessun guadagno, T alza
+  leggermente roughness. Prossimo: cella più dura (a=4.2 o seeds 6-15) dove greedy
+  fallisce, per testare se la softness salva.
 
 ## E4+ — Rollout Gibbs con energie alternative (disegnato, non avviato)
 
