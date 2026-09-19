@@ -1,0 +1,44 @@
+running greedy seed=1
+  sat steps=8602 max_drop=2.75144 wall=7.93s
+running greedy seed=2
+  sat steps=4653 max_drop=11.2036 wall=5.74s
+running greedy seed=3
+  sat steps=7498 max_drop=2.39228 wall=6.96s
+running greedy seed=4
+  sat steps=7325 max_drop=5.26247 wall=7.45s
+running greedy seed=5
+  sat steps=5488 max_drop=7.39969 wall=5.76s
+running T001 seed=1
+  sat steps=8545 max_drop=2.83585 wall=7.72s
+running T001 seed=2
+  sat steps=4583 max_drop=11.4098 wall=5.45s
+running T001 seed=3
+  walksat-fail steps=7819 max_drop=2.27041 wall=103.44s
+running T001 seed=4
+  sat steps=7340 max_drop=5.41036 wall=7.49s
+running T001 seed=5
+  sat steps=5355 max_drop=7.60445 wall=5.78s
+running T005 seed=1
+  sat steps=8522 max_drop=2.81766 wall=7.68s
+running T005 seed=2
+  sat steps=4671 max_drop=11.2471 wall=5.53s
+running T005 seed=3
+  sat steps=7190 max_drop=2.41788 wall=7.28s
+running T005 seed=4
+  sat steps=7418 max_drop=5.13562 wall=7.56s
+running T005 seed=5
+  sat steps=5459 max_drop=7.55188 wall=5.93s
+running T01 seed=1
+  sat steps=8406 max_drop=2.81154 wall=7.78s
+running T01 seed=2
+  sat steps=4462 max_drop=11.4849 wall=5.15s
+running T01 seed=3
+  sat steps=7754 max_drop=2.3605 wall=7.43s
+running T01 seed=4
+  sat steps=7416 max_drop=5.37396 wall=8.12s
+running T01 seed=5
+  sat steps=5417 max_drop=7.53867 wall=5.81s
+greedy: sat=5/5 max_drop=5.8019 mean_abs_delta=0.0174822 wall=6.77s
+T001: sat=4/5 max_drop=5.90617 mean_abs_delta=0.0187519 wall=25.98s
+T005: sat=5/5 max_drop=5.83404 mean_abs_delta=0.0189516 wall=6.80s
+T01: sat=5/5 max_drop=5.91392 mean_abs_delta=0.0188719 wall=6.86s
