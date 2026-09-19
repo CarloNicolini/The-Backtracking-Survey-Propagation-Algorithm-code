@@ -158,6 +158,15 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   non hanno headroom (greedy 2/2) → il pilot misura kill/costi/accordo-energie,
   NON rescue. Rescue test dedicato dopo: K3-N1000-a4.2 seeds 1,3 (greedy
   sp-nonconv) con look-eta/hybrid poi H=3-eta.
+- RISULTATO E2+E4a (K3-N1000-a4.15 s1-2): cert 2/2; sigma 1/2 (kill s1);
+  eta 2/2 (s1 sat, evita il kill); hybrid 1/2 (s1 muore in SP, modo diverso da
+  sigma!). Seed 1: tre energie → tre esiti sulla stessa istanza (effetto causale).
+  Accordo trial: sigma-eta d'accordo solo 21-91% step (innocuo su s2 facile con
+  conv_rate 1.0, decisivo su s1 con conv_rate 0.86). VERDETTO E2: oracolo-Σ a H=1
+  non dà guadagno (danno osservato). Eta-energy sicura quanto greedy, costosa 30x.
+- RESCUE pilot lanciato (tmux soft-rescue, binario e4b): K3-N1000-a4.2 seeds 1,3
+  (greedy sp-nonconv entrambi): greedy + H1-{eta,hybrid} + H3-eta-{t8,t15} +
+  H3-sigma-t8. Disegno 2×2 energia×profondità + ablazione trigger.
 
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
