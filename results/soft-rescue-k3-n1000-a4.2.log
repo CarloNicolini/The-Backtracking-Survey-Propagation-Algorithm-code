@@ -1,0 +1,17 @@
+running greedy seed=1
+  sp-nonconvergence steps=5479 max_drop=0.0250283 wall=5.88s
+running greedy seed=3
+  sp-nonconvergence steps=4513 max_drop=0.0142898 wall=4.50s
+running H1-eta seed=1
+  sp-nonconvergence steps=5707 max_drop=0.025494 wall=395.48s
+running H1-eta seed=3
+  sp-nonconvergence steps=4521 max_drop=0.0157809 wall=479.30s
+running H1-hybrid seed=1
+  sp-nonconvergence steps=5475 max_drop=0.0249399 wall=404.09s
+running H1-hybrid seed=3
+  sp-nonconvergence steps=4569 max_drop=0.0154228 wall=526.11s
+running H3-eta-t8 seed=1
+  sp-nonconvergence steps=5707 max_drop=0.025494 wall=395.51s
+running H3-eta-t8 seed=3
+  sp-nonconvergence steps=4524 max_drop=0.0157809 wall=479.87s
+running H3-eta-t15 seed=1
