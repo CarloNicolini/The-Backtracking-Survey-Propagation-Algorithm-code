@@ -1,0 +1,20 @@
+running cert seed=1
+  sat steps=8602 max_drop=2.75144 wall=7.53s
+running cert seed=2
+  sat steps=4653 max_drop=11.2036 wall=5.37s
+running look-sigma seed=1
+  walksat-fail steps=8813 max_drop=2.6392 wall=488.07s
+running look-sigma seed=2
+  sat steps=4566 max_drop=11.2859 wall=38.96s
+running look-eta seed=1
+  sat steps=8786 max_drop=2.67645 wall=343.36s
+running look-eta seed=2
+  sat steps=4462 max_drop=11.3621 wall=36.85s
+running look-hybrid seed=1
+  sp-nonconvergence steps=9100 max_drop=1.04918 wall=386.48s
+running look-hybrid seed=2
+  sat steps=4619 max_drop=11.2147 wall=40.34s
+cert: sat=2/2 max_drop=6.97753 mean_abs_delta=0.0197096 wall=6.45s
+look-sigma: sat=1/2 max_drop=6.96253 mean_abs_delta=0.0196459 wall=263.52s
+look-eta: sat=2/2 max_drop=7.01927 mean_abs_delta=0.0201656 wall=190.11s
+look-hybrid: sat=1/2 max_drop=6.13196 mean_abs_delta=0.019561 wall=213.41s
