@@ -1,0 +1,10 @@
+running H3-eta-t0 seed=1
+  sp-nonconvergence steps=5753 max_drop=0.168995 wall=454.23s
+running H3-eta-t0 seed=3
+  sp-nonconvergence steps=4555 max_drop=0.0157849 wall=530.17s
+running H3-sigma-t0 seed=1
+  sp-nonconvergence steps=5687 max_drop=0.0254843 wall=452.89s
+running H3-sigma-t0 seed=3
+  sp-nonconvergence steps=4396 max_drop=0.0162392 wall=519.07s
+H3-eta-t0: sat=0/2 max_drop=0.0923899 mean_abs_delta=0.00952841 wall=492.20s
+H3-sigma-t0: sat=0/2 max_drop=0.0208618 mean_abs_delta=0.00942054 wall=485.98s
