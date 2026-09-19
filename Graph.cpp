@@ -387,13 +387,37 @@ bool Graph::complexity_lookahead(Vertex*& best_v, int& best_dir,
                 close(STDOUT_FILENO);
                 close(STDERR_FILENO);
                 _in_trial=true;
+                int H=(g_rollout_h>=2 && _time_conv_print>=g_rollout_eta)
+                    ? g_rollout_h : 1;
+                int eta_sum=0;
                 decimate_one(v, dir);
                 stable_partition(ptrV.begin(), ptrV.end(),
                                  _Vertex_is_fixed_pred());
                 convergence_messages();
                 surveys();
+                eta_sum+=(int)_time_conv_print;
+                for (int h=1; h<H && complexity!=0.; ++h) {
+                    /*greedy rollout step (reference P0, no recursion)*/
+                    sort_V_Dec_move();
+                    unsigned fixed2=
+                        static_cast<unsigned>(_list_fixed_element.size());
+                    Vertex* g=NULL;
+                    for (unsigned i=fixed2; i<_N; ++i) {
+                        if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF))
+                            continue;
+                        g=ptrV[i];
+                        break;
+                    }
+                    if (g==NULL) g=ptrV[fixed2];/*legacy fallback*/
+                    decimate_one(g);
+                    stable_partition(ptrV.begin(), ptrV.end(),
+                                     _Vertex_is_fixed_pred());
+                    convergence_messages();
+                    surveys();
+                    eta_sum+=(int)_time_conv_print;
+                }
                 results[ti].sigma=complexity;
-                results[ti].eta_after=(int)_time_conv_print;
+                results[ti].eta_after=eta_sum;
                 results[ti].complete=1;
                 _exit(0);
             }
@@ -468,14 +492,15 @@ void Graph::trial_log(int best_ti, const vector<Vertex*>& vars,
         _trial_out<<"# scorer="<<bsp_scorer_name()<<" energy="<<bsp_energy_name()
                   <<" K="<<_K<<" N="<<_N<<" M="<<_M<<" seed="<<_seed
                   <<" r="<<g_r_bsp<<" lookahead_k="<<g_lookahead_k<<"\n";
-        _trial_out<<"step,vertex,dir,converged,sigma_after,eta_after,chosen\n";
+        _trial_out<<"step,vertex,dir,converged,sigma_after,eta_after,chosen,h\n";
         _trial_header_done=true;
     }
     unsigned step=(_diag_step_idx>0) ? _diag_step_idx-1 : 0;
+    int H=(g_rollout_h>=2 && _time_conv_print>=g_rollout_eta) ? g_rollout_h : 1;
     for (unsigned ti=0; ti<n; ++ti) {
         _trial_out<<step<<","<<vars[ti]->_vertex<<","<<dirs[ti]<<","<<conv[ti]<<","
                   <<setprecision(10)<<results[ti].sigma<<","<<results[ti].eta_after
-                  <<","<<((int)ti==best_ti ? 1 : 0)<<"\n";
+                  <<","<<((int)ti==best_ti ? 1 : 0)<<","<<H<<"\n";
     }
 }
 
@@ -605,6 +630,7 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
+                      <<" rollout_h="<<g_rollout_h<<" rollout_eta="<<g_rollout_eta
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -612,6 +638,7 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
+                      <<" rollout_h="<<g_rollout_h<<" rollout_eta="<<g_rollout_eta
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -619,6 +646,7 @@ void Graph::diag_step() {
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                       <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
+                      <<" rollout_h="<<g_rollout_h<<" rollout_eta="<<g_rollout_eta
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
@@ -814,6 +842,7 @@ void Graph::dataset_trials() {
                 <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                 <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
                 <<" lookahead_k="<<g_lookahead_k<<" energy="<<bsp_energy_name()
+                      <<" rollout_h="<<g_rollout_h<<" rollout_eta="<<g_rollout_eta
                 <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
                <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"

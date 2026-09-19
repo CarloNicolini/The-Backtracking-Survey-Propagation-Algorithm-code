@@ -230,6 +230,19 @@ int main(int argc,  char * const argv[]) {
             }
             continue;
         }
+        if (a.rfind("--rollout-h=", 0) == 0) {
+            g_rollout_h = stoi(a.substr(12));
+            if (g_rollout_h < 0) {
+                BSP_ERROR << "rollout-h must be >= 0, got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--rollout-eta=", 0) == 0) {
+            g_rollout_eta = static_cast<unsigned>(stoul(a.substr(14)));
+            continue;
+        }
         if (a.rfind("--nn=", 0) == 0) {
             g_nn_path = a.substr(5);
             continue;
@@ -548,6 +561,9 @@ void help(const char *prog) {
          << "                       fix the converged move with maximum Sigma (0=off).\n"
          << "  --energy=E        Trial ranking: sigma|max residual Sigma (default),\n"
          << "                       eta|min post-fix SP cost, hybrid|eta-gated Sigma.\n"
+         << "  --rollout-h=H     Extend trials to H greedy steps when fragile\n"
+         << "                       (H<=1 reproduces one-step lookahead; default 0).\n"
+         << "  --rollout-eta=N   Fragility trigger: current SP cost >= N (default 15).\n"
          << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"
          << "  --nn-veto=C       Veto mode: bury vars scoring below C,\n"
          << "                       keep hand-crafted bias otherwise (needs --nn).\n"

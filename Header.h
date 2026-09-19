@@ -135,6 +135,13 @@ extern unsigned g_lookahead_k; /*top-K by scorer, choose max post-fix Sigma; 0 =
 extern int g_energy_id;
 bool bsp_parse_energy(const string& spec); /*"sigma","eta","hybrid"*/
 string bsp_energy_name();
+
+/*H-step rollout on fragile points (E4b v1). When g_rollout_h>=2 and the current
+ fixed point needed >= g_rollout_eta SP iterations, lookahead trials extend to
+ H greedy steps and rank by final residual Sigma (sigma) or summed SP cost
+ (eta/hybrid). H<=1 reproduces E4a exactly. Off unless --rollout-h>=2.*/
+extern int g_rollout_h;
+extern unsigned g_rollout_eta;
 extern string g_nn_path; /*GenANN weights from bsp-train; empty = off*/
 extern bool g_nn_veto; /*veto mode: bury vars scoring below cutoff, else keep bias*/
 extern double g_nn_cutoff; /*veto threshold on predicted DeltaSigma*/
