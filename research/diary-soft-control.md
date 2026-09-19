@@ -167,6 +167,14 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
 - RESCUE pilot lanciato (tmux soft-rescue, binario e4b): K3-N1000-a4.2 seeds 1,3
   (greedy sp-nonconv entrambi): greedy + H1-{eta,hybrid} + H3-eta-{t8,t15} +
   H3-sigma-t8. Disegno 2×2 energia×profondità + ablazione trigger.
+- RESCUE parziale: H1-eta 0/2, H1-hybrid 0/2 (tutti sp-nonconv). H3-eta-t8 0/2 MA
+  VACUO: trigger eta≥8 scattato 1 volta su ~3000 step (eta<8 ovunque tranne un
+  singolo spike a 75) → traiettorie H3 identiche a H1. Soglia assoluta troppo
+  rara/tardiva; teaser N80 (firing denso) non replicato. Uccisa coda pilot.
+- RESCUE2 lanciato (tmux soft-rescue2, always-on): H3-{eta,sigma}-t0 su seeds 1,3
+  (4 run × ~20-25min). Vera replica del teaser. Se H3-eta-t0 salva e H3-sigma-t0
+  no → profondità+energia confermate a N=1000. Se entrambi falliscono → orizzonte
+  H=3 insufficiente o meccanismo N80 = rumore.
 
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
