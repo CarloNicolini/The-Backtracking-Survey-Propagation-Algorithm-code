@@ -1,0 +1,66 @@
+running greedy seed=1
+  sp-nonconvergence steps=1836 max_drop=0.0394787 wall=0.30s
+running greedy seed=2
+  sp-nonconvergence steps=1894 max_drop=0.0172864 wall=0.26s
+running greedy seed=3
+  sp-nonconvergence steps=986 max_drop=0.0337908 wall=0.20s
+running greedy seed=4
+  sat steps=1511 max_drop=2.16938 wall=0.41s
+running greedy seed=5
+  sp-nonconvergence steps=2127 max_drop=0.026324 wall=0.28s
+running T0005 seed=1
+  sp-nonconvergence steps=1955 max_drop=0.048056 wall=0.35s
+running T0005 seed=2
+  sp-nonconvergence steps=2037 max_drop=0.0239983 wall=0.29s
+running T0005 seed=3
+  sp-nonconvergence steps=1061 max_drop=0.0382941 wall=0.26s
+running T0005 seed=4
+  sat steps=1655 max_drop=2.1041 wall=0.28s
+running T0005 seed=5
+  sp-nonconvergence steps=2224 max_drop=0.0365094 wall=0.33s
+running T001 seed=1
+  sp-nonconvergence steps=2031 max_drop=0.0551118 wall=0.37s
+running T001 seed=2
+  sp-nonconvergence steps=2013 max_drop=0.0244164 wall=0.30s
+running T001 seed=3
+  sp-nonconvergence steps=1028 max_drop=0.0396639 wall=0.25s
+running T001 seed=4
+  sat steps=1602 max_drop=2.13758 wall=0.26s
+running T001 seed=5
+  sp-nonconvergence steps=2336 max_drop=0.0364201 wall=0.36s
+running T005 seed=1
+  sp-nonconvergence steps=1936 max_drop=0.0544654 wall=0.37s
+running T005 seed=2
+  sp-nonconvergence steps=1917 max_drop=0.0239568 wall=0.29s
+running T005 seed=3
+  sp-nonconvergence steps=1112 max_drop=0.0401578 wall=0.29s
+running T005 seed=4
+  sat steps=1625 max_drop=2.13543 wall=0.26s
+running T005 seed=5
+  sp-nonconvergence steps=2126 max_drop=0.0367234 wall=0.36s
+running T01 seed=1
+  sp-nonconvergence steps=1963 max_drop=0.044874 wall=0.37s
+running T01 seed=2
+  sp-nonconvergence steps=1950 max_drop=0.0268532 wall=0.30s
+running T01 seed=3
+  sp-nonconvergence steps=954 max_drop=0.040313 wall=0.24s
+running T01 seed=4
+  sat steps=1585 max_drop=2.11555 wall=0.27s
+running T01 seed=5
+  sp-nonconvergence steps=2810 max_drop=0.0371087 wall=0.51s
+running T05 seed=1
+  sp-nonconvergence steps=1986 max_drop=0.0456064 wall=0.37s
+running T05 seed=2
+  sp-nonconvergence steps=1961 max_drop=0.0232219 wall=0.30s
+running T05 seed=3
+  sp-nonconvergence steps=1100 max_drop=0.0388954 wall=0.29s
+running T05 seed=4
+  sat steps=1598 max_drop=2.02381 wall=0.27s
+running T05 seed=5
+  sp-nonconvergence steps=1874 max_drop=0.037591 wall=0.31s
+greedy: sat=1/5 max_drop=0.457252 mean_abs_delta=0.0137401 wall=0.29s
+T0005: sat=1/5 max_drop=0.450192 mean_abs_delta=0.0157418 wall=0.30s
+T001: sat=1/5 max_drop=0.458638 mean_abs_delta=0.0167181 wall=0.31s
+T005: sat=1/5 max_drop=0.458146 mean_abs_delta=0.0173095 wall=0.31s
+T01: sat=1/5 max_drop=0.452941 mean_abs_delta=0.0171702 wall=0.34s
+T05: sat=1/5 max_drop=0.433824 mean_abs_delta=0.0175396 wall=0.31s
