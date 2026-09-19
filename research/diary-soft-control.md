@@ -166,3 +166,7 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   è inconsistente per rho≠1 (termine variabile senza rho) → serve verifica analitica
   (derivare SP(m) corretta, confrontare rho=0 con BP indipendente). Lead C2: messaggi
   a 4 stati (da idea-025). Entrambi sono progetti veri, non scorciatoie.
+- 2026-09-19 test rho=0 esplorativo (N=100-a3.5, revertito): risolve, MA Σ(step0)=728
+  vs 2e-6 a rho=1 → readout di complessità spazzatura come previsto (formula mista).
+  eta 8 vs 20 (BP converge più facile). Conferma: C1 richiede derivare la formula di
+  free-entropy corretta per rho generico prima di qualsiasi uso come energia.
