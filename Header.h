@@ -118,6 +118,10 @@ extern double g_damping; /*SP update damping in [0,1), default 0 (off)*/
 extern bool g_dynamic_I_backtrack; /*rank releases by current assignment retention*/
 bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 
+/*Soft decimation (E3 Boltzmann). Off unless --temperature=T with T>0.*/
+extern double g_temperature; /*softmax temperature over decimation scores, default 0 (off)*/
+extern unsigned g_shortlist_k; /*sampling pool = top-K scored vars, default 10*/
+
 /*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/
 extern string g_dataset_prefix; /*output prefix for _dataset.csv*/
 extern unsigned g_dataset_k; /*shortlist size per step, default 50*/

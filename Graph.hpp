@@ -493,6 +493,8 @@ private:
 
     bool vetoed(Vertex* v, const vector<Vertex*>& sel);
 
+    Vertex* boltzmann_pick(); /*softmax sample from top-K scored vars (E3)*/
+
     double warning_to_fixed(Vertex* v, unsigned edge);
 
     double current_fixation_factor(Vertex* v);

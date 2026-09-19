@@ -179,6 +179,20 @@ int main(int argc,  char * const argv[]) {
             g_dynamic_I_backtrack = true;
             continue;
         }
+        if (a.rfind("--temperature=", 0) == 0) {
+            g_temperature = stod(a.substr(14));
+            if (!(g_temperature >= 0.0)) {
+                BSP_ERROR << "temperature must be >= 0, got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--shortlist=", 0) == 0) {
+            g_shortlist_k = static_cast<unsigned>(stoul(a.substr(12)));
+            if (g_shortlist_k == 0) g_shortlist_k = 1;
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -521,6 +535,9 @@ void help(const char *prog) {
          << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
          << "  --dynamic-i-backtrack Rank releases by current assignment-specific\n"
          << "                       Parisi I(k), rather than stale fixation scores.\n"
+         << "  --temperature=T   Soft decimation: sample 1 var from top-K with\n"
+         << "                       p(i) propto exp(score_i/T) (default 0 = greedy).\n"
+         << "  --shortlist=K     Sampling pool size for --temperature (default 10).\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

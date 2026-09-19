@@ -46,6 +46,8 @@ bool g_veto = false;
 double g_epsilon = epsilon;
 double g_damping = 0.0;
 bool g_dynamic_I_backtrack = false;
+double g_temperature = 0.0;
+unsigned g_shortlist_k = 10;
 /*Phase 3 dataset options (see Header.h).*/
 string g_dataset_prefix;
 unsigned g_dataset_k = 50;
@@ -323,6 +325,32 @@ bool Graph::vetoed(Vertex* v, const vector<Vertex*>& sel) {
     return false;
 }
 
+/*Soft decimation pick (E3): sample one variable from the top-K scored
+ unfixed vars with probability proportional to exp(score/T). ptrV is sorted
+ descending, so pool[0] is the max and doubles as the softmax stabilizer.
+ Returns NULL when no unfixed var passes the gates.*/
+Vertex* Graph::boltzmann_pick() {
+    unsigned fixed = static_cast<unsigned>(_list_fixed_element.size());
+    vector<Vertex*> pool;
+    pool.reserve(g_shortlist_k);
+    for (unsigned i = fixed; i < _N && pool.size() < g_shortlist_k; ++i) {
+        if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;
+        pool.push_back(ptrV[i]);
+    }
+    if (pool.empty()) return NULL;
+    double smax = pool[0]->_sC;
+    double sum = 0.;
+    for (unsigned i = 0; i < pool.size(); ++i)
+        sum += exp((pool[i]->_sC - smax) / g_temperature);
+    double r = (random() / (RAND_MAX + 1.0)) * sum;
+    double acc = 0.;
+    for (unsigned i = 0; i < pool.size(); ++i) {
+        acc += exp((pool[i]->_sC - smax) / g_temperature);
+        if (r < acc) return pool[i];
+    }
+    return pool.back();
+}
+
 /*public member class Graph which helps us to fix the variables that have the highest value of certitude*/
 void Graph::choose_var_to_fix_and_clean() {
     /*set the rangee over variables unfixed are into vertex ptrV*/
@@ -339,12 +367,21 @@ void Graph::choose_var_to_fix_and_clean() {
     vector<Vertex*> _veto_sel;
     _veto_sel.reserve(_batch);
     unsigned int _counter_dec_var=0;
+    if (g_temperature > 0.) {
+        /*E3 soft move: single Boltzmann sample (direction still by SP rule)*/
+        Vertex* pick = boltzmann_pick();
+        if (pick != NULL) {
+            decimate_one(pick);
+            _counter_dec_var = 1;
+        }
+    } else {
     for (unsigned int i=_size_init; i<_N && _counter_dec_var<_batch; ++i) {
         if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;/*theta skip*/
         if (g_veto && vetoed(ptrV[i], _veto_sel)) continue;/*distance-2 veto*/
         decimate_one(ptrV[i]);
         _veto_sel.push_back(ptrV[i]);
         _counter_dec_var++;
+    }
     }
     if (_counter_dec_var==0) {
         /*nothing passed the gates: legacy top-1 fallback to guarantee progress*/
@@ -435,18 +472,21 @@ void Graph::diag_step() {
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" temp="<<g_temperature<<" shortlist="<<g_shortlist_k
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" temp="<<g_temperature<<" shortlist="<<g_shortlist_k
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" dynamic_I_backtrack="<<g_dynamic_I_backtrack
+                      <<" temp="<<g_temperature<<" shortlist="<<g_shortlist_k
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
         _diag_move_out<<"step,action,vertex,dir\n";
         _diag_header_done=true;
