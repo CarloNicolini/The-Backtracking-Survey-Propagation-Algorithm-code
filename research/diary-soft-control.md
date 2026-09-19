@@ -130,6 +130,11 @@ Risultati (20 run/cella, truncation frazionaria):
   T001 4/5 (1 walksat-fail + coda 103s), T005 5/5, T01 5/5. Nessun guadagno, T alza
   leggermente roughness. Prossimo: cella più dura (a=4.2 o seeds 6-15) dove greedy
   fallisce, per testare se la softness salva.
+- 2026-09-19 cella dura K3-N1000-a4.2 seeds 1-5: greedy 3/5, T001/T005/T01 tutti 2/5.
+  La softness su score cert NON salva alcun fallimento greedy e perde seed 1.
+  Conclusione E3: la temperatura sullo score sbagliato non è la leva; la questione
+  è l'energia ℓ_SP. Risultato negativo informativo → motiva E4 (confronto Gibbs
+  tra energie). E3 resta come infrastruttura (flag --temperature) per E4/E5.
 
 ## E4+ — Rollout Gibbs con energie alternative (disegnato, non avviato)
 
