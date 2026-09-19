@@ -125,10 +125,10 @@ extern unsigned g_dataset_every; /*trial cadence in SP steps, default 1*/
 extern bool g_oracle; /*exact SAT-oracle label per trial via minisat, default off*/
 extern string g_minisat_path; /*minisat binary, default "minisat"*/
 extern unsigned g_oracle_timeout; /*per-trial minisat seconds, default 10 (0 = unbounded)*/
-/*Oracle-guided decimation (exact 1-step lookahead, POSIX). Both off by default.*/
+/*Optional one-step lookaheads (POSIX). Off by default.*/
 extern bool g_oracle_dir; /*check both dirs per chosen var, take a SAT one*/
 extern unsigned g_oracle_pick; /*scan top-K for SAT-preserving (var,dir), 0 = off*/
-extern unsigned g_lookahead_k; /*top-K complexity lookahead, 0 = off*/
+extern unsigned g_lookahead_k; /*top-K by scorer, choose max post-fix Sigma; 0 = off*/
 extern string g_nn_path; /*GenANN weights from bsp-train; empty = off*/
 extern bool g_nn_veto; /*veto mode: bury vars scoring below cutoff, else keep bias*/
 extern double g_nn_cutoff; /*veto threshold on predicted DeltaSigma*/

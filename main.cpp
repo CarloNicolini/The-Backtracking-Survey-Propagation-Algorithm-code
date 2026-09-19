@@ -217,6 +217,10 @@ int main(int argc,  char * const argv[]) {
             g_oracle_pick = static_cast<unsigned>(stoul(a.substr(14)));
             continue;
         }
+        if (a.rfind("--lookahead-k=", 0) == 0) {
+            g_lookahead_k = static_cast<unsigned>(stoul(a.substr(14)));
+            continue;
+        }
         if (a.rfind("--nn=", 0) == 0) {
             g_nn_path = a.substr(5);
             continue;
@@ -531,6 +535,8 @@ void help(const char *prog) {
          << "  --oracle-timeout=S Per-trial minisat seconds (default 10, 0=off).\n"
          << "  --oracle-dir      Resolve each decimation direction by minisat.\n"
          << "  --oracle-pick=K   Scan top-K for a SAT-preserving move (0=off).\n"
+         << "  --lookahead-k=K  Try both directions for the top-K scored vars;\n"
+         << "                       fix the converged move with maximum Sigma (0=off).\n"
          << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"
          << "  --nn-veto=C       Veto mode: bury vars scoring below C,\n"
          << "                       keep hand-crafted bias otherwise (needs --nn).\n"
