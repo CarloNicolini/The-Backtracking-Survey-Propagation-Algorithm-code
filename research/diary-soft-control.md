@@ -190,6 +190,12 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   UNSAT o regione senza punto fisso SP); screen seeds 6-20 × {cert,pol,dynI}
   (tmux soft-screen) per istanze SAT-provabili con disaccordo (candidati rescue
   veri). Minisat s3 1h in background (tmux soft-minisat).
+- SCREEN VERDETTO: cert 6/15, pol 8/15, dynI 7/15. Esiti BIPOLARI per seed
+  (6 tutti-sat, 7 tutti-falliti, 2 disaccordo) → il destino sembra largamente
+  determinato dall'istanza (sopravvivenza di SP), non dalla regola. Seed 16:
+  SOLO pol risolve (cert/dynI sp-nonconv) — candidato rescue perfetto
+  (SAT-provato). Seed 15: cert walksat-fail, pol/dynI sat. RESCUE3 lanciato
+  (tmux soft-rescue3): H1-eta + H3-{eta,sigma}-t0 su 15,16 (~50min).
 
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
