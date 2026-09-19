@@ -184,6 +184,12 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   su s1, istanza dura per DPLL); (ii) mismatch dinamiche rollout (no backtrack nel
   rollout vs r=0.9 fuori) → retest pulito proposto: SID (r=0) + H=3 dove rollout
   e realtà coincidono.
+- 2026-09-19 sera: TUTTE le policy SOTA falliscono s1/s3 (pol/gamma/dynI 0/2;
+  damping 0.3/0.5/0.8 0/6 con 1 contradiction) → 28 fallimenti consecutivi.
+  Minisat s1 inconcludente a 15min. Decisione: stop hammering su s1/s3 (forse
+  UNSAT o regione senza punto fisso SP); screen seeds 6-20 × {cert,pol,dynI}
+  (tmux soft-screen) per istanze SAT-provabili con disaccordo (candidati rescue
+  veri). Minisat s3 1h in background (tmux soft-minisat).
 
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
