@@ -153,6 +153,11 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   ~250x il greedy (trial morti bruciano 1024 iterazioni) → seeds 1-2 prima,
   estendere a segnale visto. E2 è risposto da look-sigma (upper bound energia a).
 - 2026-09-19: cert 1-2 sat veloci (~6s); look-sigma seed 1 in corso.
+- INTERIM (pilot in corso): look-sigma seed1 → walksat-fail (488s, greedy era sat:
+  kill da oracolo-Σ!), seed2 → sat veloce (39s). Nota di disegno: a4.15 seeds 1-2
+  non hanno headroom (greedy 2/2) → il pilot misura kill/costi/accordo-energie,
+  NON rescue. Rescue test dedicato dopo: K3-N1000-a4.2 seeds 1,3 (greedy
+  sp-nonconv) con look-eta/hybrid poi H=3-eta.
 
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
