@@ -196,6 +196,10 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   SOLO pol risolve (cert/dynI sp-nonconv) — candidato rescue perfetto
   (SAT-provato). Seed 15: cert walksat-fail, pol/dynI sat. RESCUE3 lanciato
   (tmux soft-rescue3): H1-eta + H3-{eta,sigma}-t0 su 15,16 (~50min).
+- 2026-09-20 mattina: VM reboottata di notte (uptime 4:35); job ripartiti ~06:45.
+  H1-eta s15 di ieri valido: walksat-fail (782s, stesso modo di greedy-cert →
+  non salva). H1-eta s16 in corso (restart pulito, file ieri parziali
+  sovrascritti). Minisat s3 restart 06:41, verdict ~07:41.
 
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
