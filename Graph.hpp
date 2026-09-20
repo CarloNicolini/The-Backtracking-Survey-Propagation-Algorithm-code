@@ -493,6 +493,10 @@ private:
 
     bool vetoed(Vertex* v, const vector<Vertex*>& sel);
 
+    double warning_to_fixed(Vertex* v, unsigned edge);
+
+    double current_fixation_factor(Vertex* v);
+
     void note_oracle_result(int r); /*timeout counting + auto-disable*/
 
     double __pu();

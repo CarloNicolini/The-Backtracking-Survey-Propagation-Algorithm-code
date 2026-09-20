@@ -115,6 +115,7 @@ extern double g_bsp_theta; /*min direction margin |sT-sF|/(sT+sF) to fix, defaul
 extern bool g_veto; /*veto co-decimating vars sharing a clause, default off*/
 extern double g_epsilon; /*SP convergence threshold, default epsilon*/
 extern double g_damping; /*SP update damping in [0,1), default 0 (off)*/
+extern bool g_dynamic_I_backtrack; /*rank releases by current assignment retention*/
 bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 
 /*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/

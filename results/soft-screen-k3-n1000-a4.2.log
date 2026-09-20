@@ -1,0 +1,93 @@
+running cert seed=6
+  sat steps=8275 max_drop=2.89259 wall=9.07s
+running cert seed=7
+  sat steps=6432 max_drop=5.81698 wall=5.83s
+running cert seed=8
+  sp-nonconvergence steps=4166 max_drop=0.0216195 wall=4.85s
+running cert seed=9
+  sp-nonconvergence steps=2824 max_drop=0.0117182 wall=2.96s
+running cert seed=10
+  sat steps=7272 max_drop=4.71471 wall=7.24s
+running cert seed=11
+  sp-nonconvergence steps=3357 max_drop=0.029381 wall=3.98s
+running cert seed=12
+  sp-nonconvergence steps=8344 max_drop=0.0267965 wall=7.42s
+running cert seed=13
+  sat steps=8303 max_drop=3.15219 wall=7.33s
+running cert seed=14
+  sat steps=8788 max_drop=1.75531 wall=6.77s
+running cert seed=15
+  walksat-fail steps=11436 max_drop=0.839404 wall=80.39s
+running cert seed=16
+  sp-nonconvergence steps=11266 max_drop=0.0267046 wall=7.71s
+running cert seed=17
+  sp-nonconvergence steps=0 max_drop=0 wall=0.23s
+running cert seed=18
+  sp-nonconvergence steps=3338 max_drop=0.0268898 wall=4.29s
+running cert seed=19
+  sp-nonconvergence steps=6923 max_drop=0.0221491 wall=7.39s
+running cert seed=20
+  sat steps=7334 max_drop=2.63515 wall=6.03s
+running pol seed=6
+  sat steps=6728 max_drop=3.03473 wall=7.56s
+running pol seed=7
+  sat steps=4612 max_drop=6.05842 wall=4.50s
+running pol seed=8
+  sp-nonconvergence steps=3383 max_drop=0.0400457 wall=4.18s
+running pol seed=9
+  sp-nonconvergence steps=2398 max_drop=0.0201356 wall=2.56s
+running pol seed=10
+  sat steps=5218 max_drop=5.15339 wall=5.85s
+running pol seed=11
+  sp-nonconvergence steps=2183 max_drop=0.0447993 wall=2.77s
+running pol seed=12
+  sp-nonconvergence steps=6098 max_drop=0.0517817 wall=6.75s
+running pol seed=13
+  sat steps=7053 max_drop=2.97142 wall=6.46s
+running pol seed=14
+  sat steps=6778 max_drop=1.80599 wall=6.72s
+running pol seed=15
+  sat steps=7103 max_drop=1.74311 wall=6.75s
+running pol seed=16
+  sat steps=7484 max_drop=1.60864 wall=6.90s
+running pol seed=17
+  sp-nonconvergence steps=0 max_drop=0 wall=0.21s
+running pol seed=18
+  sp-nonconvergence steps=2383 max_drop=0.0490611 wall=2.89s
+running pol seed=19
+  sp-nonconvergence steps=5364 max_drop=0.0678036 wall=6.05s
+running pol seed=20
+  sat steps=5438 max_drop=2.68987 wall=5.37s
+running dynI seed=6
+  sat steps=10412 max_drop=2.72574 wall=10.81s
+running dynI seed=7
+  sat steps=6922 max_drop=5.84789 wall=6.84s
+running dynI seed=8
+  sp-nonconvergence steps=3906 max_drop=0.0212728 wall=4.96s
+running dynI seed=9
+  sp-nonconvergence steps=3127 max_drop=0.01259 wall=3.53s
+running dynI seed=10
+  sat steps=7714 max_drop=4.93765 wall=8.87s
+running dynI seed=11
+  sp-nonconvergence steps=3082 max_drop=0.0282 wall=3.82s
+running dynI seed=12
+  sp-nonconvergence steps=10291 max_drop=0.02561 wall=10.43s
+running dynI seed=13
+  sat steps=8792 max_drop=3.37803 wall=9.31s
+running dynI seed=14
+  sat steps=11499 max_drop=1.80277 wall=10.87s
+running dynI seed=15
+  sat steps=11775 max_drop=1.65965 wall=10.42s
+running dynI seed=16
+  sp-nonconvergence steps=16053 max_drop=0.030933 wall=12.88s
+running dynI seed=17
+  sp-nonconvergence steps=0 max_drop=0 wall=0.22s
+running dynI seed=18
+  sp-nonconvergence steps=3487 max_drop=0.0273125 wall=4.59s
+running dynI seed=19
+  sp-nonconvergence steps=5956 max_drop=0.020024 wall=6.66s
+running dynI seed=20
+  sat steps=8655 max_drop=2.62664 wall=8.17s
+cert: sat=6/15 max_drop=1.46477 mean_abs_delta=0.0119859 wall=10.76s
+pol: sat=8/15 max_drop=1.68928 mean_abs_delta=0.0130236 wall=5.03s
+dynI: sat=7/15 max_drop=1.54295 mean_abs_delta=0.0122075 wall=7.49s
