@@ -201,6 +201,23 @@ Richiede E2>0 oppure E1 con AUC>0.7, altrimenti riconsiderare.
   non salva). H1-eta s16 in corso (restart pulito, file ieri parziali
   sovrascritti). Minisat s3 restart 06:41, verdict ~07:41.
 
+## STOP — 2026-09-20 09:05 UTC (decisione utente)
+
+Tutti i job uccisi (tmux + processi). Rescue3 su seed SAT-provati **fallisce**:
+
+| Config | Seed 15 (cert walksat-fail, pol/dynI sat) | Seed 16 (solo pol sat) |
+|---|---|---|
+| H1-eta | walksat-fail (come greedy) | sp-nonconvergence |
+| H3-eta-t0 | **contradiction** (peggio di H1) | killed mid-run |
+
+**Verdetto finale del programma soft-control near-sighted:** nessuno spostamento di
+\(p_{\mathrm{succ}}\) o \(\alpha_a\). Temperatura, oracolo-\(\Sigma\), energia-\(\eta\),
+profondità H=3, damping — tutti nulli o dannosi sulle celle dure. Gli esiti bipolari
+dello screen (seed tutti-sat o tutti-falliti) suggeriscono che vicino alla soglia il
+collo di bottiglia è l'esistenza del punto fisso SP, non la regola di decimazione.
+Eventuale seguito: messaggi a y-finito / 4 stati (energia c del draft teorico),
+non più variazioni near-sighted del controllo.
+
 ## E4b — Rollout Gibbs su punti fragili (v1 implementata, branch e4)
 
 Disegno: `research/soft-e4b-design.md` su branch e4.
