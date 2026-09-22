@@ -1,0 +1,2 @@
+seed	solutions	weighted_mass	iterations	converged	mean_edge_tv	max_edge_tv	mean_var_tv	max_var_tv	greedy_agreement
+1	2	0.00013667191276434777	1011	1	0.39959519992026016	0.9537974404634932	0.33285713473160206	0.7039496033336756	14
