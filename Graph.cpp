@@ -57,6 +57,8 @@ bool g_oracle_dir = false;
 unsigned g_oracle_pick = 0;
 unsigned g_lookahead_k = 0;
 bool g_dynamic_i = false;
+bool g_fe_backtrack = false;
+double g_bt_cost = 0.4;
 bool g_corr_batch = false;
 bool g_adaptive_r = false;
 double g_frac = frac;
@@ -536,7 +538,34 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     }
     _sigma_prev=complexity;
     _have_sigma_prev=true;
-    if((_numb_of_back_moves/_numb_of_dec_moves)<r_use) {
+    if(g_fe_backtrack) {/*ThermoSP: Gibbs split between a release and a decimation*/
+        unsigned int _n_fixed=static_cast<unsigned int>(_list_fixed_element.size());
+        if(_n_fixed==0) {/*nothing to release before the first decimation*/
+            fl_bsp=false;
+            ++_numb_of_dec_moves;
+        } else {
+            double _min_best=1e300;/*best (smallest) min_sigma Phi over the free variables*/
+            for(unsigned int i=_n_fixed; i<_N; ++i) {
+                double _best=(ptrV[i]->_phi_plus<ptrV[i]->_phi_minus)?ptrV[i]->_phi_plus:ptrV[i]->_phi_minus;
+                if(_best<_min_best)_min_best=_best;
+            }
+            double _q_bt=-1e300;/*value of the best release, DeltaPhi minus the cost*/
+            for(unsigned int i=0; i<_n_fixed; ++i) {
+                if(ptrV[i]->_forced_by_up)continue;/*UP releases are futile: UP re-forces them*/
+                double _gain=ptrV[i]->d_phi()-g_bt_cost;
+                if(_gain>_q_bt)_q_bt=_gain;
+            }
+            if(_q_bt==-1e300) {/*no release candidate: only a decimation is possible*/
+                fl_bsp=false;
+                ++_numb_of_dec_moves;
+            } else {
+                /*P(backtrack)=e^(Q_bt/T)/(e^(Q_bt/T)+e^(Q_dec/T)) with Q_dec=-min_best*/
+                fl_bsp=thermo_gibbs_direction(-_min_best,_q_bt,g_T_act);
+                if(fl_bsp)++_numb_of_back_moves;
+                else ++_numb_of_dec_moves;
+            }
+        }
+    } else if((_numb_of_back_moves/_numb_of_dec_moves)<r_use) {
         ++_numb_of_back_moves;
         fl_bsp=true;/*update values for BSP ratio choice.*/
         //if(complexity<1.e-6 and complexity>0)fl_bsp=false; /*The algorithm is close to call walksat, and for safety reasons it makes only decimations*/
@@ -1279,7 +1308,18 @@ void Graph::update_products() { /*update products*/
  end, picks the smallest I(k). Without the flag the 2016 stored bias is used.*/
 void Graph::sort_V_Back_move() {
     unsigned nfixed = _list_fixed_element.size();
-    if (g_dynamic_i && nfixed > 0) {
+    if (g_fe_backtrack && nfixed > 0) {
+        /*Free-energy release order: the assignments with the largest DeltaPhi
+         go first. The sort is ascending so that backtrack(), which releases
+         from the end, picks the largest free-energy cost. Variables fixed by
+         unit propagation go to the front: they are not release candidates and
+         backtrack() stops at them.*/
+        sort(ptrV.begin(), ptrV.begin() + nfixed,
+             [](const Vertex* a, const Vertex* b) {
+                 if (a->_forced_by_up != b->_forced_by_up) return a->_forced_by_up;
+                 return a->d_phi() < b->d_phi();
+             });
+    } else if (g_dynamic_i && nfixed > 0) {
         for (unsigned i = 0; i < nfixed; ++i) {
             Vertex* v = ptrV[i];
             v->make_products();

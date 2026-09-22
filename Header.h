@@ -130,6 +130,8 @@ extern bool g_oracle_dir; /*check both dirs per chosen var, take a SAT one*/
 extern unsigned g_oracle_pick; /*scan top-K for SAT-preserving (var,dir), 0 = off*/
 extern unsigned g_lookahead_k; /*top-K complexity lookahead, 0 = off*/
 extern bool g_dynamic_i; /*release by I(k) from current surveys, default off*/
+extern bool g_fe_backtrack; /*free-energy release order and Gibbs move split, default off*/
+extern double g_bt_cost; /*cost of one back move in the Gibbs split, default 0.4*/
 /*Complexity-profile controls. All off by default, so legacy BSP is unchanged.
  Lookahead and corr-batch pick a move by the realized Sigma after a forked
  SP reconvergence. Adaptive-r raises the backtracking ratio when Sigma falls

@@ -122,6 +122,8 @@ public:
 
     double S_C(); /*compute certitude*/
 
+    double d_phi() const; /*free-energy cost of the last assignment*/
+
     long int _var_int(bool f) { /*variable node fixed and expressed as int */
         return (f==true) ? (_vertex_lli):(-1*_vertex_lli);
     }
@@ -244,6 +246,14 @@ inline double Vertex::S(double &a, double &b, double &c) { /*compute sT,sF*/
 /*public member which describe how to compute the variable node certitude*/
 inline double Vertex::S_C() { /*compute certitude survey*/
     return bsp_score(_sT, _sF, _sI, _B_th);
+}
+
+/*public member which computes the free-energy cost of the last assignment of
+ this variable: Phi(assigned) - min(Phi(+),Phi(-)). A large value marks a
+ decision that fights the free energies of its alternatives.*/
+inline double Vertex::d_phi() const {
+    double _best=(_phi_plus<_phi_minus)?_phi_plus:_phi_minus;
+    return (_who_I_am)?(_phi_plus-_best):(_phi_minus-_best);
 }
 
 #endif /* Vertex_hpp */
