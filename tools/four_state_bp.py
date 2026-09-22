@@ -138,7 +138,7 @@ def exact_edge_marginals(clauses, n, b, t):
         weight = b**v1 * t**c1
         total_weight += weight
         satisfying_count = [
-            ((assignment & positive) | ((full_mask ^ assignment) & negative)).bit_count()
+            bin((assignment & positive) | ((full_mask ^ assignment) & negative)).count("1")
             for positive, negative, _ in clauses
         ]
         for clause_index, (positive, _, variables) in enumerate(clauses):
