@@ -116,13 +116,38 @@ void Vertex::compute_s() { /*compute surveys variable node*/
 void Vertex::make_products() { /*make products for set V_plus and V_minus*/
 
     prod_V_plus=1.;/*set the product of V_plus to 1*/
+    if(g_T_cav>0.)snap_plus.resize(_surveys_cl_to_i_plus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_plus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
+        if(g_T_cav>0.)snap_plus[i]=*_surveys_cl_to_i_plus[i];
         prod_V_plus*=(1.- *_surveys_cl_to_i_plus[i]);/*compute products for V_plus*/
     }
     prod_V_minus=1.;/*set the product of V_minus to 1*/
+    if(g_T_cav>0.)snap_minus.resize(_surveys_cl_to_i_minus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_minus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
+        if(g_T_cav>0.)snap_minus[i]=*_surveys_cl_to_i_minus[i];
         prod_V_minus*=(1.- *_surveys_cl_to_i_minus[i]);/*compute products for V_minus*/
     }
+}
+
+/*public member which computes the deformed cavity star sums at this variable.
+ The message values come from the last make_products call, so the star sees
+ exactly the values behind the legacy products. The message of the clause that
+ owns the cavity is passed as exclude and skipped in the groups (it always
+ belongs to the s group, the one selected by b, like the div_s correction of the
+ legacy factors).*/
+ThermoStar Vertex::cavity_star(bool b, const double *exclude, double T) {
+    const vector<double *> &_s_ptr=(b)?_surveys_cl_to_i_plus:_surveys_cl_to_i_minus;
+    const vector<double *> &_u_ptr=(b)?_surveys_cl_to_i_minus:_surveys_cl_to_i_plus;
+    const vector<double> &_s_val=(b)?snap_plus:snap_minus;
+    const vector<double> &_u_val=(b)?snap_minus:snap_plus;
+    vector<double> _es,_eu;
+    _es.reserve(_s_ptr.size());
+    _eu.reserve(_u_ptr.size());
+    for (unsigned long i=0; i<_s_ptr.size(); ++i)
+        if(_s_ptr[i]!=exclude)_es.push_back(_s_val[i]);
+    for (unsigned long i=0; i<_u_ptr.size(); ++i)
+        if(_u_ptr[i]!=exclude)_eu.push_back(_u_val[i]);
+    return thermo_star(_es.data(),_es.size(),_eu.data(),_eu.size(),T);
 }
 
 

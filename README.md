@@ -66,6 +66,28 @@ Example (3-SAT, clause density 4.0, 50 variables):
 ./build/main -w 3 4.0 50
 ```
 
+## Thermodynamic Survey Propagation (ThermoSP)
+
+The option `--cav-temp=T` deforms the SP cavity aggregation with a temperature
+T. The default T = 0 keeps the hard SP factors and the current behavior. For
+T > 0 the solver aggregates the cavity warning configurations with the Gibbs
+weight e^(-min(p,q)/T). Here min(p,q) counts the conflicting warning pairs of
+one configuration. The map T = 1/y relates the deformation to the
+finite-energy SP(y) equations.
+
+```bash
+./build/main --cav-temp=0.1 -w 3 4.0 50
+```
+
+The unit test `build/bsp-test` holds the numeric identities of the deformation.
+The script `tools/regression_thermo.sh` rebuilds the tree and diffs three golden
+solver runs stored in `tests/golden`. Operate the script after each change to
+the solver.
+
+```bash
+./tools/regression_thermo.sh
+```
+
 ## Memory checking with Valgrind
 
 Valgrind runs on **Linux** only (not available as a native macOS/Homebrew bottle).

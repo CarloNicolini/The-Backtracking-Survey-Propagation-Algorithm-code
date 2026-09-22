@@ -1,0 +1,4 @@
+# scorer=macro-default K=3 N=30 M=90 seed=1 r=0.9 theta=0 veto=0 eps=0.01 damp=0
+step,action,vertex,dir
+0,dec,29,1
+1,back,29,-1

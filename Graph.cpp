@@ -27,6 +27,7 @@
 
 #include "Graph.hpp"
 #include "NnScorer.hpp"
+#include "thermo_sp.hpp"
 #ifndef _WIN32
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -1027,10 +1028,16 @@ START:
                     l=0;
                     while (1) {
                         if(i!=l && _cl[C]._go_forward[l]) {
-                            _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
-                            _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
-                            _new*=__pu();/*new message from cl to variable is computed*/
-                            norm*=__norm();
+                            if(g_T_cav>0.) {/*ThermoSP deformed star sums at cavity j (SP branch, rho_SP=1)*/
+                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],g_T_cav);
+                                _new*=_st.pi_u;
+                                norm*=_st.z;
+                            } else {
+                                _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
+                                _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
+                                _new*=__pu();/*new message from cl to variable is computed*/
+                                norm*=__norm();
+                            }
                         }
                         ++l;
                         if(l==s)break;
