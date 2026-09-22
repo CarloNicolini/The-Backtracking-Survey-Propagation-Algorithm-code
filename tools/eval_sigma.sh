@@ -15,6 +15,7 @@ ALPHAS="${ALPHAS:-4.0 4.2}"
 SEEDS="${SEEDS:-1 2}"
 CONFIGS="${CONFIGS:-cert_r09|--scorer=cert --r=0.9}"
 TRIAL_TIMEOUT="${TRIAL_TIMEOUT:-600}"
+FLAGS="${FLAGS:-}"
 if [[ ! -x "$MAIN" ]]; then echo "missing $MAIN" >&2; exit 1; fi
 mkdir -p "$OUTDIR/runs"
 SUM="$OUTDIR/summary.tsv"
@@ -29,7 +30,7 @@ echo "$CONFIGS" | tr ';' '\n' | while IFS='|' read -r cfg flags; do
     tag="${cfg}_a${a}_s${s}"
     rundir="$OUTDIR/runs/$tag"
     mkdir -p "$rundir"
-    ( cd "$rundir" && timeout "$TRIAL_TIMEOUT" $MAIN --seed="$s" $flags \
+    ( cd "$rundir" && timeout "$TRIAL_TIMEOUT" $MAIN --seed="$s" $FLAGS $flags \
         --diag="$rundir/t" --diag-every=1000000 -w "$K" "$a" "$N" > log.txt 2>&1 )
     rc=$?
     log="$rundir/log.txt"
