@@ -249,6 +249,14 @@ int main(int argc,  char * const argv[]) {
             g_dynamic_i = true;
             continue;
         }
+        if (a == "--fe-backtrack") {
+            g_fe_backtrack = true;
+            continue;
+        }
+        if (a.rfind("--bt-cost=", 0) == 0) {
+            g_bt_cost = stod(a.substr(10));
+            continue;
+        }
         if (a.rfind("--frac=", 0) == 0) {
             g_frac = stod(a.substr(7));
             if (!(g_frac > 0.0 && g_frac <= 1.0)) {
@@ -293,6 +301,11 @@ int main(int argc,  char * const argv[]) {
     if ((g_scorer_id == 4 || g_T_act > 0.) && g_T_cav <= 0.) {
         BSP_ERROR << "--scorer=fth and --act-temp need --cav-temp>0"
                   << " (the free energies come from the deformed messages)" << endl;
+        return 1;
+    }
+    if (g_fe_backtrack && g_T_cav <= 0.) {
+        BSP_ERROR << "--fe-backtrack needs --cav-temp>0"
+                  << " (the release order runs on the free energies)" << endl;
         return 1;
     }
     if (g_oracle_pick > 0) {
@@ -383,6 +396,7 @@ int main(int argc,  char * const argv[]) {
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     if (g_T_cav!=0.)BSP_INFO<<"ThermoSP cavity temperature: T="<<g_T_cav<<endl;
     if (g_T_act!=0.)BSP_INFO<<"Gibbs action temperature: T_act="<<g_T_act<<endl;
+    if (g_fe_backtrack)BSP_INFO<<"Free-energy backtracking on, bt-cost="<<g_bt_cost<<endl;
     if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)
         BSP_INFO<<"profile controls: lookahead="<<g_lookahead_k
                 <<" corr_batch="<<(g_corr_batch?1:0)
@@ -600,6 +614,11 @@ void help(const char *prog) {
          << "  --dynamic-i-backtrack  Release the variable with the smallest I(k),\n"
          << "                       the fraction of clusters still compatible with\n"
          << "                       its assigned value (1-s_F if true, 1-s_T if false).\n"
+         << "  --fe-backtrack    Release by free-energy cost and pick the move type\n"
+         << "                       with a Gibbs split (needs --cav-temp>0).\n"
+         << "  --bt-cost=C       Cost of one back move in the Gibbs split\n"
+         << "                       (default 0.4, calibrated at --cav-temp=0.05\n"
+         << "                       --act-temp=0.02; scale it with --cav-temp).\n"
          << "  --frac=F          Decimation batch fraction in (0, 1]\n"
          << "                       (default 0.00125). Same value on every arm.\n"
          << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"
