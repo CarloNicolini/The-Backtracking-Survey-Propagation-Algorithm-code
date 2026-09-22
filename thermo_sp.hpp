@@ -26,14 +26,13 @@ extern double g_T_cav;
  factors (1-B_0)*A_0, (1-A_0)*B_0, A_0*B_0 with A_0 and B_0 the products of
  (1-eta) over the two groups.*/
 struct ThermoStar {
-    double pi_u;
-    double pi_s;
-    double pi_0;
-    double z;
+  double pi_u;
+  double pi_s;
+  double pi_0;
+  double z;
 };
 
-ThermoStar thermo_star(const double *eta_s, std::size_t ns,
-                       const double *eta_u, std::size_t nu,
-                       double T);
+ThermoStar thermo_star(const double *eta_s, std::size_t ns, const double *eta_u,
+                       std::size_t nu, double T);
 
 #endif /* THERMO_SP_HPP */

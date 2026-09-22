@@ -28,6 +28,7 @@
 #ifndef Vertex_hpp
 #define Vertex_hpp
 #include "Header.h"
+#include "thermo_sp.hpp"
 
 /***********************************************************************************/
 /***********************************************************************************/
@@ -91,6 +92,8 @@ public:
 
     void make_products(); /*update products and surveys*/
 
+    ThermoStar cavity_star(bool b, const double *exclude, double T); /*deformed cavity star sums*/
+
     void compute_s(); /*compute surveys for each variable node*/
 
     void fix_var_i(); /*fix variable i to true or false*/
@@ -152,6 +155,8 @@ public:
     double _sNN; /*NN predicted DeltaSigma (NaN if none/abstained)*/
     double prod_V_plus; /*product (1-message) in V_plus*/
     double prod_V_minus; /*product (1-message) in V_minus*/
+    vector<double> snap_plus; /*message values of V_plus at the last make_products call*/
+    vector<double> snap_minus; /*message values of V_minus at the last make_products call*/
     double complexity_variable;/*variable node complexity*/
     unsigned int _vertex; /*vertex label*/
     long int _vertex_lli; /*vertex label for literal*/

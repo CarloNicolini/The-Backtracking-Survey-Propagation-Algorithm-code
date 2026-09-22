@@ -39,6 +39,7 @@
 #include "Vertex.hpp"
 #include "Graph.hpp"
 #include "NnScorer.hpp"
+#include "thermo_sp.hpp"
 #define UNIX 1
 #if UNIX
 #define random() rand()
@@ -170,6 +171,15 @@ int main(int argc,  char * const argv[]) {
             g_damping = stod(a.substr(10));
             if (!(g_damping >= 0.0 && g_damping < 1.0)) {
                 BSP_ERROR << "damping must be in [0, 1), got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
+        if (a.rfind("--cav-temp=", 0) == 0) {
+            g_T_cav = stod(a.substr(11));
+            if (!(g_T_cav >= 0.0)) {
+                BSP_ERROR << "cav-temp must be >= 0, got " << a << endl;
                 help(cleaned_args[0].c_str());
                 return 1;
             }
@@ -356,6 +366,7 @@ int main(int argc,  char * const argv[]) {
     if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
+    if (g_T_cav!=0.)BSP_INFO<<"ThermoSP cavity temperature: T="<<g_T_cav<<endl;
     if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)
         BSP_INFO<<"profile controls: lookahead="<<g_lookahead_k
                 <<" corr_batch="<<(g_corr_batch?1:0)
@@ -544,6 +555,9 @@ void help(const char *prog) {
          << "  --veto            Veto co-decimating vars sharing a clause.\n"
          << "  --eps=E           SP convergence threshold (default 0.01).\n"
          << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
+         << "  --cav-temp=T      Cavity temperature of ThermoSP in [0, inf)\n"
+         << "                       (default 0 keeps the legacy SP factors; the\n"
+         << "                       map T = 1/y matches finite-energy SP(y)).\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
