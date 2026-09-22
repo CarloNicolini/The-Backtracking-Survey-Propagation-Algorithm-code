@@ -6,7 +6,7 @@ project(BSP
   LANGUAGES C CXX
 )
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -18,6 +18,16 @@ endif()
 
 # Tune for the build machine CPU (best local performance; turn off for portable binaries).
 option(BSP_NATIVE_ARCH "Optimize for the host CPU (-march=native / equivalent)" ON)
+
+include(FetchContent)
+set(CXXOPTS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CXXOPTS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CXXOPTS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(cxxopts
+  GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
+  GIT_TAG        v3.3.1
+)
+FetchContent_MakeAvailable(cxxopts)
 
 set(BSP_NN_SOURCES
   NnScorer.cpp
@@ -33,11 +43,13 @@ add_executable(bsp
   walksat.cpp
   ${BSP_NN_SOURCES}
 )
+target_link_libraries(bsp PRIVATE cxxopts::cxxopts)
 
 add_executable(bsp_train
   bsp_train.cpp
   ${BSP_NN_SOURCES}
 )
+target_link_libraries(bsp_train PRIVATE cxxopts::cxxopts)
 
 target_include_directories(bsp PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(bsp_train PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -123,8 +135,6 @@ if(BSP_IPO_SUPPORTED)
 else()
   message(STATUS "IPO/LTO not available: ${BSP_IPO_ERROR}")
 endif()
-
-set_target_properties(bsp PROPERTIES OUTPUT_NAME "main")
 
 if(UNIX AND NOT APPLE)
   target_link_libraries(bsp PRIVATE m)

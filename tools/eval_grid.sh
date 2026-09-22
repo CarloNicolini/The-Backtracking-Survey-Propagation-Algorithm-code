@@ -2,7 +2,7 @@
 # Small ablation grid: scorer x r, recording solve/fail and last Sigma/N from stdout.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MAIN="${MAIN:-$ROOT/build/main}"
+MAIN="${MAIN:-$ROOT/build/bsp}"
 OUT="${OUT:-$ROOT/tools/eval_grid.tsv}"
 if [[ ! -x "$MAIN" ]]; then
   echo "missing $MAIN (build the solver first)" >&2

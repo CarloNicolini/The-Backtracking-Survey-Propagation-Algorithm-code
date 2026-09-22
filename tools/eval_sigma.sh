@@ -7,7 +7,7 @@
 #   OUTDIR=/tmp/eval TRIAL_TIMEOUT=600 ./tools/eval_sigma.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MAIN="${MAIN:-$ROOT/build/main}"
+MAIN="${MAIN:-$ROOT/build/bsp}"
 OUTDIR="${OUTDIR:-/tmp/eval_sigma}"
 K="${K:-3}"
 N="${N:-500}"

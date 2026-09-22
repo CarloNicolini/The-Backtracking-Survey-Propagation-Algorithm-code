@@ -8,7 +8,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-BIN="$ROOT/build/main"
+BIN="$ROOT/build/bsp"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 

@@ -2,23 +2,12 @@
 #include "NnScorer.hpp"
 #include "third_party/genann/genann.h"
 #include <cmath>
+#include <cxxopts.hpp>
 #include <sstream>
 
 /*Train a 15-d -> hidden -> 1 MLP on PREFIX_dataset.csv rows produced by
- ./main --dataset=PREFIX. Writes a weights file loadable via --nn=FILE.
+ ./bsp --dataset=PREFIX. Writes a weights file loadable via --nn=FILE.
  With --eval FILE.nn: load weights, score rows, report ranking quality.*/
-
-static void usage(const char* prog) {
-    cerr << "Usage: " << prog
-         << " --data FILE.csv --out FILE.nn [--hidden N] [--epochs E] [--lr L]\n"
-         << "  FILE.csv is PREFIX_dataset.csv from ./main --dataset=PREFIX\n"
-         << "  --include-unknown: also train on rows without oracle labels\n"
-         << "    (default: oracle-verified sat=0/1 rows only, since blind\n"
-         << "    DeltaSigma labels can be inverted on fatal moves)\n"
-         << "  --target=sat|floor: y=sat classifier vs DeltaSigma+FLOOR\n"
-         << "    regression (default floor)\n"
-         << "  --eval FILE.nn --data FILE.csv: report ranking quality only\n";
-}
 
 /*When false (default), rows with sat=-1 (no exact oracle label) are
  skipped: their DeltaSigma can look innocent on fatal moves.*/
@@ -86,27 +75,74 @@ static bool parse_csv_line(const string& line, Row& r) {
     return true;
 }
 
+static void print_cli_help(const cxxopts::Options& options) {
+    cerr << options.help() << "\n"
+         << "FILE.csv is PREFIX_dataset.csv from ./bsp --dataset=PREFIX.\n"
+         << "Train: --data FILE.csv --out FILE.nn [--hidden N] [--epochs E] [--lr L]\n"
+         << "Eval:  --eval FILE.nn --data FILE.csv\n";
+}
+
 int main(int argc, char** argv) {
-    string data_path, out_path, eval_path;
-    int hidden = 16;
-    int epochs = 200;
-    double lr = 0.05;
-    for (int i = 1; i < argc; ++i) {
-        string a = argv[i];
-        if (a.rfind("--data=", 0) == 0) data_path = a.substr(7);
-        else if (a.rfind("--out=", 0) == 0) out_path = a.substr(6);
-        else if (a.rfind("--eval=", 0) == 0) eval_path = a.substr(7);
-        else if (a.rfind("--hidden=", 0) == 0) hidden = atoi(a.substr(9).c_str());
-        else if (a.rfind("--epochs=", 0) == 0) epochs = atoi(a.substr(9).c_str());
-        else if (a.rfind("--lr=", 0) == 0) lr = atof(a.substr(5).c_str());
-        else if (a == "--include-unknown") g_include_unknown = true;
-        else if (a == "--target=sat") g_target_sat = true;
-        else if (a == "--target=floor") g_target_sat = false;
-        else if (a == "-h" || a == "--help") { usage(argv[0]); return 0; }
-        else { usage(argv[0]); return 1; }
+    const char* prog = (argv[0] != NULL && argv[0][0] != '\0') ? argv[0] : "bsp-train";
+
+    cxxopts::Options options(prog,
+        "Train or evaluate a GenANN MLP on DeltaSigma dataset rows.");
+    options.add_options()
+        ("data", "PREFIX_dataset.csv from ./bsp --dataset=PREFIX",
+            cxxopts::value<string>())
+        ("out", "Output weights file for --nn=FILE",
+            cxxopts::value<string>())
+        ("eval", "Load weights and report ranking quality only",
+            cxxopts::value<string>())
+        ("hidden", "Hidden-layer width (default 16)",
+            cxxopts::value<int>()->default_value("16"))
+        ("epochs", "Training epochs (default 200)",
+            cxxopts::value<int>()->default_value("200"))
+        ("lr", "Learning rate (default 0.05)",
+            cxxopts::value<double>()->default_value("0.05"))
+        ("include-unknown",
+            "Also train on rows without oracle labels (default: sat=0/1 only)")
+        ("target", "sat|floor: y=sat classifier vs DeltaSigma+FLOOR (default floor)",
+            cxxopts::value<string>()->default_value("floor"))
+        ("h,help", "Show this help message");
+
+    cxxopts::ParseResult result;
+    try {
+        result = options.parse(argc, argv);
+    } catch (const cxxopts::exceptions::exception& e) {
+        cerr << e.what() << endl;
+        print_cli_help(options);
+        return 1;
     }
+
+    if (result.count("help")) {
+        print_cli_help(options);
+        return 0;
+    }
+
+    string data_path = result.count("data") ? result["data"].as<string>() : "";
+    string out_path = result.count("out") ? result["out"].as<string>() : "";
+    string eval_path = result.count("eval") ? result["eval"].as<string>() : "";
+    int hidden = result["hidden"].as<int>();
+    int epochs = result["epochs"].as<int>();
+    double lr = result["lr"].as<double>();
+    if (result.count("include-unknown"))
+        g_include_unknown = true;
+    {
+        const string target = result["target"].as<string>();
+        if (target == "sat")
+            g_target_sat = true;
+        else if (target == "floor")
+            g_target_sat = false;
+        else {
+            cerr << "target must be sat or floor, got " << target << endl;
+            print_cli_help(options);
+            return 1;
+        }
+    }
+
     if (!eval_path.empty()) {
-        if (data_path.empty()) { usage(argv[0]); return 1; }
+        if (data_path.empty()) { print_cli_help(options); return 1; }
         if (!bsp_nn_load(eval_path)) return 1;
         ifstream in(data_path.c_str());
         if (!in) {
@@ -158,7 +194,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (data_path.empty() || out_path.empty() || hidden < 1 || epochs < 1 || lr <= 0.0) {
-        usage(argv[0]);
+        print_cli_help(options);
         return 1;
     }
 

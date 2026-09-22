@@ -41,6 +41,7 @@
 #include "NnScorer.hpp"
 #include "thermo_sp.hpp"
 #include "thermo_policy.hpp"
+#include <cxxopts.hpp>
 #define UNIX 1
 #if UNIX
 #define random() rand()
@@ -66,236 +67,290 @@
 
 
 
-void help(const char *prog);/*print usage / help*/
+static void print_cli_help(const cxxopts::Options& options, const char* prog) {
+    const char* name = (prog != NULL && prog[0] != '\0') ? prog : "bsp";
+    cout << options.help() << "\n"
+         << "Examples:\n"
+         << "  " << name << " -w 3 4.0 50\n"
+         << "  " << name << " -v --log-prefix -w 3 4.0 50\n"
+         << "  " << name << " -l formula.cnf\n";
+}
 
-int main(int argc,  char * const argv[]) {
+int main(int argc, char* argv[]) {
+    const char* prog = (argv[0] != NULL && argv[0][0] != '\0') ? argv[0] : "bsp";
 
-    /* Strip logging flags so Graph still sees: prog -w K alpha N  or  prog -l file.cnf */
-    vector<string> cleaned_args;
-    cleaned_args.push_back(argv[0] ? argv[0] : "main");
-    bool show_help = false;
-    for (int i = 1; i < argc; ++i) {
-        const string a = argv[i];
-        if (a == "-h" || a == "--help") {
-            show_help = true;
-            continue;
-        }
-        if (a == "-q" || a == "--quiet") {
-            bsp::set_log_level(bsp::LogLevel::Warn);
-            continue;
-        }
-        if (a == "-v" || a == "--verbose") {
-            bsp::set_log_level(bsp::LogLevel::Debug);
-            continue;
-        }
-        if (a == "-vv") {
-            bsp::set_log_level(bsp::LogLevel::Trace);
-            continue;
-        }
-        if (a == "--log-prefix") {
-            bsp::set_log_prefix(true);
-            continue;
-        }
-        if (a.rfind("--log-level=", 0) == 0) {
-            bsp::LogLevel level;
-            if (!bsp::parse_log_level(a.substr(12), level)) {
-                BSP_ERROR << "Unknown log level in " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            bsp::set_log_level(level);
-            continue;
-        }
-        if (a.rfind("--scorer=", 0) == 0) {
-            if (!bsp_parse_scorer(a.substr(9))) {
-                BSP_ERROR << "Unknown scorer in " << a
-                          << " (expected cert|pol|i_c|gamma:<g>)" << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a.rfind("--diag=", 0) == 0) {
-            g_diag_prefix = a.substr(7);
-            continue;
-        }
-        if (a == "--dump-residuals") {
-            g_dump_residuals = true;
-            continue;
-        }
-        if (a.rfind("--diag-every=", 0) == 0) {
-            g_diag_every = static_cast<unsigned>(stoul(a.substr(13)));
-            if (g_diag_every == 0) g_diag_every = 1;
-            continue;
-        }
+    cxxopts::Options options(prog,
+        "Backtracking Survey Propagation for random K-SAT.\n"
+        "  " + string(prog) + " [options] -w <K> <alpha> <N>\n"
+        "  " + string(prog) + " [options] -l <formula.cnf>");
+    options.custom_help("[options] (-w <K> <alpha> <N> | -l <formula.cnf>)");
+    options.add_options()
+        ("w,write", "Generate a random K-SAT instance (operands: K alpha N)")
+        ("l,load", "Load a CNF formula from file and solve it",
+            cxxopts::value<string>())
+        ("h,help", "Show this help message")
+        ("scorer", "Decimation scorer: cert|pol|i_c|fth|gamma:<g>",
+            cxxopts::value<string>())
+        ("diag", "Write PREFIX_steps.csv / PREFIX_vars.csv diagnostics",
+            cxxopts::value<string>())
+        ("diag-every", "Log vars + residuals every K steps (default 1)",
+            cxxopts::value<unsigned>())
+        ("dump-residuals", "Also dump PREFIX_res_s<step>.cnf (needs --diag)")
+        ("r", "Backtracking ratio in [0, 1) (default 0.9; 0 gives SID)",
+            cxxopts::value<double>())
+        ("seed", "Fix the RNG seed S >= 1 for reproducible runs",
+            cxxopts::value<long>())
+        ("theta", "Min direction margin |sT-sF|/(sT+sF) in [0, 1]",
+            cxxopts::value<double>())
+        ("veto", "Veto co-decimating vars sharing a clause")
+        ("eps", "SP convergence threshold (default 0.01)",
+            cxxopts::value<double>())
+        ("damping", "SP update damping in [0, 1) (default 0)",
+            cxxopts::value<double>())
+        ("cav-temp", "Cavity temperature of ThermoSP (default 0)",
+            cxxopts::value<double>())
+        ("act-temp", "Gibbs action temperature (default 0; needs --cav-temp>0)",
+            cxxopts::value<double>())
+        ("rsb-m", "1RSB cluster reweighting exponent m (default 0)",
+            cxxopts::value<double>())
+        ("dataset", "Write PREFIX_dataset.csv DeltaSigma trials",
+            cxxopts::value<string>())
+        ("dataset-k", "Shortlist size per step (default 50)",
+            cxxopts::value<unsigned>())
+        ("dataset-every", "Trial cadence in SP steps (default 1)",
+            cxxopts::value<unsigned>())
+        ("oracle", "Label each trial residual with minisat (on|off)",
+            cxxopts::value<string>()->default_value("off")->implicit_value("on"))
+        ("minisat", "Minisat binary (default minisat)",
+            cxxopts::value<string>())
+        ("oracle-timeout", "Per-trial minisat seconds (default 10, 0=off)",
+            cxxopts::value<unsigned>())
+        ("oracle-dir", "Resolve each decimation direction by minisat")
+        ("oracle-pick", "Scan top-K for a SAT-preserving move (0=off)",
+            cxxopts::value<unsigned>())
+        ("lookahead", "Top-K complexity lookahead (0=off)",
+            cxxopts::value<unsigned>())
+        ("corr-batch", "Prefer a distance-2 batch when batch size >= 2")
+        ("adaptive-r", "Raise r after a steep Sigma drop or slow SP")
+        ("dynamic-i-backtrack", "Release by smallest I(k) from current surveys")
+        ("fe-backtrack", "Free-energy release order and Gibbs move split")
+        ("bt-cost", "Cost of one back move in the Gibbs split",
+            cxxopts::value<double>())
+        ("frac", "Decimation batch fraction in (0, 1]",
+            cxxopts::value<double>())
+        ("nn", "GenANN weights file from bsp-train",
+            cxxopts::value<string>())
+        ("nn-veto", "Veto mode: bury vars scoring below C (needs --nn)",
+            cxxopts::value<double>())
+        ("q,quiet", "Warnings and errors only")
+        ("v,verbose", "Debug logging (-vv for trace)")
+        ("log-level", "error|warn|info|debug|trace (default: info)",
+            cxxopts::value<string>())
+        ("log-prefix", "Prefix each line with [LEVEL]");
+
+    /* cxxopts accepts -r but rejects single-char long options (--r=...); scripts use --r=. */
+    vector<string> argv_store;
+    argv_store.reserve(static_cast<size_t>(argc) + 4);
+    for (int i = 0; i < argc; ++i) {
+        const string a = argv[i] ? argv[i] : "";
         if (a.rfind("--r=", 0) == 0) {
-            g_r_bsp = stod(a.substr(4));
-            if (!(g_r_bsp >= 0.0 && g_r_bsp < 1.0)) {
-                BSP_ERROR << "r must be in [0, 1), got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
+            argv_store.push_back("-r");
+            argv_store.push_back(a.substr(4));
+        } else if (a == "--r") {
+            argv_store.push_back("-r");
+        } else {
+            argv_store.push_back(a);
         }
-        if (a.rfind("--seed=", 0) == 0) {
-            g_fixed_seed = stol(a.substr(7));
-            if (g_fixed_seed < 1) {
-                BSP_ERROR << "seed must be >= 1, got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a.rfind("--theta=", 0) == 0) {
-            g_bsp_theta = stod(a.substr(8));
-            if (!(g_bsp_theta >= 0.0 && g_bsp_theta <= 1.0)) {
-                BSP_ERROR << "theta must be in [0, 1], got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a == "--veto") {
-            g_veto = true;
-            continue;
-        }
-        if (a.rfind("--eps=", 0) == 0) {
-            g_epsilon = stod(a.substr(6));
-            if (!(g_epsilon > 0.0)) {
-                BSP_ERROR << "eps must be > 0, got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a.rfind("--damping=", 0) == 0) {
-            g_damping = stod(a.substr(10));
-            if (!(g_damping >= 0.0 && g_damping < 1.0)) {
-                BSP_ERROR << "damping must be in [0, 1), got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a.rfind("--cav-temp=", 0) == 0) {
-            g_T_cav = stod(a.substr(11));
-            if (!(g_T_cav >= 0.0)) {
-                BSP_ERROR << "cav-temp must be >= 0, got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a.rfind("--act-temp=", 0) == 0) {
-            g_T_act = stod(a.substr(11));
-            if (!(g_T_act >= 0.0)) {
-                BSP_ERROR << "act-temp must be >= 0, got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a.rfind("--rsb-m=", 0) == 0) {
-            g_rsb_m = stod(a.substr(8));
-            continue;
-        }
-        if (a.rfind("--dataset=", 0) == 0) {
-            g_dataset_prefix = a.substr(10);
-            continue;
-        }
-        if (a.rfind("--dataset-k=", 0) == 0) {
-            g_dataset_k = static_cast<unsigned>(stoul(a.substr(12)));
-            if (g_dataset_k == 0) g_dataset_k = 1;
-            continue;
-        }
-        if (a.rfind("--dataset-every=", 0) == 0) {
-            g_dataset_every = static_cast<unsigned>(stoul(a.substr(16)));
-            if (g_dataset_every == 0) g_dataset_every = 1;
-            continue;
-        }
-        if (a == "--oracle=off") {
-            g_oracle = false;
-            continue;
-        }
-        if (a == "--oracle" || a == "--oracle=on") {
-            g_oracle = true;
-            continue;
-        }
-        if (a.rfind("--minisat=", 0) == 0) {
-            g_minisat_path = a.substr(10);
-            continue;
-        }
-        if (a.rfind("--oracle-timeout=", 0) == 0) {
-            g_oracle_timeout = static_cast<unsigned>(stoul(a.substr(17)));
-            continue;
-        }
-        if (a == "--oracle-dir") {
-            g_oracle_dir = true;
-            continue;
-        }
-        if (a.rfind("--oracle-pick=", 0) == 0) {
-            g_oracle_pick = static_cast<unsigned>(stoul(a.substr(14)));
-            continue;
-        }
-        if (a.rfind("--lookahead=", 0) == 0) {
-            g_lookahead_k = static_cast<unsigned>(stoul(a.substr(12)));
-            continue;
-        }
-        if (a == "--corr-batch") {
-            g_corr_batch = true;
-            continue;
-        }
-        if (a == "--adaptive-r") {
-            g_adaptive_r = true;
-            continue;
-        }
-        if (a == "--dynamic-i-backtrack") {
-            g_dynamic_i = true;
-            continue;
-        }
-        if (a == "--fe-backtrack") {
-            g_fe_backtrack = true;
-            continue;
-        }
-        if (a.rfind("--bt-cost=", 0) == 0) {
-            g_bt_cost = stod(a.substr(10));
-            continue;
-        }
-        if (a.rfind("--frac=", 0) == 0) {
-            g_frac = stod(a.substr(7));
-            if (!(g_frac > 0.0 && g_frac <= 1.0)) {
-                BSP_ERROR << "frac must be in (0, 1], got " << a << endl;
-                help(cleaned_args[0].c_str());
-                return 1;
-            }
-            continue;
-        }
-        if (a.rfind("--nn=", 0) == 0) {
-            g_nn_path = a.substr(5);
-            continue;
-        }
-        if (a.rfind("--nn-veto=", 0) == 0) {
-            g_nn_veto = true;
-            g_nn_cutoff = stod(a.substr(10));
-            continue;
-        }
-        cleaned_args.push_back(a);
+    }
+    vector<char*> argv_adj;
+    argv_adj.reserve(argv_store.size());
+    for (size_t i = 0; i < argv_store.size(); ++i)
+        argv_adj.push_back(const_cast<char*>(argv_store[i].c_str()));
+    int argc_adj = static_cast<int>(argv_adj.size());
+
+    cxxopts::ParseResult result;
+    try {
+        result = options.parse(argc_adj, argv_adj.data());
+    } catch (const cxxopts::exceptions::exception& e) {
+        BSP_ERROR << e.what() << endl;
+        print_cli_help(options, prog);
+        return 1;
     }
 
-    if (show_help || cleaned_args.size() < 2) {
-        help(cleaned_args[0].c_str());
-        return show_help ? 0 : 1;
+    if (result.count("help")) {
+        print_cli_help(options, prog);
+        return 0;
     }
-    if (!(cleaned_args[1] == "-w" || cleaned_args[1] == "-l")) {
-        help(cleaned_args[0].c_str());
+
+    if (result.count("quiet"))
+        bsp::set_log_level(bsp::LogLevel::Warn);
+    else if (result.count("verbose") >= 2)
+        bsp::set_log_level(bsp::LogLevel::Trace);
+    else if (result.count("verbose") >= 1)
+        bsp::set_log_level(bsp::LogLevel::Debug);
+    if (result.count("log-prefix"))
+        bsp::set_log_prefix(true);
+    if (result.count("log-level")) {
+        bsp::LogLevel level;
+        if (!bsp::parse_log_level(result["log-level"].as<string>(), level)) {
+            BSP_ERROR << "Unknown log level "
+                      << result["log-level"].as<string>() << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+        bsp::set_log_level(level);
+    }
+
+    if (result.count("scorer")) {
+        if (!bsp_parse_scorer(result["scorer"].as<string>())) {
+            BSP_ERROR << "Unknown scorer "
+                      << result["scorer"].as<string>()
+                      << " (expected cert|pol|i_c|fth|gamma:<g>)" << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("diag"))
+        g_diag_prefix = result["diag"].as<string>();
+    if (result.count("dump-residuals"))
+        g_dump_residuals = true;
+    if (result.count("diag-every")) {
+        g_diag_every = result["diag-every"].as<unsigned>();
+        if (g_diag_every == 0) g_diag_every = 1;
+    }
+    if (result.count("r")) {
+        g_r_bsp = result["r"].as<double>();
+        if (!(g_r_bsp >= 0.0 && g_r_bsp < 1.0)) {
+            BSP_ERROR << "r must be in [0, 1), got " << g_r_bsp << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("seed")) {
+        g_fixed_seed = result["seed"].as<long>();
+        if (g_fixed_seed < 1) {
+            BSP_ERROR << "seed must be >= 1, got " << g_fixed_seed << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("theta")) {
+        g_bsp_theta = result["theta"].as<double>();
+        if (!(g_bsp_theta >= 0.0 && g_bsp_theta <= 1.0)) {
+            BSP_ERROR << "theta must be in [0, 1], got " << g_bsp_theta << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("veto"))
+        g_veto = true;
+    if (result.count("eps")) {
+        g_epsilon = result["eps"].as<double>();
+        if (!(g_epsilon > 0.0)) {
+            BSP_ERROR << "eps must be > 0, got " << g_epsilon << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("damping")) {
+        g_damping = result["damping"].as<double>();
+        if (!(g_damping >= 0.0 && g_damping < 1.0)) {
+            BSP_ERROR << "damping must be in [0, 1), got " << g_damping << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("cav-temp")) {
+        g_T_cav = result["cav-temp"].as<double>();
+        if (!(g_T_cav >= 0.0)) {
+            BSP_ERROR << "cav-temp must be >= 0, got " << g_T_cav << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("act-temp")) {
+        g_T_act = result["act-temp"].as<double>();
+        if (!(g_T_act >= 0.0)) {
+            BSP_ERROR << "act-temp must be >= 0, got " << g_T_act << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("rsb-m"))
+        g_rsb_m = result["rsb-m"].as<double>();
+    if (result.count("dataset"))
+        g_dataset_prefix = result["dataset"].as<string>();
+    if (result.count("dataset-k")) {
+        g_dataset_k = result["dataset-k"].as<unsigned>();
+        if (g_dataset_k == 0) g_dataset_k = 1;
+    }
+    if (result.count("dataset-every")) {
+        g_dataset_every = result["dataset-every"].as<unsigned>();
+        if (g_dataset_every == 0) g_dataset_every = 1;
+    }
+    if (result.count("oracle")) {
+        const string o = result["oracle"].as<string>();
+        if (o == "on")
+            g_oracle = true;
+        else if (o == "off")
+            g_oracle = false;
+        else {
+            BSP_ERROR << "oracle must be on or off, got " << o << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("minisat"))
+        g_minisat_path = result["minisat"].as<string>();
+    if (result.count("oracle-timeout"))
+        g_oracle_timeout = result["oracle-timeout"].as<unsigned>();
+    if (result.count("oracle-dir"))
+        g_oracle_dir = true;
+    if (result.count("oracle-pick"))
+        g_oracle_pick = result["oracle-pick"].as<unsigned>();
+    if (result.count("lookahead"))
+        g_lookahead_k = result["lookahead"].as<unsigned>();
+    if (result.count("corr-batch"))
+        g_corr_batch = true;
+    if (result.count("adaptive-r"))
+        g_adaptive_r = true;
+    if (result.count("dynamic-i-backtrack"))
+        g_dynamic_i = true;
+    if (result.count("fe-backtrack"))
+        g_fe_backtrack = true;
+    if (result.count("bt-cost"))
+        g_bt_cost = result["bt-cost"].as<double>();
+    if (result.count("frac")) {
+        g_frac = result["frac"].as<double>();
+        if (!(g_frac > 0.0 && g_frac <= 1.0)) {
+            BSP_ERROR << "frac must be in (0, 1], got " << g_frac << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("nn"))
+        g_nn_path = result["nn"].as<string>();
+    if (result.count("nn-veto")) {
+        g_nn_veto = true;
+        g_nn_cutoff = result["nn-veto"].as<double>();
+    }
+
+    const bool do_write = result.count("write") > 0;
+    const bool do_load = result.count("load") > 0;
+    const vector<string> unmatched = result.unmatched();
+
+    if (do_write == do_load) {
+        print_cli_help(options, prog);
         return 1;
     }
-    if (cleaned_args[1] == "-l" && cleaned_args.size() != 3) {
-        help(cleaned_args[0].c_str());
+    if (do_write && unmatched.size() != 3) {
+        BSP_ERROR << "-w expects exactly three operands: K alpha N" << endl;
+        print_cli_help(options, prog);
         return 1;
     }
-    if (cleaned_args[1] == "-w" && cleaned_args.size() < 5) {
-        help(cleaned_args[0].c_str());
+    if (do_load && !unmatched.empty()) {
+        BSP_ERROR << "-l does not take extra operands beyond the CNF path" << endl;
+        print_cli_help(options, prog);
         return 1;
     }
     if (g_dump_residuals && g_diag_prefix.empty()) {
@@ -320,10 +375,22 @@ int main(int argc,  char * const argv[]) {
         if (!bsp_nn_load(g_nn_path)) return 1;
     }
 
-    vector<char *> av;
-    av.reserve(cleaned_args.size());
-    for (size_t i = 0; i < cleaned_args.size(); ++i)
-        av.push_back(const_cast<char *>(cleaned_args[i].c_str()));
+    vector<string> graph_args;
+    graph_args.push_back(prog);
+    if (do_write) {
+        graph_args.push_back("-w");
+        graph_args.push_back(unmatched[0]);
+        graph_args.push_back(unmatched[1]);
+        graph_args.push_back(unmatched[2]);
+    } else {
+        graph_args.push_back("-l");
+        graph_args.push_back(result["load"].as<string>());
+    }
+
+    vector<char*> av;
+    av.reserve(graph_args.size());
+    for (size_t i = 0; i < graph_args.size(); ++i)
+        av.push_back(const_cast<char*>(graph_args[i].c_str()));
     int ac = static_cast<int>(av.size());
 
     Graph G(ac, &av[0]);/*declaration object Graph*/
@@ -340,31 +407,10 @@ int main(int argc,  char * const argv[]) {
     /***********************************************************************************/
 
     /* At this point the code choses between loading a SAT CNF instance or building one. */
-    int c;
-    bool have_instance = false;
-    while ((c = getopt (ac, &av[0], "l:w:h")) != -1)/* write or load an instance K-SAT*/
-        switch (c) {
-        case 'l':/* load an instance K-SAT*/
-            G.read_from_file_graph(); /*read CNF instance from file*/
-            have_instance = true;
-            break;
-        case 'w':/* write an instance for SAT problem*/
-            G.write_on_file_graph(); /*build and write a CNF instance on file*/
-            have_instance = true;
-            break;
-
-        case 'h':/* help function is called*/
-            help(cleaned_args[0].c_str());
-            return 0;
-
-        default:
-            help(cleaned_args[0].c_str());
-            return 1;
-        }
-    if (!have_instance) {
-        help(cleaned_args[0].c_str());
-        return 1;
-    }
+    if (do_load)
+        G.read_from_file_graph(); /*read CNF instance from file*/
+    else
+        G.write_on_file_graph(); /*build and write a CNF instance on file*/
     /***********************************************************************************/
     /***********************************************************************************/
     /***********************************************************************************/
@@ -561,87 +607,3 @@ PARAPHASE:
     return 0;
 }
 
-
-void help(const char *prog) {
-    const char *name = (prog != NULL && prog[0] != '\0') ? prog : "main";
-    cout << "Usage:\n"
-         << "  " << name << " [log options] -w <K> <alpha> <N>\n"
-         << "  " << name << " [log options] -l <formula.cnf>\n"
-         << "  " << name << " -h\n"
-         << "\n"
-         << "Solver options:\n"
-         << "  -w <K> <alpha> <N>   Generate a random K-SAT instance and solve it.\n"
-         << "                       K     = literals per clause\n"
-         << "                       alpha = clause density (M/N)\n"
-         << "                       N     = number of variables\n"
-         << "  -l <formula.cnf>    Load a CNF formula from file and solve it.\n"
-         << "  -h, --help          Show this help message.\n"
-         << "  --scorer=SPEC       Decimation scorer: cert|pol|i_c|fth|gamma:<g>.\n"
-         << "                       Default keeps the compiled-in scorer (CERT).\n"
-         << "                       fth ranks by the free-energy bias and needs\n"
-         << "                       --cav-temp>0.\n"
-         << "  --diag=PREFIX       Write PREFIX_steps.csv / PREFIX_vars.csv\n"
-         << "                       per-SP-fixed-point diagnostics (off by default).\n"
-         << "  --diag-every=K      Log vars + residuals every K steps (default 1).\n"
-         << "  --dump-residuals    Also dump PREFIX_res_s<step>.cnf (needs --diag).\n"
-         << "  --r=R             Backtracking ratio in [0, 1) (default 0.9;\n"
-         << "                       0 gives SID without backtracking).\n"
-         << "  --seed=S          Fix the RNG seed S >= 1 for reproducible runs.\n"
-         << "  --theta=T         Fix only vars with direction margin\n"
-         << "                       |sT-sF|/(sT+sF) >= T in [0, 1] (default 0).\n"
-         << "  --veto            Veto co-decimating vars sharing a clause.\n"
-         << "  --eps=E           SP convergence threshold (default 0.01).\n"
-         << "  --damping=D       SP update damping in [0, 1) (default 0).\n"
-         << "  --cav-temp=T      Cavity temperature of ThermoSP in [0, inf)\n"
-         << "                       (default 0 keeps the legacy SP factors; the\n"
-         << "                       map T = 1/y matches finite-energy SP(y)).\n"
-         << "  --act-temp=T      Action temperature of the Gibbs decimation\n"
-         << "                       policy in [0, inf) (default 0 keeps the hard\n"
-         << "                       sT>sF rule). Needs --cav-temp>0.\n"
-         << "  --rsb-m=M         1RSB cluster reweighting exponent m of the\n"
-         << "                       measure mu_m(C) ~ e^(m N s_C) (default 0 keeps\n"
-         << "                       the uniform cluster measure).\n"
-         << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
-         << "                       DeltaSigma trials (off by default, POSIX).\n"
-         << "  --dataset-k=K     Shortlist size per step (default 50).\n"
-         << "  --dataset-every=S Trial cadence in SP steps (default 1).\n"
-         << "  --oracle / --oracle=on  Label each trial residual with minisat.\n"
-         << "  --oracle=off       Skip the exact minisat label (default).\n"
-         << "  --minisat=PATH     Minisat binary (default minisat).\n"
-         << "  --oracle-timeout=S Per-trial minisat seconds (default 10, 0=off).\n"
-         << "  --oracle-dir      Resolve each decimation direction by minisat.\n"
-         << "  --oracle-pick=K   Scan top-K for a SAT-preserving move (0=off).\n"
-         << "  --lookahead=K     On each decimation, fix the variable among the\n"
-         << "                       top K by score whose SP reconvergence drops\n"
-         << "                       Sigma the least (0 = off). Direction stays SP.\n"
-         << "  --corr-batch      When the batch fixes at least two variables,\n"
-         << "                       compare the top batch with a distance-2 batch\n"
-         << "                       and keep the one with higher Sigma.\n"
-         << "  --adaptive-r      Raise r after a steep Sigma drop or a slow SP\n"
-         << "                       convergence. The base --r= value stays the floor.\n"
-         << "  --dynamic-i-backtrack  Release the variable with the smallest I(k),\n"
-         << "                       the fraction of clusters still compatible with\n"
-         << "                       its assigned value (1-s_F if true, 1-s_T if false).\n"
-         << "  --fe-backtrack    Release by free-energy cost and pick the move type\n"
-         << "                       with a Gibbs split (needs --cav-temp>0).\n"
-         << "  --bt-cost=C       Cost of one back move in the Gibbs split\n"
-         << "                       (default 0.4, calibrated at --cav-temp=0.05\n"
-         << "                       --act-temp=0.02; scale it with --cav-temp).\n"
-         << "  --frac=F          Decimation batch fraction in (0, 1]\n"
-         << "                       (default 0.00125). Same value on every arm.\n"
-         << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"
-         << "  --nn-veto=C       Veto mode: bury vars scoring below C,\n"
-         << "                       keep hand-crafted bias otherwise (needs --nn).\n"
-         << "\n"
-         << "Logging options (do not change the algorithm):\n"
-         << "  -q, --quiet         Warnings and errors only\n"
-         << "  -v, --verbose       Debug logging\n"
-         << "  -vv                 Trace logging\n"
-         << "  --log-level=LEVEL   error|warn|info|debug|trace (default: info)\n"
-         << "  --log-prefix        Prefix each line with [LEVEL]\n"
-         << "\n"
-         << "Examples:\n"
-         << "  " << name << " -w 3 4.0 50\n"
-         << "  " << name << " -v --log-prefix -w 3 4.0 50\n"
-         << "  " << name << " -l formula.cnf\n";
-}

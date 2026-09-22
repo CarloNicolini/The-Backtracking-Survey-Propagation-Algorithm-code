@@ -10,15 +10,16 @@ For any problem, email: marinoraffaele.nunziatella@gmail.com
 
 ## Build (CMake)
 
-Requires CMake ≥ 3.16 and a C++11 compiler (g++ on Linux, AppleClang/Clang on
-macOS, or MSVC on Windows).
+Requires CMake ≥ 3.16 and a C++14 compiler (g++ on Linux, AppleClang/Clang on
+macOS, or MSVC on Windows). Network access is needed on the first configure so
+CMake can FetchContent the cxxopts header library.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
 
-The executable is `build/main`.
+The executable is `build/bsp`.
 
 ### Options
 
@@ -51,19 +52,19 @@ cmake --install build --prefix /path/to/prefix
 Generate a random instance and solve it:
 
 ```bash
-./build/main -w <K> <alpha> <N>
+./build/bsp -w <K> <alpha> <N>
 ```
 
 Load a CNF file and solve it:
 
 ```bash
-./build/main -l <formula.cnf>
+./build/bsp -l <formula.cnf>
 ```
 
 Example (3-SAT, clause density 4.0, 50 variables):
 
 ```bash
-./build/main -w 3 4.0 50
+./build/bsp -w 3 4.0 50
 ```
 
 ## Thermodynamic Survey Propagation (ThermoSP)
@@ -76,7 +77,7 @@ one configuration. The map T = 1/y relates the deformation to the
 finite-energy SP(y) equations.
 
 ```bash
-./build/main --cav-temp=0.1 -w 3 4.0 50
+./build/bsp --cav-temp=0.1 -w 3 4.0 50
 ```
 
 The option `--act-temp=T` turns the Gibbs decimation policy on. The policy
@@ -86,7 +87,7 @@ The scorer `--scorer=fth` ranks the variables by the absolute free-energy bias
 B = Phi_minus - Phi_plus. Both options need `--cav-temp>0`.
 
 ```bash
-./build/main --cav-temp=0.1 --act-temp=0.1 --scorer=fth -w 3 4.0 50
+./build/bsp --cav-temp=0.1 --act-temp=0.1 --scorer=fth -w 3 4.0 50
 ```
 
 The option `--fe-backtrack` moves the backtracking step to free energies. The
@@ -127,7 +128,7 @@ point. At m = 0 the tilt is the identity and the solver keeps the uniform
 cluster measure.
 
 ```bash
-./build/main --rsb-m=0.5 -w 3 4.0 50
+./build/bsp --rsb-m=0.5 -w 3 4.0 50
 ```
 
 ## Memory checking with Valgrind
@@ -140,7 +141,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
 cmake --build build -j
 
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
-  ./build/main -w 3 3.0 30
+  ./build/bsp -w 3 3.0 30
 ```
 
 On macOS, the same check can be run in a Linux container, for example:
@@ -151,6 +152,6 @@ docker run --rm -v "$PWD":/src -w /src ubuntu:24.04 bash -lc '
   cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
   cmake --build build -j
   valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
-    ./build/main -w 3 3.0 30
+    ./build/bsp -w 3 3.0 30
 '
 ```
