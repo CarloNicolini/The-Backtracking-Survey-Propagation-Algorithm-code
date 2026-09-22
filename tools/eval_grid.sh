@@ -14,13 +14,14 @@ ALPHAS="${ALPHAS:-3.0 3.5 4.0}"
 SCORERS="${SCORERS:-cert pol gamma:1.0}"
 RS="${RS:-0 0.9}"
 SEEDS="${SEEDS:-1 2}"
+FLAGS="${FLAGS:-}"
 echo -e "scorer\tr\talpha\tseed\tstatus\tlast_sigma_over_N" > "$OUT"
 for sc in $SCORERS; do
   for r in $RS; do
     for a in $ALPHAS; do
       for s in $SEEDS; do
         set +e
-        log="$("$MAIN" --scorer="$sc" --r="$r" --seed="$s" -w "$K" "$a" "$N" 2>&1)"
+        log="$("$MAIN" $FLAGS --scorer="$sc" --r="$r" --seed="$s" -w "$K" "$a" "$N" 2>&1)"
         rc=$?
         set -e
         status="fail"

@@ -91,12 +91,13 @@ int WalkSat(vector <vector<bool> > & sol,int argc, char * argv[]); // WalkSat fu
 #endif
 
 /*Runtime decimation-scorer selection. -1 keeps the compiled-in __H macro
- (legacy behavior, CERT by default); 0=CERT, 1=POL, 2=GAMMA, 3=I_C.
+ (legacy behavior, CERT by default); 0=CERT, 1=POL, 2=GAMMA, 3=I_C, 4=FTH.
  GAMMA scores b*|sT-sF|^g_scorer_gamma, interpolating certainty (g=0)
- and polarization-like rankings. Set via --scorer=... (see main.cpp).*/
+ and polarization-like rankings. FTH ranks by the absolute free-energy bias
+ and needs --cav-temp>0. Set via --scorer=... (see main.cpp).*/
 extern int g_scorer_id;
 extern double g_scorer_gamma;
-double bsp_score(double a, double b, double c); /*a=sT,b=sF,c=sI*/
+double bsp_score(double a, double b, double c, double b_th); /*a=sT,b=sF,c=sI,b_th=Phi_minus-Phi_plus*/
 bool bsp_parse_scorer(const string& spec); /*"cert","pol","i_c","gamma:<g>"*/
 string bsp_scorer_name(); /*short name of the active scorer, for logging*/
 

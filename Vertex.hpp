@@ -29,6 +29,7 @@
 #define Vertex_hpp
 #include "Header.h"
 #include "thermo_sp.hpp"
+#include "thermo_policy.hpp"
 
 /***********************************************************************************/
 /***********************************************************************************/
@@ -83,6 +84,9 @@ public:
         _sI=0.;/*survey sI variable node*/
         _sF=0.;/*survey sF variable node*/
         _sC=0.;/*certitude*/
+        _phi_plus=0.;/*free energy of x_i=true (0 without ThermoSP)*/
+        _phi_minus=0.;/*free energy of x_i=false (0 without ThermoSP)*/
+        _B_th=0.;/*free-energy bias Phi(-)-Phi(+)*/
         _sNN=0.0/0.0;/*NN prediction (NaN = none yet / abstained)*/
         _I_am_white=false;/*white variable*/
     };
@@ -152,6 +156,9 @@ public:
     double _sI; /*survey of i indeterminate*/
     double _sF; /*survey of i false*/
     double _sC; /*certitude*/
+    double _phi_plus; /*free energy of the assignment x_i=true*/
+    double _phi_minus; /*free energy of the assignment x_i=false*/
+    double _B_th; /*free-energy bias Phi_minus-Phi_plus*/
     double _sNN; /*NN predicted DeltaSigma (NaN if none/abstained)*/
     double prod_V_plus; /*product (1-message) in V_plus*/
     double prod_V_minus; /*product (1-message) in V_minus*/
@@ -178,9 +185,11 @@ inline double Vertex::_one_minus(unsigned int &i) { /*compute 1-survey stored in
     return (1.-_surveys_cl_to_i[i]);
 }
 
-/*public memeber which fixes the variable node to true or false, depending by surveys value _sT and _sF*/
+/*public memeber which fixes the variable node to true or false, depending by surveys value _sT and _sF.
+ With g_T_act>0 the assignment is a Gibbs draw on the free energies of the two directions.*/
 inline void Vertex::fix_var_i() { /*fix variable node to rue or false*/
-    if(_sT>_sF) _who_I_am=true;
+    if(g_T_act>0.) _who_I_am=thermo_gibbs_direction(_phi_plus,_phi_minus,g_T_act);
+    else if(_sT>_sF) _who_I_am=true;
     else _who_I_am=false;
 }
 
@@ -234,7 +243,7 @@ inline double Vertex::S(double &a, double &b, double &c) { /*compute sT,sF*/
 
 /*public member which describe how to compute the variable node certitude*/
 inline double Vertex::S_C() { /*compute certitude survey*/
-    return bsp_score(_sT, _sF, _sI);
+    return bsp_score(_sT, _sF, _sI, _B_th);
 }
 
 #endif /* Vertex_hpp */

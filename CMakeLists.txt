@@ -29,6 +29,7 @@ add_executable(bsp
   Graph.cpp
   Vertex.cpp
   thermo_sp.cpp
+  thermo_policy.cpp
   walksat.cpp
   ${BSP_NN_SOURCES}
 )
@@ -47,6 +48,7 @@ enable_testing()
 add_executable(bsp-test
   tests/test_thermo_sp.cpp
   thermo_sp.cpp
+  thermo_policy.cpp
 )
 target_include_directories(bsp-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME thermo-sp COMMAND bsp-test)

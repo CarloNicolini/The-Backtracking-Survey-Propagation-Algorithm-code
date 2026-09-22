@@ -34,8 +34,9 @@
 int g_scorer_id = -1;
 double g_scorer_gamma = 1.0;
 
-/*Score a variable for (de)selection from its surveys: a=sT, b=sF, c=sI.*/
-double bsp_score(double a, double b, double c) {
+/*Score a variable for (de)selection from its surveys: a=sT, b=sF, c=sI,
+ b_th=free-energy bias Phi_minus-Phi_plus.*/
+double bsp_score(double a, double b, double c, double b_th) {
     double bias = 1.0 - std::min(a, b); /*CERT*/
     double pol = std::fabs(a - b); /*POL*/
     switch (g_scorer_id) {
@@ -43,15 +44,17 @@ double bsp_score(double a, double b, double c) {
         case 1: return pol;
         case 2: return bias * std::pow(pol, g_scorer_gamma);
         case 3: return c; /*I_C*/
+        case 4: return std::fabs(b_th); /*FTH, the free-energy bias*/
         default: return __H(a, b, c); /*legacy compiled-in macro*/
     }
 }
 
-/*Parse a --scorer=... spec: "cert", "pol", "i_c" or "gamma:<g>", g>=0.*/
+/*Parse a --scorer=... spec: "cert", "pol", "i_c", "fth" or "gamma:<g>", g>=0.*/
 bool bsp_parse_scorer(const string& spec) {
     if (spec == "cert") { g_scorer_id = 0; return true; }
     if (spec == "pol") { g_scorer_id = 1; return true; }
     if (spec == "i_c") { g_scorer_id = 3; return true; }
+    if (spec == "fth") { g_scorer_id = 4; return true; }
     if (spec.compare(0, 6, "gamma:") == 0) {
         try {
             g_scorer_gamma = std::stod(spec.substr(6));
@@ -71,6 +74,7 @@ string bsp_scorer_name() {
         case 0: return "cert";
         case 1: return "pol";
         case 3: return "i_c";
+        case 4: return "fth";
         case 2: {
             ostringstream o;
             o << "gamma:" << g_scorer_gamma;
@@ -107,6 +111,13 @@ void Vertex::compute_s() { /*compute surveys variable node*/
         _p_plus=_st.pi_s;/*p>q region*/
         _p_minus=_st.pi_u;/*q>p region*/
         _p_I=_st.pi_0;
+        /*free energies of the two assignments (1e-300 floors the log of an
+         impossible direction, so an unconstrained variable keeps bias 0)*/
+        double _fp=(_p_plus>1e-300)?_p_plus:1e-300;
+        double _fm=(_p_minus>1e-300)?_p_minus:1e-300;
+        _phi_plus=-g_T_cav*log(_fp);
+        _phi_minus=-g_T_cav*log(_fm);
+        _B_th=_phi_minus-_phi_plus;
     } else {
         _p_plus=_p_PLUS();/*compute bias _pi_plus*/
         _p_minus=_p_MINUS();/*compute bias _pi_minus*/
