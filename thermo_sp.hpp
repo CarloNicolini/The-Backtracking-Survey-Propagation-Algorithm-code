@@ -15,6 +15,18 @@
  (hard) SP factors of Graph::__pu and Graph::__norm. Set with --cav-temp=T.*/
 extern double g_T_cav;
 
+/*Cluster reweighting exponent of the 1RSB measure mu_m(C) proportional to
+ e^(m N s_C). m=0 keeps the uniform cluster measure. It tilts every cavity
+ message with the branch cluster counts of the note: the warning mass eta
+ carries kappa_warn^m and the silent mass (1-eta) carries kappa_sil^m. Set with
+ --rsb-m=M.*/
+extern double g_rsb_m;
+
+/*Tilted warning probability of one message under the 1RSB measure: the two
+ masses eta*kappa_warn^m and (1-eta)*kappa_sil^m give this ratio. At m=0 the
+ value is eta exactly.*/
+double thermo_tilt(double eta, double kappa_warn, double kappa_sil, double m);
+
 /*Deformed Pi sums of one cavity star. eta_s holds the messages that push the
  cavity variable to satisfy the target clause, eta_u the messages that push it
  the other way. A warning configuration omega draws each message as active with

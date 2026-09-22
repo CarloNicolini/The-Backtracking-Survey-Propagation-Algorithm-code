@@ -108,6 +108,28 @@ script after each change to the solver.
 ./tools/regression_thermo.sh
 ```
 
+### 1RSB cluster reweighting
+
+The option `--rsb-m=M` deforms the cluster measure with mu_m(C) proportional to
+e^(m N s_C), where s_C is the internal entropy of the cluster C. The derivation
+runs as follows. The 1RSB free entropy weights each branch of a cavity star with
+its cluster count to the power m. The warning state of one message carries the
+branch count kappa_warn, and the silent state carries kappa_sil. The two masses
+of the message are then eta kappa_warn^m and (1-eta) kappa_sil^m. A product over
+messages splits into two factors. One factor is the product of the mass sums,
+and it cancels in every message ratio. The other factor is a product of tilted
+ratios, so the star sums keep their form with the tilted message
+eta_tilde = eta kappa_warn^m / (eta kappa_warn^m + (1-eta) kappa_sil^m). The
+branch counts are the sector sums of the same star: kappa_warn is the product of
+the Pi_u factors over the other literals, and kappa_sil is the rest of the
+partition sum. The messages and the branch counts iterate together to a fixed
+point. At m = 0 the tilt is the identity and the solver keeps the uniform
+cluster measure.
+
+```bash
+./build/main --rsb-m=0.5 -w 3 4.0 50
+```
+
 ## Memory checking with Valgrind
 
 Valgrind runs on **Linux** only (not available as a native macOS/Homebrew bottle).

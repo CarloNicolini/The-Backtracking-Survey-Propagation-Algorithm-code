@@ -45,16 +45,18 @@ double bsp_score(double a, double b, double c, double b_th) {
         case 2: return bias * std::pow(pol, g_scorer_gamma);
         case 3: return c; /*I_C*/
         case 4: return std::fabs(b_th); /*FTH, the free-energy bias*/
+        case 5: return std::fabs(a - b); /*RSB, b_i(m) of the 1RSB measure*/
         default: return __H(a, b, c); /*legacy compiled-in macro*/
     }
 }
 
-/*Parse a --scorer=... spec: "cert", "pol", "i_c", "fth" or "gamma:<g>", g>=0.*/
+/*Parse a --scorer=... spec: "cert", "pol", "i_c", "fth", "rsb" or "gamma:<g>", g>=0.*/
 bool bsp_parse_scorer(const string& spec) {
     if (spec == "cert") { g_scorer_id = 0; return true; }
     if (spec == "pol") { g_scorer_id = 1; return true; }
     if (spec == "i_c") { g_scorer_id = 3; return true; }
     if (spec == "fth") { g_scorer_id = 4; return true; }
+    if (spec == "rsb") { g_scorer_id = 5; return true; }
     if (spec.compare(0, 6, "gamma:") == 0) {
         try {
             g_scorer_gamma = std::stod(spec.substr(6));
@@ -75,6 +77,7 @@ string bsp_scorer_name() {
         case 1: return "pol";
         case 3: return "i_c";
         case 4: return "fth";
+        case 5: return "rsb";
         case 2: {
             ostringstream o;
             o << "gamma:" << g_scorer_gamma;
@@ -132,17 +135,18 @@ void Vertex::compute_s() { /*compute surveys variable node*/
 
 /*public member which updates products (1-survey) for V_plus and V_minus sets. These products are usful for computing SP and BP equations in an easy way.*/
 void Vertex::make_products() { /*make products for set V_plus and V_minus*/
+    bool _snap=(g_T_cav>0. or g_rsb_m!=0.);/*cache values for the star sums*/
 
     prod_V_plus=1.;/*set the product of V_plus to 1*/
-    if(g_T_cav>0.)snap_plus.resize(_surveys_cl_to_i_plus.size());/*cache values for ThermoSP stars*/
+    if(_snap)snap_plus.resize(_surveys_cl_to_i_plus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_plus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
-        if(g_T_cav>0.)snap_plus[i]=*_surveys_cl_to_i_plus[i];
+        if(_snap)snap_plus[i]=*_surveys_cl_to_i_plus[i];
         prod_V_plus*=(1.- *_surveys_cl_to_i_plus[i]);/*compute products for V_plus*/
     }
     prod_V_minus=1.;/*set the product of V_minus to 1*/
-    if(g_T_cav>0.)snap_minus.resize(_surveys_cl_to_i_minus.size());/*cache values for ThermoSP stars*/
+    if(_snap)snap_minus.resize(_surveys_cl_to_i_minus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_minus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
-        if(g_T_cav>0.)snap_minus[i]=*_surveys_cl_to_i_minus[i];
+        if(_snap)snap_minus[i]=*_surveys_cl_to_i_minus[i];
         prod_V_minus*=(1.- *_surveys_cl_to_i_minus[i]);/*compute products for V_minus*/
     }
 }
