@@ -573,12 +573,16 @@ void Graph::diag_step() {
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN\n";
+        _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN";
+        if(g_T_cav>0.)_diag_var_out<<",e_mean,log_z";/*ThermoSP cavity statistics*/
+        _diag_var_out<<"\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_move_out<<"step,action,vertex,dir\n";
+        _diag_move_out<<"step,action,vertex,dir";
+        if(g_T_cav>0.)_diag_move_out<<",e_mean,log_z";/*ThermoSP cavity statistics*/
+        _diag_move_out<<"\n";
         _diag_header_done=true;
     }
     unsigned step=_diag_step_idx++;
@@ -597,7 +601,12 @@ void Graph::diag_step() {
                      <<(v->_who_I_am ? 1 : 0)<<","
                      <<setprecision(10)<<v->_sT<<","<<v->_sF<<","<<v->_sI<<","
                      <<v->_sC<<","<<fabs(v->_sT-v->_sF)<<","
-                     <<v->_degree_i<<","<<v->_sNN<<"\n";
+                     <<v->_degree_i<<","<<v->_sNN;
+        if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
+            ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav);
+            _diag_var_out<<","<<_st.e_mean<<","<<log(_st.z);
+        }
+        _diag_var_out<<"\n";
     }
     _diag_var_out<<flush;
     if (g_dump_residuals) {
@@ -614,7 +623,12 @@ void Graph::diag_step() {
 void Graph::diag_move(const char* action, Vertex* v, int dir) {
     if (_in_trial) return;/*trial children must not touch shared file offsets*/
     if (g_diag_prefix.empty() || !_diag_header_done) return;
-    _diag_move_out<<(_diag_step_idx-1)<<","<<action<<","<<v->_vertex<<","<<dir<<endl;
+    _diag_move_out<<(_diag_step_idx-1)<<","<<action<<","<<v->_vertex<<","<<dir;
+    if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
+        ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav);
+        _diag_move_out<<","<<_st.e_mean<<","<<log(_st.z);
+    }
+    _diag_move_out<<endl;
 }
 
 #ifndef _WIN32
@@ -1028,13 +1042,13 @@ START:
                     l=0;
                     while (1) {
                         if(i!=l && _cl[C]._go_forward[l]) {
-                            if(g_T_cav>0.) {/*ThermoSP deformed star sums at cavity j (SP branch, rho_SP=1)*/
-                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],g_T_cav);
+                            _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
+                            _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
+                            if(g_T_cav>0.) {/*ThermoSP: finite-T corrections on top of the hard factors*/
+                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav);
                                 _new*=_st.pi_u;
                                 norm*=_st.z;
                             } else {
-                                _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
-                                _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
                                 _new*=__pu();/*new message from cl to variable is computed*/
                                 norm*=__norm();
                             }
@@ -1107,8 +1121,14 @@ void Graph::update_complexity_clauses() {
             if(_cl[C]._go_forward[j]==1) {
                 _prod_S=_Pr_S(_cl[C].v_V[j],_cl[C].v_lit[j], _cl[C].div_s[j]);
                 _prod_U=_Pr_U(_cl[C].v_V[j],_cl[C].v_lit[j]);
-                _ps*=__norm();/*update product for clause complexity*/
-                _pu*=__pu();/*update product for clause complexity*/
+                if(g_T_cav>0.) {/*ThermoSP: same star sums as the message update*/
+                    ThermoStar _st=_cl[C].v_V[j]->cavity_star(_cl[C].v_lit[j],_cl[C].v_survey_cl_to_i[j],_prod_S,_prod_U,g_T_cav);
+                    _ps*=_st.z;/*update product for clause complexity*/
+                    _pu*=_st.pi_u;/*update product for clause complexity*/
+                } else {
+                    _ps*=__norm();/*update product for clause complexity*/
+                    _pu*=__pu();/*update product for clause complexity*/
+                }
             }
         }
         complexity_clauses+=log(_ps-_pu);/*update clause complexity*/

@@ -102,9 +102,16 @@ bool bsp_pass_margin(double sT, double sF) {
 void Vertex::compute_s() { /*compute surveys variable node*/
     double _p_plus=0.,_p_minus=0.,_p_I=0.;/*declaration local variables*/
     complexity_variable=0.;/*set variable complexity to zero*/
-    _p_plus=_p_PLUS();/*compute bias _pi_plus*/
-    _p_minus=_p_MINUS();/*compute bias _pi_minus*/
-    _p_I=_p_IND();/*compute bias _pi_indeterminate*/
+    if(g_T_cav>0.) {/*ThermoSP field star: warnings to true count p, warnings to false count q*/
+        ThermoStar _st=cavity_star(true,NULL,prod_V_plus,prod_V_minus,g_T_cav);
+        _p_plus=_st.pi_s;/*p>q region*/
+        _p_minus=_st.pi_u;/*q>p region*/
+        _p_I=_st.pi_0;
+    } else {
+        _p_plus=_p_PLUS();/*compute bias _pi_plus*/
+        _p_minus=_p_MINUS();/*compute bias _pi_minus*/
+        _p_I=_p_IND();/*compute bias _pi_indeterminate*/
+    }
     complexity_variable=_p_I+_p_minus+_p_plus;/*update variable node complexity*/
     _sT=S(_p_plus, _p_minus, _p_I);/*compute survey _sT variable node*/
     _sF=S(_p_minus, _p_plus, _p_I);/*compute survey _sF variable node*/
@@ -134,8 +141,10 @@ void Vertex::make_products() { /*make products for set V_plus and V_minus*/
  exactly the values behind the legacy products. The message of the clause that
  owns the cavity is passed as exclude and skipped in the groups (it always
  belongs to the s group, the one selected by b, like the div_s correction of the
- legacy factors).*/
-ThermoStar Vertex::cavity_star(bool b, const double *exclude, double T) {
+ legacy factors). A0 and B0 are the hard factors of the two groups with the
+ cavity message already excluded: pass the exact values of _Pr_S and _Pr_U, or
+ prod_V_plus and prod_V_minus for the field star.*/
+ThermoStar Vertex::cavity_star(bool b, const double *exclude, double A0, double B0, double T) {
     const vector<double *> &_s_ptr=(b)?_surveys_cl_to_i_plus:_surveys_cl_to_i_minus;
     const vector<double *> &_u_ptr=(b)?_surveys_cl_to_i_minus:_surveys_cl_to_i_plus;
     const vector<double> &_s_val=(b)?snap_plus:snap_minus;
@@ -147,7 +156,7 @@ ThermoStar Vertex::cavity_star(bool b, const double *exclude, double T) {
         if(_s_ptr[i]!=exclude)_es.push_back(_s_val[i]);
     for (unsigned long i=0; i<_u_ptr.size(); ++i)
         if(_u_ptr[i]!=exclude)_eu.push_back(_u_val[i]);
-    return thermo_star(_es.data(),_es.size(),_eu.data(),_eu.size(),T);
+    return thermo_star(_es.data(),_es.size(),_eu.data(),_eu.size(),A0,B0,T);
 }
 
 
