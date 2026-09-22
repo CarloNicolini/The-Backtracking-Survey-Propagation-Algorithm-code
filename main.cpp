@@ -40,6 +40,7 @@
 #include "Graph.hpp"
 #include "NnScorer.hpp"
 #include "thermo_sp.hpp"
+#include "thermo_policy.hpp"
 #define UNIX 1
 #if UNIX
 #define random() rand()
@@ -185,6 +186,15 @@ int main(int argc,  char * const argv[]) {
             }
             continue;
         }
+        if (a.rfind("--act-temp=", 0) == 0) {
+            g_T_act = stod(a.substr(11));
+            if (!(g_T_act >= 0.0)) {
+                BSP_ERROR << "act-temp must be >= 0, got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -280,6 +290,11 @@ int main(int argc,  char * const argv[]) {
         BSP_ERROR << "--dump-residuals requires --diag=PREFIX" << endl;
         return 1;
     }
+    if ((g_scorer_id == 4 || g_T_act > 0.) && g_T_cav <= 0.) {
+        BSP_ERROR << "--scorer=fth and --act-temp need --cav-temp>0"
+                  << " (the free energies come from the deformed messages)" << endl;
+        return 1;
+    }
     if (g_oracle_pick > 0) {
         BSP_ERROR << "--oracle-pick is not implemented yet (use --oracle-dir)" << endl;
         return 1;
@@ -367,6 +382,7 @@ int main(int argc,  char * const argv[]) {
     else BSP_INFO<<"START SID:"<<endl;
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     if (g_T_cav!=0.)BSP_INFO<<"ThermoSP cavity temperature: T="<<g_T_cav<<endl;
+    if (g_T_act!=0.)BSP_INFO<<"Gibbs action temperature: T_act="<<g_T_act<<endl;
     if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)
         BSP_INFO<<"profile controls: lookahead="<<g_lookahead_k
                 <<" corr_batch="<<(g_corr_batch?1:0)
@@ -541,8 +557,10 @@ void help(const char *prog) {
          << "                       N     = number of variables\n"
          << "  -l <formula.cnf>    Load a CNF formula from file and solve it.\n"
          << "  -h, --help          Show this help message.\n"
-         << "  --scorer=SPEC       Decimation scorer: cert|pol|i_c|gamma:<g>.\n"
+         << "  --scorer=SPEC       Decimation scorer: cert|pol|i_c|fth|gamma:<g>.\n"
          << "                       Default keeps the compiled-in scorer (CERT).\n"
+         << "                       fth ranks by the free-energy bias and needs\n"
+         << "                       --cav-temp>0.\n"
          << "  --diag=PREFIX       Write PREFIX_steps.csv / PREFIX_vars.csv\n"
          << "                       per-SP-fixed-point diagnostics (off by default).\n"
          << "  --diag-every=K      Log vars + residuals every K steps (default 1).\n"
@@ -558,6 +576,9 @@ void help(const char *prog) {
          << "  --cav-temp=T      Cavity temperature of ThermoSP in [0, inf)\n"
          << "                       (default 0 keeps the legacy SP factors; the\n"
          << "                       map T = 1/y matches finite-energy SP(y)).\n"
+         << "  --act-temp=T      Action temperature of the Gibbs decimation\n"
+         << "                       policy in [0, inf) (default 0 keeps the hard\n"
+         << "                       sT>sF rule). Needs --cav-temp>0.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"

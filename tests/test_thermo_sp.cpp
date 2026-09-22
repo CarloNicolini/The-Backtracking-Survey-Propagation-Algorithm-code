@@ -5,10 +5,12 @@
 //  Numeric identities of the thermodynamic star sums (thermodynamic-sp.md):
 //  1. the sums match a brute-force enumeration of the warning configurations;
 //  2. the T=0 and tiny-T sums equal the hard SP factors exactly;
-//  3. the partition sum z equals pi_u+pi_s+pi_0.
+//  3. the partition sum z equals pi_u+pi_s+pi_0;
+//  4. the Gibbs sampler frequencies match the weights e^(-Phi/T_act).
 //
 
 #include "thermo_sp.hpp"
+#include "thermo_policy.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -146,11 +148,34 @@ static void test_partition_sum(mt19937 &rng) {
     }
 }
 
+/*The Gibbs draw of the decision policy: the frequency of true must match the
+ logistic weight of the free-energy bias, and T_act=0 gives the hard rule.*/
+static void test_gibbs_sampler() {
+    srandom(20260922u);
+    const double phi_plus[] = {0.3, 1.2, 0.7, 0.3};
+    const double phi_minus[] = {1.2, 0.3, 0.7, 1.2};
+    const double t_act[] = {0.5, 0.5, 0.3, 0.05};
+    for (size_t k = 0; k < 4; ++k) {
+        double p_true = 1. / (1. + exp((phi_plus[k] - phi_minus[k]) / t_act[k]));
+        int hits = 0;
+        for (int i = 0; i < 10000; ++i)
+            if (thermo_gibbs_direction(phi_plus[k], phi_minus[k], t_act[k])) ++hits;
+        expect_close("gibbs frequency", hits / 10000., p_true, 0.02);
+    }
+    expect_close("hard rule true", thermo_gibbs_direction(0.2, 0.5, 0.) ? 1. : 0.,
+                 1., 0.);
+    expect_close("hard rule false", thermo_gibbs_direction(0.5, 0.2, 0.) ? 1. : 0.,
+                 0., 0.);
+    expect_close("hard rule tie", thermo_gibbs_direction(0.3, 0.3, 0.) ? 1. : 0.,
+                 0., 0.);
+}
+
 int main() {
     mt19937 rng(20260922u);
     test_matches_brute_force(rng);
     test_zero_temperature_limit(rng);
     test_partition_sum(rng);
+    test_gibbs_sampler();
     if (failures == 0) printf("bsp-test: all thermo_sp identities hold\n");
     else printf("bsp-test: %d failures\n", failures);
     return failures == 0 ? 0 : 1;
