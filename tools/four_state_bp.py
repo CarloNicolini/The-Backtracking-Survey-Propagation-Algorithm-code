@@ -183,6 +183,8 @@ def exact_variable_marginals(clauses, n, b, t):
         total_weight += weight
         for variable in range(n):
             values[variable * 2 + (0 if assignment & (1 << variable) else 1)] += weight
+    if total_weight == 0.0:
+        return {variable: [0.5, 0.5] for variable in range(n)}, 0.0
     return {
         variable: [values[variable * 2] / total_weight, values[variable * 2 + 1] / total_weight]
         for variable in range(n)
