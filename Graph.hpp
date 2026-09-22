@@ -131,6 +131,8 @@ public:
     vector<double> update;
     vector<double> old_s;
     vector<double> div_s;
+    vector<double> kappa_warn; /*1RSB branch cluster counts of the warning state*/
+    vector<double> kappa_sil; /*1RSB branch cluster counts of the silent state*/
     vector<unsigned int> _vecpos; /*vector of integer that describes literal position*/
     vector<long int> _var;
     vector<int> _v_ref;/*vector of Boolean variables in integer*/

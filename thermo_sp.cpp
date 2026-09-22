@@ -15,6 +15,16 @@
 using namespace std;
 
 double g_T_cav = 0.;
+double g_rsb_m = 0.;
+
+double thermo_tilt(double eta, double kappa_warn, double kappa_sil, double m) {
+  if (m == 0.) return eta;
+  /*a branch with no cluster count has no weight in mu_m for any m*/
+  double w = (kappa_warn > 0.) ? eta * pow(kappa_warn, m) : 0.;
+  double s = (kappa_sil > 0.) ? (1. - eta) * pow(kappa_sil, m) : 0.;
+  double t = w + s;
+  return (t > 0.) ? w / t : eta;
+}
 
 /*Coefficients of the polynomial product over one warning group:
  prod_b (1 - eta_b + eta_b z) = sum_p A_p z^p. coef must hold n+1 values and

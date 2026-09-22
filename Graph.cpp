@@ -1085,6 +1085,10 @@ START:
                         ++l;
                         if(l==s)break;
                     }
+                    if(g_rsb_m!=0.) {/*1RSB branch cluster counts of this arc*/
+                        _cl[C].kappa_warn[i]=_new;/*all other literals push the warning*/
+                        _cl[C].kappa_sil[i]=norm-_new;/*the complement is silence*/
+                    }
                     _new=compute_message(_new,norm);/*set to 0 a message iff the message is smaller than 1e-16*/
                     if(_new==1.) {
                         unit_propagation(C); /*fix the variable into clause c to true and clean the graph*/
@@ -1107,13 +1111,17 @@ START:
                 }
                 if(i==s)break;
             }
-            i=0;
-            while (1) {
-                *_cl[C].v_survey_cl_to_i[i]=_cl[C].update[i];
-                _cl[C].div_s[i]=Div_s(_cl[C].update[i]);
-                ++i;
-                if(i==s)break;
+        i=0;
+        while (1) {
+            double _eta=_cl[C].update[i];
+            if(g_rsb_m!=0.) {/*1RSB: the stored message carries the tilted masses*/
+                _eta=thermo_tilt(_eta,_cl[C].kappa_warn[i],_cl[C].kappa_sil[i],g_rsb_m);
             }
+            *_cl[C].v_survey_cl_to_i[i]=_eta;
+            _cl[C].div_s[i]=Div_s(_eta);
+            ++i;
+            if(i==s)break;
+        }
         }
         update_products();/*update products into vertex node for speeding up the algorithm*/
         if(_counter_conv==0) { /*if counter convergence is zero, a convergence is found*/
@@ -1210,6 +1218,8 @@ void Graph::split_and_collect_information() { /*split the graph in different vec
             _cl[l].old_s.push_back(_rn);
             _cl[l].update.push_back(_rn);
             _cl[l].div_s.push_back(Div_s(_rn));
+            _cl[l].kappa_warn.push_back(1.);/*neutral 1RSB branch counts*/
+            _cl[l].kappa_sil.push_back(1.);
             pos++;/*update position*/
             if(_ivec[i]>0) { /*check if literal is negated or not*/
                 _cl[l]._lit.push_back(true);/*store literal in Boolean list _lit*/

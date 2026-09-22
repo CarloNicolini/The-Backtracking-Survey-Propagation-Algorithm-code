@@ -195,6 +195,10 @@ int main(int argc,  char * const argv[]) {
             }
             continue;
         }
+        if (a.rfind("--rsb-m=", 0) == 0) {
+            g_rsb_m = stod(a.substr(8));
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -396,6 +400,7 @@ int main(int argc,  char * const argv[]) {
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     if (g_T_cav!=0.)BSP_INFO<<"ThermoSP cavity temperature: T="<<g_T_cav<<endl;
     if (g_T_act!=0.)BSP_INFO<<"Gibbs action temperature: T_act="<<g_T_act<<endl;
+    if (g_rsb_m!=0.)BSP_INFO<<"1RSB cluster reweighting: m="<<g_rsb_m<<endl;
     if (g_fe_backtrack)BSP_INFO<<"Free-energy backtracking on, bt-cost="<<g_bt_cost<<endl;
     if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)
         BSP_INFO<<"profile controls: lookahead="<<g_lookahead_k
@@ -593,6 +598,9 @@ void help(const char *prog) {
          << "  --act-temp=T      Action temperature of the Gibbs decimation\n"
          << "                       policy in [0, inf) (default 0 keeps the hard\n"
          << "                       sT>sF rule). Needs --cav-temp>0.\n"
+         << "  --rsb-m=M         1RSB cluster reweighting exponent m of the\n"
+         << "                       measure mu_m(C) ~ e^(m N s_C) (default 0 keeps\n"
+         << "                       the uniform cluster measure).\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
