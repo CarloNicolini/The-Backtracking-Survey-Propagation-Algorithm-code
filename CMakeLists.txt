@@ -28,6 +28,7 @@ add_executable(bsp
   main.cpp
   Graph.cpp
   Vertex.cpp
+  thermo_sp.cpp
   walksat.cpp
   ${BSP_NN_SOURCES}
 )
@@ -40,6 +41,15 @@ add_executable(bsp_train
 target_include_directories(bsp PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(bsp_train PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 set_target_properties(bsp_train PROPERTIES OUTPUT_NAME "bsp-train")
+
+# Numeric identities of the thermodynamic star sums (run with ctest).
+enable_testing()
+add_executable(bsp-test
+  tests/test_thermo_sp.cpp
+  thermo_sp.cpp
+)
+target_include_directories(bsp-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME thermo-sp COMMAND bsp-test)
 
 # ---------------------------------------------------------------------------
 # Compiler / linker optimization flags
