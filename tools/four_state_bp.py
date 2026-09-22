@@ -151,6 +151,44 @@ def exact_edge_marginals(clauses, n, b, t):
     return {key: value / total_weight for key, value in counts.items()}, total_weight, solution_count
 
 
+def bp_variable_marginals(variable_messages, clause_messages, variable_edges, edge_values, b, t):
+    marginals = {}
+    for variable, edges in variable_edges.items():
+        values = [0.0, 0.0]
+        for sign in (1, -1):
+            factors = []
+            for edge in edges:
+                message = clause_messages[edge]
+                if sign == edge_values[edge]:
+                    factors.append((message[J0], message[J1]))
+                else:
+                    factors.append((message[V0], 0.0))
+            coefficients = polynomial(factors)
+            values[0 if sign == 1 else 1] = biased_mass(coefficients, b, t)
+        total = sum(values)
+        marginals[variable] = [value / total for value in values]
+    return marginals
+
+
+def exact_variable_marginals(clauses, n, b, t):
+    full_mask = (1 << n) - 1
+    values = [0.0] * (2 * n)
+    total_weight = 0.0
+    for assignment in range(1 << n):
+        if not all((assignment & positive) | ((full_mask ^ assignment) & negative)
+                   for positive, negative, _ in clauses):
+            continue
+        c1, v1, _ = whitening_statistics(assignment, clauses, n, full_mask)
+        weight = b**v1 * t**c1
+        total_weight += weight
+        for variable in range(n):
+            values[variable * 2 + (0 if assignment & (1 << variable) else 1)] += weight
+    return {
+        variable: [values[variable * 2] / total_weight, values[variable * 2 + 1] / total_weight]
+        for variable in range(n)
+    }, total_weight
+
+
 def total_variation(left, right):
     return 0.5 * sum(abs(a - b) for a, b in zip(left, right))
 
@@ -194,7 +232,18 @@ def main():
         parser.error("--out is required")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["seed", "solutions", "weighted_mass", "iterations", "converged", "mean_edge_tv", "max_edge_tv"]
+    fields = [
+        "seed",
+        "solutions",
+        "weighted_mass",
+        "iterations",
+        "converged",
+        "mean_edge_tv",
+        "max_edge_tv",
+        "mean_var_tv",
+        "max_var_tv",
+        "greedy_agreement",
+    ]
     with args.out.open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, delimiter="\t", lineterminator="\n")
         writer.writeheader()
@@ -218,6 +267,20 @@ def main():
                 ])
                 expected = [exact.get((edge[0], edge[1], state), 0.0) for state in range(3)]
                 errors.append(total_variation(belief, expected))
+            exact_vars, _ = exact_variable_marginals(clauses, args.n, args.b, args.t)
+            bp_vars = bp_variable_marginals(
+                variable_messages, clause_messages, variable_edges, edge_values,
+                args.b, args.t
+            )
+            var_errors = [
+                total_variation(bp_vars[variable], exact_vars[variable])
+                for variable in range(args.n)
+            ]
+            greedy_agreement = sum(
+                (bp_vars[variable][0] > bp_vars[variable][1])
+                == (exact_vars[variable][0] > exact_vars[variable][1])
+                for variable in range(args.n)
+            )
             converged = iterations < args.iterations
             writer.writerow({
                 "seed": seed,
@@ -227,11 +290,16 @@ def main():
                 "converged": int(converged),
                 "mean_edge_tv": sum(errors) / len(errors),
                 "max_edge_tv": max(errors),
+                "mean_var_tv": sum(var_errors) / len(var_errors),
+                "max_var_tv": max(var_errors),
+                "greedy_agreement": greedy_agreement,
             })
             print(
                 f"seed={seed} solutions={solution_count} iterations={iterations} "
-                f"converged={converged} mean_tv={sum(errors) / len(errors):.6g} "
-                f"max_tv={max(errors):.6g} seconds={time.perf_counter() - started:.2f}",
+                f"converged={converged} edge_tv={sum(errors) / len(errors):.6g} "
+                f"var_tv={sum(var_errors) / len(var_errors):.6g} "
+                f"greedy={greedy_agreement}/{args.n} "
+                f"seconds={time.perf_counter() - started:.2f}",
                 flush=True,
             )
 
