@@ -1,0 +1,13 @@
+scorer	r	alpha	seed	status	last_sigma_over_N
+cert	0	3.5	1	solve	0
+cert	0	3.5	2	solve	0
+cert	0	4.0	1	fail	0.00380427278
+cert	0	4.0	2	fail	-0.000437869783
+pol	0	3.5	1	solve	0
+pol	0	3.5	2	solve	0
+pol	0	4.0	1	fail	0.00403330917
+pol	0	4.0	2	fail	0.00157094989
+gamma:1.0	0	3.5	1	solve	0
+gamma:1.0	0	3.5	2	solve	0
+gamma:1.0	0	4.0	1	fail	0.00381890868
+gamma:1.0	0	4.0	2	fail	0.00127468088

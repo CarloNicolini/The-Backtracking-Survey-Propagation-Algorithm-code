@@ -128,6 +128,14 @@ extern unsigned g_oracle_timeout; /*per-trial minisat seconds, default 10 (0 = u
 extern bool g_oracle_dir; /*check both dirs per chosen var, take a SAT one*/
 extern unsigned g_oracle_pick; /*scan top-K for SAT-preserving (var,dir), 0 = off*/
 extern unsigned g_lookahead_k; /*top-K complexity lookahead, 0 = off*/
+extern bool g_dynamic_i; /*release by I(k) from current surveys, default off*/
+/*Complexity-profile controls. All off by default, so legacy BSP is unchanged.
+ Lookahead and corr-batch pick a move by the realized Sigma after a forked
+ SP reconvergence. Adaptive-r raises the backtracking ratio when Sigma falls
+ steeply or SP converges slowly. g_frac overrides the compiled-in batch fraction.*/
+extern bool g_corr_batch; /*among high-P vars, prefer a distance-2 batch*/
+extern bool g_adaptive_r; /*raise r when the Sigma slope is steep or SP is slow*/
+extern double g_frac; /*decimation batch fraction, default frac*/
 extern string g_nn_path; /*GenANN weights from bsp-train; empty = off*/
 extern bool g_nn_veto; /*veto mode: bury vars scoring below cutoff, else keep bias*/
 extern double g_nn_cutoff; /*veto threshold on predicted DeltaSigma*/

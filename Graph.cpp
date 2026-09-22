@@ -54,6 +54,17 @@ string g_minisat_path = "minisat";
 unsigned g_oracle_timeout = 10;
 bool g_oracle_dir = false;
 unsigned g_oracle_pick = 0;
+unsigned g_lookahead_k = 0;
+bool g_dynamic_i = false;
+bool g_corr_batch = false;
+bool g_adaptive_r = false;
+double g_frac = frac;
+/*A step is steep when it removes this fraction of the current complexity.
+ SP is slow when it needs more than this many iterations (t_max is 1024).
+ The boost is added to r, then clipped below 1.*/
+static const double k_slope_frac = 0.05;
+static const unsigned k_eta_cut = 128;
+static const double k_r_boost = 0.09;
 string g_nn_path;
 bool g_nn_veto = false;
 double g_nn_cutoff = 0.0;
@@ -274,11 +285,105 @@ bool Graph::vetoed(Vertex* v, const vector<Vertex*>& sel) {
     return false;
 }
 
+static bool same_var_set(const vector<Vertex*>& a, const vector<Vertex*>& b) {
+    if (a.size()!=b.size()) return false;
+    for (unsigned i=0; i<a.size(); ++i) {
+        bool found=false;
+        for (unsigned j=0; j<b.size(); ++j)
+            if (a[i]==b[j]) { found=true; break; }
+        if (!found) return false;
+    }
+    return true;
+}
+
+/*Place win at the front of the unfixed region. The fixed prefix stays put.*/
+static void promote_unfixed(vector<Vertex*>& p, unsigned nfixed, const vector<Vertex*>& win) {
+    vector<Vertex*> rest;
+    rest.reserve(p.size()-nfixed);
+    for (unsigned i=nfixed; i<p.size(); ++i) {
+        bool used=false;
+        for (unsigned j=0; j<win.size(); ++j)
+            if (p[i]==win[j]) { used=true; break; }
+        if (!used) rest.push_back(p[i]);
+    }
+    for (unsigned j=0; j<win.size(); ++j) p[nfixed+j]=win[j];
+    for (unsigned j=0; j<rest.size(); ++j) p[nfixed+win.size()+j]=rest[j];
+}
+
+/*Fork a child that fixes vars in the SP direction and reconverges.
+ The parent graph is unchanged. Returns 1 if that child found a fixed point.
+ sigma is the complexity after reconvergence. sweeps counts the iterations
+ spent, and is added to the run total so a lookahead can be compared with
+ plain BSP at equal SP work. A contradiction or a non-convergence returns 0
+ and charges t_max sweeps.*/
+int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) {
+    sigma=0.;
+    sweeps=0;
+    if (vars.empty()) return 0;
+#ifdef _WIN32
+    return 0;
+#else
+    double* tout=(double*)mmap(NULL, 3*sizeof(double), PROT_READ|PROT_WRITE,
+                               MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if (tout==MAP_FAILED) {
+        BSP_ERROR<<"mmap failed for complexity probe"<<endl;
+        exit(-1);
+    }
+    tout[0]=0.; tout[1]=0.; tout[2]=0.;
+    _diag_step_out<<flush;
+    _diag_var_out<<flush;
+    _diag_move_out<<flush;
+    _ds_out<<flush;
+    cout<<flush;
+    cerr<<flush;
+    fflush(NULL);
+    pid_t pid=fork();
+    if (pid<0) {
+        BSP_ERROR<<"fork failed for complexity probe"<<endl;
+        exit(-1);
+    }
+    if (pid==0) {
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        _in_trial=true;
+        for (unsigned i=0; i<vars.size(); ++i) {
+            Vertex* v=vars[i];
+            _list_fixed_element.push_back(v);
+            v->_it_list_fixed_elem=--_list_fixed_element.end();
+            v->_I_am_a_fixed_variable=true;
+            v->fix_var_i();
+            if (_last_certitude>v->_sC) _last_certitude=v->_sC;
+            clean(v);
+            v->_degree_i=0;
+        }
+        stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
+        convergence_messages();
+        surveys();
+        tout[0]=1.;
+        tout[1]=complexity;
+        tout[2]=(double)_time_conv_print;
+        _exit(0);
+    }
+    int status=0;
+    while (waitpid(pid, &status, 0)<0 && errno==EINTR) { /*retry*/ }
+    int conv=(WIFEXITED(status) && WEXITSTATUS(status)==0) ? 1 : 0;
+    if (conv) {
+        sigma=tout[1];
+        sweeps=(int)tout[2]+1;
+    } else {
+        sweeps=t_max;
+    }
+    _sp_sweeps+=(unsigned long)sweeps;
+    munmap(tout, 3*sizeof(double));
+    return conv;
+#endif
+}
+
 /*public member class Graph which helps us to fix the variables that have the highest value of certitude*/
 void Graph::choose_var_to_fix_and_clean() {
     /*set the rangee over variables unfixed are into vertex ptrV*/
     _M_t=0;
-    unsigned int _size=(unsigned int)(frac*((double)_N_t))+(unsigned int)_list_fixed_element.size();
+    unsigned int _size=(unsigned int)(g_frac*((double)_N_t))+(unsigned int)_list_fixed_element.size();
     unsigned int _size_init=(unsigned int)_list_fixed_element.size();
     /*set unit propagation counter to zero*/
     _unit_prop=0;
@@ -287,6 +392,62 @@ void Graph::choose_var_to_fix_and_clean() {
         _size=1+_size_init;
     }
     unsigned int _batch=_size-_size_init;/*decimation width of this move*/
+    /*Variant 2 needs a real batch. Below that width it is the same as the
+     2016 ranking, so the single-variable lookahead (variant 1) runs instead.
+     Both leave the SP direction alone and only reorder which variables are fixed.*/
+    if (g_corr_batch && _batch>=2) {
+        vector<Vertex*> legacy, diverse;
+        for (unsigned i=_size_init; i<_N && legacy.size()<_batch; ++i) {
+            if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;
+            legacy.push_back(ptrV[i]);
+        }
+        for (unsigned i=_size_init; i<_N && diverse.size()<_batch; ++i) {
+            if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;
+            if (vetoed(ptrV[i], diverse)) continue;
+            diverse.push_back(ptrV[i]);
+        }
+        if (legacy.size()==_batch && diverse.size()==_batch && !same_var_set(legacy, diverse)) {
+            double s_leg=0., s_div=0.;
+            int w_leg=0, w_div=0;
+            int c_leg=probe_fixes(legacy, s_leg, w_leg);
+            int c_div=probe_fixes(diverse, s_div, w_div);
+            bool take_div=c_div && std::isfinite(s_div) &&
+                          (!c_leg || !std::isfinite(s_leg) || s_div>s_leg);
+            if (take_div) promote_unfixed(ptrV, _size_init, diverse);
+            BSP_INFO<<"corr-batch "<<(take_div?"diverse":"legacy")
+                    <<" Sigma_leg="<<s_leg<<"("<<c_leg<<")"
+                    <<" Sigma_div="<<s_div<<"("<<c_div<<")"
+                    <<" sp_sweeps="<<_sp_sweeps<<endl;
+        }
+    } else if (g_lookahead_k>1) {
+        unsigned nfree=_N-_size_init;
+        unsigned k=g_lookahead_k<nfree ? g_lookahead_k : nfree;
+        int best=-1;
+        double best_sigma=0.;
+        unsigned probed=0;
+        for (unsigned j=0; j<k; ++j) {
+            Vertex* v=ptrV[_size_init+j];
+            if (!bsp_pass_margin(v->_sT, v->_sF)) continue;
+            vector<Vertex*> one(1, v);
+            double sigma=0.;
+            int sw=0;
+            int conv=probe_fixes(one, sigma, sw);
+            ++probed;
+            if (!conv || !std::isfinite(sigma)) continue;
+            if (best<0 || sigma>best_sigma) {
+                best=(int)j;
+                best_sigma=sigma;
+            }
+        }
+        if (best>0) {
+            vector<Vertex*> win(1, ptrV[_size_init+best]);
+            promote_unfixed(ptrV, _size_init, win);
+        }
+        if (probed>0)
+            BSP_INFO<<"lookahead chose rank "<<(best<0?0:best)
+                    <<" of "<<probed<<" Sigma="<<best_sigma
+                    <<" sp_sweeps="<<_sp_sweeps<<endl;
+    }
     vector<Vertex*> _veto_sel;
     _veto_sel.reserve(_batch);
     unsigned int _counter_dec_var=0;
@@ -354,7 +515,27 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
     if(complexity_variables==0.) complexity=0;
-    if((_numb_of_back_moves/_numb_of_dec_moves)<g_r_bsp) {
+    /*Variant 3: keep the 2016 ratio, but spend extra releases when the last
+     step removed a large fraction of Sigma or SP took many iterations.
+     The total loss between two endpoints does not rank paths; the slope does.*/
+    double r_use=g_r_bsp;
+    if (g_adaptive_r && _have_sigma_prev) {
+        double drop=_sigma_prev-complexity;
+        /*Ignore the last digits. A relative drop is a cliff only while Sigma
+         is still a real fraction of its initial value.*/
+        bool steep=(_sigma_prev>0.01*_comp_init) && (drop>k_slope_frac*_sigma_prev);
+        bool slow=_time_conv_print>k_eta_cut;
+        if (steep || slow) {
+            r_use=g_r_bsp+k_r_boost;
+            if (r_use>0.99) r_use=0.99;
+            BSP_INFO<<"adaptive backtrack r="<<r_use
+                    <<" steep="<<(steep?1:0)<<" slow="<<(slow?1:0)
+                    <<" dSigma="<<drop<<" eta="<<_time_conv_print<<endl;
+        }
+    }
+    _sigma_prev=complexity;
+    _have_sigma_prev=true;
+    if((_numb_of_back_moves/_numb_of_dec_moves)<r_use) {
         ++_numb_of_back_moves;
         fl_bsp=true;/*update values for BSP ratio choice.*/
         //if(complexity<1.e-6 and complexity>0)fl_bsp=false; /*The algorithm is close to call walksat, and for safety reasons it makes only decimations*/
@@ -386,7 +567,7 @@ void Graph::diag_step() {
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed\n";
+        _diag_step_out<<"step,move,Nt,Mt,Sigma,Sigma_per_N,eta,unit_prop,last_cert,n_fixed,sp_sweeps\n";
         _diag_var_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
@@ -405,7 +586,8 @@ void Graph::diag_step() {
                   <<setprecision(10)<<complexity<<","
                   <<(complexity/static_cast<double>(_N))<<","
                   <<_time_conv_print<<","<<_unit_prop<<","
-                  <<_last_certitude<<","<<_list_fixed_element.size()<<endl;
+                  <<_last_certitude<<","<<_list_fixed_element.size()<<","
+                  <<_sp_sweeps<<endl;
     if (step % g_diag_every != 0) return;
     for (unsigned i=0; i<_N; ++i) {
         Vertex *v=ptrV[i];
@@ -888,13 +1070,16 @@ START:
             _M_t=static_cast<unsigned int>(_cl_list.size());
             // cout<<"I found a convergence at "<<t<<" "<<_m<<endl;
             _time_conv_print=t;
+            _sp_sweeps+=(unsigned long)t+1UL;
             update_complexity_clauses();/*update complexity_clause*/
             conv_f=true;
             break;
         }
     }
     if(!conv_f) { /*if after t_max iterations no convergence is found, the algorithm return exit failure */
+        _sp_sweeps+=t_max;
         BSP_ERROR<<"SP does not find any fixed points -> SP does not converge."<<endl;
+        BSP_ERROR<<"sp_sweeps="<<_sp_sweeps<<endl;
         BSP_ERROR<<"I am sorry I quit :("<<endl;
         exit(-1);
     }
@@ -1057,9 +1242,32 @@ void Graph::update_products() { /*update products*/
 /***********************************************************************************/
 /***********************************************************************************/
 
-/*public member class Graph. This memeber sorts the element of the list in ascending order, using as predicate the certitude, The first x components of the vector are not sorted because they contain fixed variables*/
+/*Sort the fixed prefix for a backtracking move. With --dynamic-i-backtrack
+ the release score is I(k), the fraction of clusters still compatible with
+ the assigned value, rebuilt from the current incoming surveys:
+   fixed to true  -> I(k) = 1 - s_F
+   fixed to false -> I(k) = 1 - s_T
+ Smaller I(k) means the assignment kills more clusters, so it is released
+ first. The sort is descending so that backtrack(), which releases from the
+ end, picks the smallest I(k). Without the flag the 2016 stored bias is used.*/
 void Graph::sort_V_Back_move() {
-    sort(ptrV.begin(), ptrV.begin()+(_list_fixed_element.size()), _Vertex_greater_pred());
+    unsigned nfixed = _list_fixed_element.size();
+    if (g_dynamic_i && nfixed > 0) {
+        for (unsigned i = 0; i < nfixed; ++i) {
+            Vertex* v = ptrV[i];
+            v->make_products();
+            double pp = v->_p_PLUS();
+            double pm = v->_p_MINUS();
+            double pi = v->_p_IND();
+            double sT_v = v->S(pp, pm, pi);
+            double sF_v = v->S(pm, pp, pi);
+            v->_sNN = v->_who_I_am ? (1.0 - sF_v) : (1.0 - sT_v);
+        }
+        sort(ptrV.begin(), ptrV.begin() + nfixed,
+             [](const Vertex* a, const Vertex* b) { return a->_sNN > b->_sNN; });
+    } else {
+        sort(ptrV.begin(), ptrV.begin() + nfixed, _Vertex_greater_pred());
+    }
 }
 
 

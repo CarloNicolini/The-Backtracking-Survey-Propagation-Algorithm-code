@@ -213,6 +213,31 @@ int main(int argc,  char * const argv[]) {
             g_oracle_pick = static_cast<unsigned>(stoul(a.substr(14)));
             continue;
         }
+        if (a.rfind("--lookahead=", 0) == 0) {
+            g_lookahead_k = static_cast<unsigned>(stoul(a.substr(12)));
+            continue;
+        }
+        if (a == "--corr-batch") {
+            g_corr_batch = true;
+            continue;
+        }
+        if (a == "--adaptive-r") {
+            g_adaptive_r = true;
+            continue;
+        }
+        if (a == "--dynamic-i-backtrack") {
+            g_dynamic_i = true;
+            continue;
+        }
+        if (a.rfind("--frac=", 0) == 0) {
+            g_frac = stod(a.substr(7));
+            if (!(g_frac > 0.0 && g_frac <= 1.0)) {
+                BSP_ERROR << "frac must be in (0, 1], got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
         if (a.rfind("--nn=", 0) == 0) {
             g_nn_path = a.substr(5);
             continue;
@@ -331,6 +356,12 @@ int main(int argc,  char * const argv[]) {
     if(g_r_bsp!=0.)BSP_INFO<<"START BSP WITH r="<<g_r_bsp<<":"<<endl;
     else BSP_INFO<<"START SID:"<<endl;
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
+    if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)
+        BSP_INFO<<"profile controls: lookahead="<<g_lookahead_k
+                <<" corr_batch="<<(g_corr_batch?1:0)
+                <<" adaptive_r="<<(g_adaptive_r?1:0)
+                <<" frac="<<g_frac
+                <<" dynamic_i="<<(g_dynamic_i?1:0)<<endl;
     /*Check if we have to use unit propagation*/
     G.unit_propagation();
 
@@ -523,6 +554,19 @@ void help(const char *prog) {
          << "  --oracle-timeout=S Per-trial minisat seconds (default 10, 0=off).\n"
          << "  --oracle-dir      Resolve each decimation direction by minisat.\n"
          << "  --oracle-pick=K   Scan top-K for a SAT-preserving move (0=off).\n"
+         << "  --lookahead=K     On each decimation, fix the variable among the\n"
+         << "                       top K by score whose SP reconvergence drops\n"
+         << "                       Sigma the least (0 = off). Direction stays SP.\n"
+         << "  --corr-batch      When the batch fixes at least two variables,\n"
+         << "                       compare the top batch with a distance-2 batch\n"
+         << "                       and keep the one with higher Sigma.\n"
+         << "  --adaptive-r      Raise r after a steep Sigma drop or a slow SP\n"
+         << "                       convergence. The base --r= value stays the floor.\n"
+         << "  --dynamic-i-backtrack  Release the variable with the smallest I(k),\n"
+         << "                       the fraction of clusters still compatible with\n"
+         << "                       its assigned value (1-s_F if true, 1-s_T if false).\n"
+         << "  --frac=F          Decimation batch fraction in (0, 1]\n"
+         << "                       (default 0.00125). Same value on every arm.\n"
          << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"
          << "  --nn-veto=C       Veto mode: bury vars scoring below C,\n"
          << "                       keep hand-crafted bias otherwise (needs --nn).\n"
