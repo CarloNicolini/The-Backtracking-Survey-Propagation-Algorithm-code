@@ -21,18 +21,24 @@ extern double g_T_cav;
  probability eta, p and q count the active warnings of the two groups, and
  min(p,q) is its conflict energy. The Gibbs weight e^(-min(p,q)/T) deforms the
  hard aggregation of the note: pi_u collects the configurations with q>p, pi_s
- those with p>q, pi_0 those with p=q, and z is the partition sum. At T=0 only
- the conflict-free configurations keep weight 1 and the sums return the hard SP
- factors (1-B_0)*A_0, (1-A_0)*B_0, A_0*B_0 with A_0 and B_0 the products of
- (1-eta) over the two groups.*/
+ those with p>q, pi_0 those with p=q, z is the partition sum, and e_mean is the
+ mean conflict energy under the Gibbs weight.
+ A0 and B0 are the products of (1-eta) over the two groups with the cavity
+ message already excluded, in the exact form used by the legacy factors (give
+ the values from _Pr_S and _Pr_U, or from prod_V_plus and prod_V_minus). The
+ conflict-free configurations then give the hard factors (1-B_0)*A_0,
+ (1-A_0)*B_0, A_0*B_0 and A_0+B_0-A_0*B_0 exactly, and the sums over the
+ conflicting configurations add the finite-T corrections on top. At T=0 the
+ corrections vanish and the sums equal __pu and __norm.*/
 struct ThermoStar {
   double pi_u;
   double pi_s;
   double pi_0;
   double z;
+  double e_mean;
 };
 
 ThermoStar thermo_star(const double *eta_s, std::size_t ns, const double *eta_u,
-                       std::size_t nu, double T);
+                       std::size_t nu, double A0, double B0, double T);
 
 #endif /* THERMO_SP_HPP */

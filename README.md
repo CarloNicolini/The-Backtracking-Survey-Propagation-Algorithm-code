@@ -80,9 +80,10 @@ finite-energy SP(y) equations.
 ```
 
 The unit test `build/bsp-test` holds the numeric identities of the deformation.
-The script `tools/regression_thermo.sh` rebuilds the tree and diffs three golden
-solver runs stored in `tests/golden`. Operate the script after each change to
-the solver.
+The script `tools/regression_thermo.sh` rebuilds the tree and compares three
+golden solver runs stored in `tests/golden`. Numbers match within 1e-12
+absolute and 1e-6 relative, and all other text matches exactly. Operate the
+script after each change to the solver.
 
 ```bash
 ./tools/regression_thermo.sh

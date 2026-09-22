@@ -92,7 +92,7 @@ public:
 
     void make_products(); /*update products and surveys*/
 
-    ThermoStar cavity_star(bool b, const double *exclude, double T); /*deformed cavity star sums*/
+    ThermoStar cavity_star(bool b, const double *exclude, double A0, double B0, double T); /*deformed cavity star sums*/
 
     void compute_s(); /*compute surveys for each variable node*/
 
