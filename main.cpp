@@ -40,6 +40,7 @@
 #include "Graph.hpp"
 #include "NnScorer.hpp"
 #include "thermo_sp.hpp"
+#include "thermo_policy.hpp"
 #define UNIX 1
 #if UNIX
 #define random() rand()
@@ -185,6 +186,15 @@ int main(int argc,  char * const argv[]) {
             }
             continue;
         }
+        if (a.rfind("--act-temp=", 0) == 0) {
+            g_T_act = stod(a.substr(11));
+            if (!(g_T_act >= 0.0)) {
+                BSP_ERROR << "act-temp must be >= 0, got " << a << endl;
+                help(cleaned_args[0].c_str());
+                return 1;
+            }
+            continue;
+        }
         if (a.rfind("--dataset=", 0) == 0) {
             g_dataset_prefix = a.substr(10);
             continue;
@@ -239,6 +249,14 @@ int main(int argc,  char * const argv[]) {
             g_dynamic_i = true;
             continue;
         }
+        if (a == "--fe-backtrack") {
+            g_fe_backtrack = true;
+            continue;
+        }
+        if (a.rfind("--bt-cost=", 0) == 0) {
+            g_bt_cost = stod(a.substr(10));
+            continue;
+        }
         if (a.rfind("--frac=", 0) == 0) {
             g_frac = stod(a.substr(7));
             if (!(g_frac > 0.0 && g_frac <= 1.0)) {
@@ -278,6 +296,16 @@ int main(int argc,  char * const argv[]) {
     }
     if (g_dump_residuals && g_diag_prefix.empty()) {
         BSP_ERROR << "--dump-residuals requires --diag=PREFIX" << endl;
+        return 1;
+    }
+    if ((g_scorer_id == 4 || g_T_act > 0.) && g_T_cav <= 0.) {
+        BSP_ERROR << "--scorer=fth and --act-temp need --cav-temp>0"
+                  << " (the free energies come from the deformed messages)" << endl;
+        return 1;
+    }
+    if (g_fe_backtrack && g_T_cav <= 0.) {
+        BSP_ERROR << "--fe-backtrack needs --cav-temp>0"
+                  << " (the release order runs on the free energies)" << endl;
         return 1;
     }
     if (g_oracle_pick > 0) {
@@ -367,6 +395,8 @@ int main(int argc,  char * const argv[]) {
     else BSP_INFO<<"START SID:"<<endl;
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     if (g_T_cav!=0.)BSP_INFO<<"ThermoSP cavity temperature: T="<<g_T_cav<<endl;
+    if (g_T_act!=0.)BSP_INFO<<"Gibbs action temperature: T_act="<<g_T_act<<endl;
+    if (g_fe_backtrack)BSP_INFO<<"Free-energy backtracking on, bt-cost="<<g_bt_cost<<endl;
     if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)
         BSP_INFO<<"profile controls: lookahead="<<g_lookahead_k
                 <<" corr_batch="<<(g_corr_batch?1:0)
@@ -541,8 +571,10 @@ void help(const char *prog) {
          << "                       N     = number of variables\n"
          << "  -l <formula.cnf>    Load a CNF formula from file and solve it.\n"
          << "  -h, --help          Show this help message.\n"
-         << "  --scorer=SPEC       Decimation scorer: cert|pol|i_c|gamma:<g>.\n"
+         << "  --scorer=SPEC       Decimation scorer: cert|pol|i_c|fth|gamma:<g>.\n"
          << "                       Default keeps the compiled-in scorer (CERT).\n"
+         << "                       fth ranks by the free-energy bias and needs\n"
+         << "                       --cav-temp>0.\n"
          << "  --diag=PREFIX       Write PREFIX_steps.csv / PREFIX_vars.csv\n"
          << "                       per-SP-fixed-point diagnostics (off by default).\n"
          << "  --diag-every=K      Log vars + residuals every K steps (default 1).\n"
@@ -558,6 +590,9 @@ void help(const char *prog) {
          << "  --cav-temp=T      Cavity temperature of ThermoSP in [0, inf)\n"
          << "                       (default 0 keeps the legacy SP factors; the\n"
          << "                       map T = 1/y matches finite-energy SP(y)).\n"
+         << "  --act-temp=T      Action temperature of the Gibbs decimation\n"
+         << "                       policy in [0, inf) (default 0 keeps the hard\n"
+         << "                       sT>sF rule). Needs --cav-temp>0.\n"
          << "  --dataset=PREFIX  Write PREFIX_dataset.csv with tentative-fix\n"
          << "                       DeltaSigma trials (off by default, POSIX).\n"
          << "  --dataset-k=K     Shortlist size per step (default 50).\n"
@@ -579,6 +614,11 @@ void help(const char *prog) {
          << "  --dynamic-i-backtrack  Release the variable with the smallest I(k),\n"
          << "                       the fraction of clusters still compatible with\n"
          << "                       its assigned value (1-s_F if true, 1-s_T if false).\n"
+         << "  --fe-backtrack    Release by free-energy cost and pick the move type\n"
+         << "                       with a Gibbs split (needs --cav-temp>0).\n"
+         << "  --bt-cost=C       Cost of one back move in the Gibbs split\n"
+         << "                       (default 0.4, calibrated at --cav-temp=0.05\n"
+         << "                       --act-temp=0.02; scale it with --cav-temp).\n"
          << "  --frac=F          Decimation batch fraction in (0, 1]\n"
          << "                       (default 0.00125). Same value on every arm.\n"
          << "  --nn=FILE         Rank by a GenANN weights file from bsp-train.\n"

@@ -91,12 +91,13 @@ int WalkSat(vector <vector<bool> > & sol,int argc, char * argv[]); // WalkSat fu
 #endif
 
 /*Runtime decimation-scorer selection. -1 keeps the compiled-in __H macro
- (legacy behavior, CERT by default); 0=CERT, 1=POL, 2=GAMMA, 3=I_C.
+ (legacy behavior, CERT by default); 0=CERT, 1=POL, 2=GAMMA, 3=I_C, 4=FTH.
  GAMMA scores b*|sT-sF|^g_scorer_gamma, interpolating certainty (g=0)
- and polarization-like rankings. Set via --scorer=... (see main.cpp).*/
+ and polarization-like rankings. FTH ranks by the absolute free-energy bias
+ and needs --cav-temp>0. Set via --scorer=... (see main.cpp).*/
 extern int g_scorer_id;
 extern double g_scorer_gamma;
-double bsp_score(double a, double b, double c); /*a=sT,b=sF,c=sI*/
+double bsp_score(double a, double b, double c, double b_th); /*a=sT,b=sF,c=sI,b_th=Phi_minus-Phi_plus*/
 bool bsp_parse_scorer(const string& spec); /*"cert","pol","i_c","gamma:<g>"*/
 string bsp_scorer_name(); /*short name of the active scorer, for logging*/
 
@@ -129,6 +130,8 @@ extern bool g_oracle_dir; /*check both dirs per chosen var, take a SAT one*/
 extern unsigned g_oracle_pick; /*scan top-K for SAT-preserving (var,dir), 0 = off*/
 extern unsigned g_lookahead_k; /*top-K complexity lookahead, 0 = off*/
 extern bool g_dynamic_i; /*release by I(k) from current surveys, default off*/
+extern bool g_fe_backtrack; /*free-energy release order and Gibbs move split, default off*/
+extern double g_bt_cost; /*cost of one back move in the Gibbs split, default 0.4*/
 /*Complexity-profile controls. All off by default, so legacy BSP is unchanged.
  Lookahead and corr-batch pick a move by the realized Sigma after a forked
  SP reconvergence. Adaptive-r raises the backtracking ratio when Sigma falls

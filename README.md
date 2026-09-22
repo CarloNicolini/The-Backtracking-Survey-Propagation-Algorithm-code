@@ -79,6 +79,25 @@ finite-energy SP(y) equations.
 ./build/main --cav-temp=0.1 -w 3 4.0 50
 ```
 
+The option `--act-temp=T` turns the Gibbs decimation policy on. The policy
+draws the assignment of a variable with the weights e^(-Phi/T), where Phi is
+the free energy of the direction. The default T = 0 keeps the hard sT>sF rule.
+The scorer `--scorer=fth` ranks the variables by the absolute free-energy bias
+B = Phi_minus - Phi_plus. Both options need `--cav-temp>0`.
+
+```bash
+./build/main --cav-temp=0.1 --act-temp=0.1 --scorer=fth -w 3 4.0 50
+```
+
+The option `--fe-backtrack` moves the backtracking step to free energies. The
+solver releases the assignments with the largest free-energy cost first. It
+draws the move type with a Gibbs split between a release and a decimation. The
+cost `--bt-cost=C` charges one back move in that split. Both need
+`--cav-temp>0`. The default cost 0.4 is calibrated at `--cav-temp=0.05`
+`--act-temp=0.02` on the golden instance: the back to decimation ratio there is
+1.0 against 0.9 for the ratio rule. All free energies scale with
+`--cav-temp`, so scale the cost with it. A zero cost can make the solver loop.
+
 The unit test `build/bsp-test` holds the numeric identities of the deformation.
 The script `tools/regression_thermo.sh` rebuilds the tree and compares three
 golden solver runs stored in `tests/golden`. Numbers match within 1e-12
