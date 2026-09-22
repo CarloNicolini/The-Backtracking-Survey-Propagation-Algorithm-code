@@ -1,0 +1,13 @@
+build/
+build-dbg/
+build-valgrind/
+data/
+Value_Anal_Compl_*.txt
+whitening*.txt
+outfile
+*.aux
+*.log
+*.pdf
+*.o
+*.d
+example_delta.nn

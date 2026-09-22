@@ -270,6 +270,9 @@ public:
         _oracle_timeouts=0;/*consecutive minisat timeouts*/
         _oracle_timeouts_total=0;/*total minisat timeouts*/
         _oracle_tmp_ctr=0;/*oracle temp-file counter*/
+        _sigma_prev=0.;/*previous fixed-point complexity*/
+        _have_sigma_prev=false;/*slope is defined only after the first fixed point*/
+        _sp_sweeps=0;/*cumulative SP iterations, including discarded probes*/
         _counter_conv=0;/*counter convergence surveys set to 0*/
         complexity_clauses=0.;/*clause complexity set to 0*/
         complexity_variables=0.;/*variable complexity set to 0*/
@@ -443,6 +446,9 @@ private:
     unsigned int _diag_step_idx;/*diagnostic step counter*/
     bool _diag_header_done;/*diagnostic CSV headers written*/
     unsigned int _time_conv_print; /*convergence time*/
+    double _sigma_prev; /*complexity at the previous fixed point*/
+    bool _have_sigma_prev; /*true after the first surveys() call*/
+    unsigned long _sp_sweeps; /*SP iterations spent, probes included*/
     int _argc;/*copy of argc*/
     unsigned long s;
     double _new;
@@ -486,6 +492,8 @@ private:
     double Div_s(double &s);
 
     bool _conv(double &a, double &b);
+
+    int probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps); /*forked tentative fix*/
 
     double _Pr_U(Vertex *V, bool b);
 
