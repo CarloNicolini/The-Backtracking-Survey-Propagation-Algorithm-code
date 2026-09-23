@@ -622,7 +622,7 @@ void Graph::diag_step() {
                      <<v->_sC<<","<<fabs(v->_sT-v->_sF)<<","
                      <<v->_degree_i;
         if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
-            ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav);
+            ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_rsb_gamma);
             _diag_var_out<<","<<_st.e_mean<<","<<log(_st.z);
         }
         _diag_var_out<<"\n";
@@ -644,7 +644,7 @@ void Graph::diag_move(const char* action, Vertex* v, int dir) {
     if (g_diag_prefix.empty() || !_diag_header_done) return;
     _diag_move_out<<(_diag_step_idx-1)<<","<<action<<","<<v->_vertex<<","<<dir;
     if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
-        ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav);
+        ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_rsb_gamma);
         _diag_move_out<<","<<_st.e_mean<<","<<log(_st.z);
     }
     _diag_move_out<<endl;
@@ -850,8 +850,8 @@ START:
                         if(i!=l && _cl[C]._go_forward[l]) {
                             _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
                             _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
-                            if(g_T_cav>0.) {/*ThermoSP: finite-T corrections on top of the hard factors*/
-                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav);
+                            if(g_T_cav>0. || g_rsb_gamma!=0.) {/*ThermoSP or unfrozen bias*/
+                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav,g_rsb_gamma);
                                 _new*=_st.pi_u;
                                 norm*=_st.z;
                             } else {
@@ -935,8 +935,8 @@ void Graph::update_complexity_clauses() {
             if(_cl[C]._go_forward[j]==1) {
                 _prod_S=_Pr_S(_cl[C].v_V[j],_cl[C].v_lit[j], _cl[C].div_s[j]);
                 _prod_U=_Pr_U(_cl[C].v_V[j],_cl[C].v_lit[j]);
-                if(g_T_cav>0.) {/*ThermoSP: same star sums as the message update*/
-                    ThermoStar _st=_cl[C].v_V[j]->cavity_star(_cl[C].v_lit[j],_cl[C].v_survey_cl_to_i[j],_prod_S,_prod_U,g_T_cav);
+                if(g_T_cav>0. || g_rsb_gamma!=0.) {/*same star sums as the message update*/
+                    ThermoStar _st=_cl[C].v_V[j]->cavity_star(_cl[C].v_lit[j],_cl[C].v_survey_cl_to_i[j],_prod_S,_prod_U,g_T_cav,g_rsb_gamma);
                     _ps*=_st.z;/*update product for clause complexity*/
                     _pu*=_st.pi_u;/*update product for clause complexity*/
                 } else {
@@ -1110,9 +1110,17 @@ void Graph::sort_V_Back_move() {
         for (unsigned i = 0; i < nfixed; ++i) {
             Vertex* v = ptrV[i];
             v->make_products();
-            double pp = v->_p_PLUS();
-            double pm = v->_p_MINUS();
-            double pi = v->_p_IND();
+            double pp, pm, pi;
+            if (g_T_cav>0. || g_rsb_gamma!=0.) {
+                ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_rsb_gamma);
+                pp=_st.pi_s;
+                pm=_st.pi_u;
+                pi=_st.pi_0;
+            } else {
+                pp = v->_p_PLUS();
+                pm = v->_p_MINUS();
+                pi = v->_p_IND();
+            }
             double sT_v = v->S(pp, pm, pi);
             double sF_v = v->S(pm, pp, pi);
             v->_Ik = v->_who_I_am ? (1.0 - sF_v) : (1.0 - sT_v);

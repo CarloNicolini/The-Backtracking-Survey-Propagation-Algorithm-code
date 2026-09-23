@@ -22,6 +22,15 @@ extern double g_T_cav;
  --rsb-m=M.*/
 extern double g_rsb_m;
 
+/*Unfrozen-cluster bias of mu_{m,gamma}(C) proportional to exp[N(m s_C+gamma q_C)],
+ where q_C is the fraction of variables with no warning. gamma multiplies only
+ the hard unfrozen sector A0*B0 of a cavity star by e^gamma; frozen sectors and
+ the finite-T balanced conflicts (p=q>0) stay put. gamma=0 is ordinary SP.
+ This is not --scorer=gamma:<g>, which only ranks decimation. Set with
+ --rsb-gamma=G. With gamma!=0 the printed Sigma is the free entropy of this
+ biased measure, not the uniform complexity at m=0, gamma=0.*/
+extern double g_rsb_gamma;
+
 /*Tilted warning probability of one message under the 1RSB measure: the two
  masses eta*kappa_warn^m and (1-eta)*kappa_sil^m give this ratio. At m=0 the
  value is eta exactly.*/
@@ -40,8 +49,10 @@ double thermo_tilt(double eta, double kappa_warn, double kappa_sil, double m);
  the values from _Pr_S and _Pr_U, or from prod_V_plus and prod_V_minus). The
  conflict-free configurations then give the hard factors (1-B_0)*A_0,
  (1-A_0)*B_0, A_0*B_0 and A_0+B_0-A_0*B_0 exactly, and the sums over the
- conflicting configurations add the finite-T corrections on top. At T=0 the
- corrections vanish and the sums equal __pu and __norm.*/
+ conflicting configurations add the finite-T corrections on top. At T=0 and
+ gamma=0 the corrections vanish and the sums equal __pu and __norm. gamma
+ replaces the hard unfrozen mass A_0*B_0 by e^gamma*A_0*B_0 and rebuilds z;
+ the p=q>0 corrections are not multiplied by e^gamma.*/
 struct ThermoStar {
   double pi_u;
   double pi_s;
@@ -51,6 +62,7 @@ struct ThermoStar {
 };
 
 ThermoStar thermo_star(const double *eta_s, std::size_t ns, const double *eta_u,
-                       std::size_t nu, double A0, double B0, double T);
+                       std::size_t nu, double A0, double B0, double T,
+                       double gamma = 0.);
 
 #endif /* THERMO_SP_HPP */

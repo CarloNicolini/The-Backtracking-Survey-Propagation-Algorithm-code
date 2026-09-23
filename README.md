@@ -134,6 +134,21 @@ cluster measure.
 ./build/release/bsp --rsb-m=0.5 -w 3 4.0 50
 ```
 
+### Unfrozen-cluster bias
+
+The option `--rsb-gamma=G` deforms the same star with mu proportional to
+e^(gamma * q_C), where q_C is the fraction of variables that receive no warning.
+Only the hard unfrozen mass A0*B0 is multiplied by e^gamma. The frozen sectors
+stay as they are, and the finite-temperature balanced conflicts (p=q>0) are not
+boosted. The clause message is still eta = pi_u / z. At gamma = 0 the factors
+match ordinary SP. This flag is not `--scorer=gamma:<g>`, which only ranks
+variables for decimation. With gamma != 0 the printed complexity is the free
+entropy of the biased measure.
+
+```bash
+./build/release/bsp --rsb-gamma=0.5 -w 3 4.0 50
+```
+
 ## Memory checking with Valgrind
 
 Valgrind runs on **Linux** only (not available as a native macOS/Homebrew bottle).

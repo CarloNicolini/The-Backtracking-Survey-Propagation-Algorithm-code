@@ -16,6 +16,7 @@ using namespace std;
 
 double g_T_cav = 0.;
 double g_rsb_m = 0.;
+double g_rsb_gamma = 0.;
 
 double thermo_tilt(double eta, double kappa_warn, double kappa_sil, double m) {
   if (m == 0.) return eta;
@@ -44,12 +45,18 @@ static void group_coefficients(const double *eta, size_t n, double *coef) {
 }
 
 ThermoStar thermo_star(const double *eta_s, size_t ns, const double *eta_u,
-                       size_t nu, double A0, double B0, double T) {
+                       size_t nu, double A0, double B0, double T, double gamma) {
   ThermoStar out = {0., 0., 0., 0., 0.};
   out.pi_u = (1. - B0) * A0;
   out.pi_s = (1. - A0) * B0;
-  out.pi_0 = A0 * B0;
-  out.z = A0 + B0 - (rho_SP * A0 * B0);
+  /*Hard unfrozen mass only. Balanced conflicts added below stay unboosted.*/
+  double pi0_hard = A0 * B0;
+  double w_free = (gamma == 0.) ? 1. : exp(gamma);
+  out.pi_0 = pi0_hard * w_free;
+  if (gamma == 0.)
+    out.z = A0 + B0 - (rho_SP * A0 * B0); /*legacy association at gamma=0*/
+  else
+    out.z = out.pi_u + out.pi_s + out.pi_0;
   if (T <= 0.) return out; /*tropical limit: the corrections vanish*/
   vector<double> A(ns + 1), B(nu + 1);
   group_coefficients(eta_s, ns, &A[0]);

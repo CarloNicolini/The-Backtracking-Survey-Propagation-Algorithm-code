@@ -1,5 +1,5 @@
 {
-  "description": "One-factor screen of the four ThermoBSP axes on K=3, N=128. Seeds 101-180 are disjoint from screen_k3n500 (seeds 1-50). Axis map: T_cav=--cav-temp, T_act=--act-temp, m=--rsb-m, release=I(k)|DeltaPhi. The CLI --scorer=gamma:<g> is NOT the unfrozen-cluster gamma (unimplemented).",
+  "description": "One-factor screen of the ThermoBSP axes on K=3. Seeds 101-180 are disjoint from screen_k3n500 (seeds 1-50). Axis map: T_cav=--cav-temp, T_act=--act-temp, m=--rsb-m, gamma=--rsb-gamma (unfrozen clusters), release=I(k)|DeltaPhi. The CLI --scorer=gamma:<g> is NOT --rsb-gamma.",
   "bsp": "build/bsp",
   "K": 3,
   "N": 500,
@@ -96,6 +96,18 @@
         "--fe-backtrack",
         "--bt-cost=0.4"
       ]
+    },
+    {
+      "name": "gamma_0.5",
+      "axis": "rsb_gamma",
+      "role": "Unfrozen-cluster bias at T=0, m=0. Boosts the hard free sector of each cavity star.",
+      "flags": ["--scorer=cert", "--r=0.9", "--rsb-gamma=0.5"]
+    },
+    {
+      "name": "gamma_1.0",
+      "axis": "rsb_gamma",
+      "role": "Stronger unfrozen bias; dose check vs gamma_0.5.",
+      "flags": ["--scorer=cert", "--r=0.9", "--rsb-gamma=1.0"]
     }
   ],
   "decision_rules": [
@@ -103,7 +115,8 @@
     "If dynI wins and fe_bt / soft_rsb do not, the hard I(k) corner is the publishable claim; soft temperatures are not helping at this N.",
     "If rsb_* loses to cert, do not raise m in follow-ups; keep m=0.",
     "If cav_* alone helps, T_cav is worth a finer grid; if only dynI_cav helps, the gain is still the release rule.",
-    "If soft_rsb beats fe_bt, m helps only inside the soft package; if it loses, stacking m hurts."
+    "If soft_rsb beats fe_bt, m helps only inside the soft package; if it loses, stacking m hurts.",
+    "If gamma_* loses to cert, do not raise the unfrozen bias; keep gamma=0."
   ],
   "howto": {
     "run": "bsp-grid experiments/axes_k3n500.json -o experiments/axes_k3n500 -j 8",

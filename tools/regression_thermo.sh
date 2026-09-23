@@ -68,13 +68,49 @@ for name in w30 w100 l80; do
             status=1
             continue
         fi
-        cmp -s "$gp" "$r/$f" && continue
-        if ! numdiff "$gp" "$r/$f" >"$WORK/numdiff.msg"; then
+        cmp_left="$gp"
+        cmp_right="$r/$f"
+        if [ "$f" = "stdout.log" ]; then
+            grep -v '^Output directory:' "$gp" > "$WORK/gold.stdout"
+            grep -v '^Output directory:' "$r/$f" > "$WORK/run.stdout"
+            cmp_left="$WORK/gold.stdout"
+            cmp_right="$WORK/run.stdout"
+        fi
+        cmp -s "$cmp_left" "$cmp_right" && continue
+        if ! numdiff "$cmp_left" "$cmp_right" >"$WORK/numdiff.msg"; then
             echo "regression_thermo: $name/$f differs ($(cat "$WORK/numdiff.msg"))" >&2
-            diff "$gp" "$r/$f" | head -10 >&2
+            diff "$cmp_left" "$cmp_right" | head -10 >&2 || true
             status=1
         fi
     done
 done
 [ "$status" -eq 0 ] && echo "regression_thermo: all golden outputs match"
+
+# --rsb-gamma=0 must reproduce the hard baseline. --rsb-gamma=0.5 must move
+# the complexity trace. A strong bias can make SP quit with a contradiction
+# (exit 255); that is a controlled solver stop, not a crash.
+mkdir -p "$WORK/gbase" "$WORK/g0" "$WORK/g05"
+(cd "$WORK/gbase" && "$BIN" --outdir=. -w 3 3.0 20 --seed=7 >stdout.log 2>stderr.log)
+(cd "$WORK/g0" && "$BIN" --outdir=. --rsb-gamma=0 -w 3 3.0 20 --seed=7 >stdout.log 2>stderr.log)
+g05_rc=0
+(cd "$WORK/g05" && "$BIN" --outdir=. --rsb-gamma=0.5 -w 3 3.0 20 --seed=7 >stdout.log 2>stderr.log) || g05_rc=$?
+if [ "$g05_rc" -ne 0 ] && [ "$g05_rc" -ne 255 ]; then
+    echo "regression_thermo: --rsb-gamma=0.5 exited $g05_rc" >&2
+    status=1
+fi
+trace_sigma() {
+    awk 'NF==5 && $1 ~ /^[0-9]/ {print}' "$1"
+}
+trace_sigma "$WORK/gbase/stdout.log" > "$WORK/gbase.trace"
+trace_sigma "$WORK/g0/stdout.log" > "$WORK/g0.trace"
+trace_sigma "$WORK/g05/stdout.log" > "$WORK/g05.trace"
+if ! numdiff "$WORK/gbase.trace" "$WORK/g0.trace" >"$WORK/numdiff.msg"; then
+    echo "regression_thermo: --rsb-gamma=0 differs from baseline ($(cat "$WORK/numdiff.msg"))" >&2
+    status=1
+fi
+if cmp -s "$WORK/gbase.trace" "$WORK/g05.trace"; then
+    echo "regression_thermo: --rsb-gamma=0.5 matches baseline" >&2
+    status=1
+fi
+
 exit "$status"

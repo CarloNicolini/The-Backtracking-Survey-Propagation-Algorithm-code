@@ -224,6 +224,46 @@ static void test_rsb_tilt(mt19937 &rng) {
     }
 }
 
+/*The unfrozen bias multiplies only the hard free mass A0*B0. Frozen sectors
+ stay put, balanced conflicts at T>0 are not boosted, eta=pi_u/z falls when
+ that mass is positive, and thermo_tilt at m=0 stays the identity.*/
+static void test_rsb_gamma() {
+    const double es[] = {0.2};
+    const double eu[] = {0.3};
+    const double A0 = 0.8;
+    const double B0 = 0.7;
+    const double hard = A0 * B0;
+    const double gammas[] = {-0.4, 0., 0.5, 1.2};
+    const double temps[] = {0., 0.25};
+    for (size_t ig = 0; ig < 4; ++ig) {
+        for (size_t it = 0; it < 2; ++it) {
+            ThermoStar base = thermo_star(es, 1, eu, 1, A0, B0, temps[it], 0.);
+            ThermoStar got = thermo_star(es, 1, eu, 1, A0, B0, temps[it], gammas[ig]);
+            double boost = (gammas[ig] == 0.) ? 0. : (exp(gammas[ig]) - 1.) * hard;
+            expect_close("gamma pi_u", got.pi_u, base.pi_u, 1e-12);
+            expect_close("gamma pi_s", got.pi_s, base.pi_s, 1e-12);
+            expect_close("gamma pi_0 boost", got.pi_0 - base.pi_0, boost, 1e-12);
+            expect_close("gamma z boost", got.z - base.z, boost, 1e-12);
+            expect_close("gamma z sum", got.z, got.pi_u + got.pi_s + got.pi_0, 1e-12);
+            if (gammas[ig] == 0. && temps[it] == 0.) {
+                expect_close("gamma0 pi_0", got.pi_0, hard, 1e-14);
+                expect_close("gamma0 z", got.z, A0 + B0 - A0 * B0, 1e-14);
+            }
+        }
+        ThermoStar hard0 = thermo_star(es, 1, eu, 1, A0, B0, 0., 0.);
+        ThermoStar hardg = thermo_star(es, 1, eu, 1, A0, B0, 0., gammas[ig]);
+        if (gammas[ig] > 0. && hard0.pi_u > 0. && hard0.z > 0. && hardg.z > 0.) {
+            double eta0 = hard0.pi_u / hard0.z;
+            double etag = hardg.pi_u / hardg.z;
+            if (!(etag < eta0)) {
+                fprintf(stderr, "FAIL gamma eta: %.17g not below %.17g\n", etag, eta0);
+                ++failures;
+            }
+        }
+    }
+    expect_close("tilt m=0 with gamma aside", thermo_tilt(0.4, 1.7, 0.3, 0.), 0.4, 0.);
+}
+
 int main() {
     mt19937 rng(20260922u);
     test_matches_brute_force(rng);
@@ -231,6 +271,7 @@ int main() {
     test_partition_sum(rng);
     test_gibbs_sampler();
     test_rsb_tilt(rng);
+    test_rsb_gamma();
     if (failures == 0) printf("bsp-test: all thermo_sp identities hold\n");
     else printf("bsp-test: %d failures\n", failures);
     return failures == 0 ? 0 : 1;

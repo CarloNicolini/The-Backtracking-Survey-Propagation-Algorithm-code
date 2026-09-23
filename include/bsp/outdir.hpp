@@ -33,6 +33,7 @@ struct BspRunManifest {
   double cav_temp;
   double act_temp;
   double rsb_m;
+  double rsb_gamma;
   bool dynamic_i;
   bool fe_backtrack;
   double bt_cost;
