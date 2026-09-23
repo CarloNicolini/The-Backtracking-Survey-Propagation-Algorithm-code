@@ -1,0 +1,113 @@
+{
+  "description": "One-factor screen of the four ThermoBSP axes on K=3, N=128. Seeds 101-180 are disjoint from screen_k3n500 (seeds 1-50). Axis map: T_cav=--cav-temp, T_act=--act-temp, m=--rsb-m, release=I(k)|DeltaPhi. The CLI --scorer=gamma:<g> is NOT the unfrozen-cluster gamma (unimplemented).",
+  "bsp": "build/bsp",
+  "K": 3,
+  "N": 500,
+  "alphas": [3.8, 4.0, 4.1, 4.15, 4.2, 4.22, 4.25, 4.26],
+  "seeds": {"start": 101, "stop": 180},
+  "timeout_s": 600,
+  "jobs": 8,
+  "extra_flags": ["-q"],
+  "plot": {
+    "success_vs_alpha": "Primary: which axis moves P(solve). Compare each one-factor cfg to cert.",
+    "sigma_mean_vs_step_alphas": [4.15, 4.2, 4.22],
+    "sigma_note": "Run bsp-plot three times with --alpha set to each value above. Slower Sigma descent with flat or higher P(solve) supports the Parisi hypothesis; slower Sigma with worse P(solve) is a false friend."
+  },
+  "configs": [
+    {
+      "name": "cert",
+      "axis": "baseline",
+      "role": "BSP 2016 reference: hard SP, certainty scorer, fixed r.",
+      "flags": ["--scorer=cert", "--r=0.9"]
+    },
+    {
+      "name": "dynI",
+      "axis": "release_I",
+      "role": "Hard free-entropy release via I(k). Measured member of the theory (T=0, m=0).",
+      "flags": ["--scorer=cert", "--r=0.9", "--dynamic-i-backtrack"]
+    },
+    {
+      "name": "cav_0.05",
+      "axis": "T_cav",
+      "role": "ThermoSP cavity temperature alone; soft warning aggregation, classic backtrack.",
+      "flags": ["--scorer=cert", "--r=0.9", "--cav-temp=0.05"]
+    },
+    {
+      "name": "cav_0.10",
+      "axis": "T_cav",
+      "role": "Stronger cavity temperature; dose check vs cav_0.05.",
+      "flags": ["--scorer=cert", "--r=0.9", "--cav-temp=0.10"]
+    },
+    {
+      "name": "rsb_0.30",
+      "axis": "m",
+      "role": "1RSB cluster reweighting mu ~ exp(m N s_C); mild m.",
+      "flags": ["--scorer=rsb", "--r=0.9", "--rsb-m=0.30"]
+    },
+    {
+      "name": "rsb_0.50",
+      "axis": "m",
+      "role": "Stronger m; expect possible harm if uniform clusters (m=0) were the good regime.",
+      "flags": ["--scorer=rsb", "--r=0.9", "--rsb-m=0.50"]
+    },
+    {
+      "name": "act_fth",
+      "axis": "T_act",
+      "role": "Gibbs action temperature on direction + free-energy scorer; release still uses r.",
+      "flags": [
+        "--scorer=fth",
+        "--r=0.9",
+        "--cav-temp=0.05",
+        "--act-temp=0.02"
+      ]
+    },
+    {
+      "name": "fe_bt",
+      "axis": "release_DeltaPhi",
+      "role": "Soft release on DeltaPhi and Gibbs back/dec split (r ignored). Needs cav-temp.",
+      "flags": [
+        "--scorer=fth",
+        "--cav-temp=0.05",
+        "--act-temp=0.02",
+        "--fe-backtrack",
+        "--bt-cost=0.4"
+      ]
+    },
+    {
+      "name": "dynI_cav",
+      "axis": "I_x_T_cav",
+      "role": "Interaction: best hard release plus mild ThermoSP messages.",
+      "flags": [
+        "--scorer=cert",
+        "--r=0.9",
+        "--cav-temp=0.05",
+        "--dynamic-i-backtrack"
+      ]
+    },
+    {
+      "name": "soft_rsb",
+      "axis": "T_cav_T_act_DeltaPhi_m",
+      "role": "Soft package plus mild 1RSB reweighting: tests whether m helps once messages and release are already soft.",
+      "flags": [
+        "--scorer=fth",
+        "--cav-temp=0.05",
+        "--act-temp=0.02",
+        "--rsb-m=0.30",
+        "--fe-backtrack",
+        "--bt-cost=0.4"
+      ]
+    }
+  ],
+  "decision_rules": [
+    "Promote an axis only if P(solve) beats cert on at least two contiguous alphas with non-overlapping binomial SE, or mean Sigma descent improves without lowering P(solve).",
+    "If dynI wins and fe_bt / soft_rsb do not, the hard I(k) corner is the publishable claim; soft temperatures are not helping at this N.",
+    "If rsb_* loses to cert, do not raise m in follow-ups; keep m=0.",
+    "If cav_* alone helps, T_cav is worth a finer grid; if only dynI_cav helps, the gain is still the release rule.",
+    "If soft_rsb beats fe_bt, m helps only inside the soft package; if it loses, stacking m hurts."
+  ],
+  "howto": {
+    "run": "bsp-grid experiments/axes_k3n500.json -o experiments/axes_k3n500 -j 8",
+    "plot_success": "bsp-plot experiments/axes_k3n500 -o experiments/axes_k3n500/figures",
+    "plot_sigma_critical": "bsp-plot experiments/axes_k3n500 -o experiments/axes_k3n500/figures --alpha 4.2"
+  }
+}
