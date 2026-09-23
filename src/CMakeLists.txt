@@ -22,8 +22,10 @@ if(BSP_NATIVE_ARCH)
   include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-march=native" BSP_HAS_MARCH_NATIVE)
   if(BSP_HAS_MARCH_NATIVE)
+    # Two $<CONFIG:...> checks: multi-value CONFIG needs CMake 3.19+.
     target_compile_options(bsp_core PRIVATE
-      $<$<CONFIG:Release,RelWithDebInfo>:-march=native>)
+      $<$<CONFIG:Release>:-march=native>
+      $<$<CONFIG:RelWithDebInfo>:-march=native>)
   endif()
 endif()
 
