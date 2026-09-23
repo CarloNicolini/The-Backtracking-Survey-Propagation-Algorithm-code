@@ -1,0 +1,10 @@
+# Fallback when compile_commands.json is missing or stale after a Pitchfork move.
+# Relative -I paths are resolved against the compile working directory (often
+# src/), so include both forms.
+CompileFlags:
+  Add:
+    - -Iinclude
+    - -I../include
+  Remove:
+    - -flto=*
+    - -march=*
