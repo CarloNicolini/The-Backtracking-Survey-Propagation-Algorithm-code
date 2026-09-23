@@ -84,7 +84,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "random.h"
+#include <bsp/random.hpp>
 int WalkSat(std::vector <std::vector<bool> > & sol,int argc, char * argv[]);
 
 #define NT

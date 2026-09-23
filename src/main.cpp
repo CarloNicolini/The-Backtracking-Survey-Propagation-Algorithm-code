@@ -35,12 +35,12 @@
 
 #define MAIN
 #define VERSION "BSP_SAT_VERSION_2018"
-#include "Header.h"
-#include "Vertex.hpp"
-#include "Graph.hpp"
-#include "NnScorer.hpp"
-#include "thermo_sp.hpp"
-#include "thermo_policy.hpp"
+#include <bsp/Header.hpp>
+#include <bsp/Vertex.hpp>
+#include <bsp/Graph.hpp>
+#include <bsp/thermo_sp.hpp>
+#include <bsp/thermo_policy.hpp>
+#include <bsp/outdir.hpp>
 #include <cxxopts.hpp>
 #define UNIX 1
 #if UNIX
@@ -72,8 +72,10 @@ static void print_cli_help(const cxxopts::Options& options, const char* prog) {
     cout << options.help() << "\n"
          << "Examples:\n"
          << "  " << name << " -w 3 4.0 50\n"
+         << "  " << name << " --outdir=./myrun --seed=1 -w 3 4.0 50\n"
          << "  " << name << " -v --log-prefix -w 3 4.0 50\n"
-         << "  " << name << " -l formula.cnf\n";
+         << "  " << name << " -l formula.cnf\n"
+         << "\nWithout --outdir, all files go under bsp_runs/<K_N_a_s_scorer_...>/ with manifest.json.\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -113,17 +115,9 @@ int main(int argc, char* argv[]) {
             cxxopts::value<double>())
         ("rsb-m", "1RSB cluster reweighting exponent m (default 0)",
             cxxopts::value<double>())
-        ("dataset", "Write PREFIX_dataset.csv DeltaSigma trials",
-            cxxopts::value<string>())
-        ("dataset-k", "Shortlist size per step (default 50)",
-            cxxopts::value<unsigned>())
-        ("dataset-every", "Trial cadence in SP steps (default 1)",
-            cxxopts::value<unsigned>())
-        ("oracle", "Label each trial residual with minisat (on|off)",
-            cxxopts::value<string>()->default_value("off")->implicit_value("on"))
         ("minisat", "Minisat binary (default minisat)",
             cxxopts::value<string>())
-        ("oracle-timeout", "Per-trial minisat seconds (default 10, 0=off)",
+        ("oracle-timeout", "Per-check minisat seconds (default 10, 0=off)",
             cxxopts::value<unsigned>())
         ("oracle-dir", "Resolve each decimation direction by minisat")
         ("oracle-pick", "Scan top-K for a SAT-preserving move (0=off)",
@@ -138,10 +132,8 @@ int main(int argc, char* argv[]) {
             cxxopts::value<double>())
         ("frac", "Decimation batch fraction in (0, 1]",
             cxxopts::value<double>())
-        ("nn", "GenANN weights file from bsp-train",
+        ("outdir", "Directory for all file outputs (default: bsp_runs/<slug>)",
             cxxopts::value<string>())
-        ("nn-veto", "Veto mode: bury vars scoring below C (needs --nn)",
-            cxxopts::value<double>())
         ("q,quiet", "Warnings and errors only")
         ("v,verbose", "Debug logging (-vv for trace)")
         ("log-level", "error|warn|info|debug|trace (default: info)",
@@ -278,28 +270,6 @@ int main(int argc, char* argv[]) {
     }
     if (result.count("rsb-m"))
         g_rsb_m = result["rsb-m"].as<double>();
-    if (result.count("dataset"))
-        g_dataset_prefix = result["dataset"].as<string>();
-    if (result.count("dataset-k")) {
-        g_dataset_k = result["dataset-k"].as<unsigned>();
-        if (g_dataset_k == 0) g_dataset_k = 1;
-    }
-    if (result.count("dataset-every")) {
-        g_dataset_every = result["dataset-every"].as<unsigned>();
-        if (g_dataset_every == 0) g_dataset_every = 1;
-    }
-    if (result.count("oracle")) {
-        const string o = result["oracle"].as<string>();
-        if (o == "on")
-            g_oracle = true;
-        else if (o == "off")
-            g_oracle = false;
-        else {
-            BSP_ERROR << "oracle must be on or off, got " << o << endl;
-            print_cli_help(options, prog);
-            return 1;
-        }
-    }
     if (result.count("minisat"))
         g_minisat_path = result["minisat"].as<string>();
     if (result.count("oracle-timeout"))
@@ -327,12 +297,6 @@ int main(int argc, char* argv[]) {
             print_cli_help(options, prog);
             return 1;
         }
-    }
-    if (result.count("nn"))
-        g_nn_path = result["nn"].as<string>();
-    if (result.count("nn-veto")) {
-        g_nn_veto = true;
-        g_nn_cutoff = result["nn-veto"].as<double>();
     }
 
     const bool do_write = result.count("write") > 0;
@@ -371,9 +335,53 @@ int main(int argc, char* argv[]) {
         BSP_ERROR << "--oracle-pick is not implemented yet (use --oracle-dir)" << endl;
         return 1;
     }
-    if (!g_nn_path.empty()) {
-        if (!bsp_nn_load(g_nn_path)) return 1;
+
+    unsigned run_K = 0;
+    double run_alpha = 0.;
+    unsigned run_N = 0;
+    string load_in;
+    if (do_write) {
+        run_K = static_cast<unsigned>(stoul(unmatched[0], nullptr, 0));
+        run_alpha = stod(unmatched[1]);
+        run_N = static_cast<unsigned>(stoul(unmatched[2], nullptr, 0));
+    } else {
+        load_in = result["load"].as<string>();
     }
+
+    const bool have_outdir = result.count("outdir") > 0;
+    const string outdir_arg = have_outdir ? result["outdir"].as<string>() : "";
+    string load_abs, outdir_abs, cwd_before;
+    if (bsp_enter_outdir(outdir_arg, have_outdir, run_K, run_alpha, run_N, load_in,
+                         load_abs, outdir_abs, cwd_before) != 0)
+        return 1;
+
+    BspRunManifest man;
+    man.outdir = outdir_abs;
+    man.cwd_before = cwd_before;
+    man.mode = do_write ? "write" : "load";
+    man.load_path = load_abs;
+    man.K = run_K;
+    man.alpha = run_alpha;
+    man.N = run_N;
+    man.seed = g_fixed_seed;
+    man.scorer = bsp_scorer_name();
+    man.r = g_r_bsp;
+    man.cav_temp = g_T_cav;
+    man.act_temp = g_T_act;
+    man.rsb_m = g_rsb_m;
+    man.dynamic_i = g_dynamic_i;
+    man.fe_backtrack = g_fe_backtrack;
+    man.bt_cost = g_bt_cost;
+    man.frac_batch = g_frac;
+    man.eps = g_epsilon;
+    man.damping = g_damping;
+    man.theta = g_bsp_theta;
+    man.diag = g_diag_prefix;
+    man.diag_every = g_diag_every;
+    man.timestamp_utc = bsp_utc_now();
+    for (int i = 0; i < argc; ++i)
+        man.argv.push_back(argv[i] ? argv[i] : "");
+    bsp_write_manifest("manifest.json", man);
 
     vector<string> graph_args;
     graph_args.push_back(prog);
@@ -384,7 +392,7 @@ int main(int argc, char* argv[]) {
         graph_args.push_back(unmatched[2]);
     } else {
         graph_args.push_back("-l");
-        graph_args.push_back(result["load"].as<string>());
+        graph_args.push_back(load_abs);
     }
 
     vector<char*> av;
@@ -505,8 +513,6 @@ SP:
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
-    G.dataset_trials();/*tentative-fix trials (no-op unless --dataset)*/
-    G.apply_nn_scores();/*overwrite scores if --nn=weights was given*/
 
     /*The backtracking survey propagation (BSP) algorithm proceeds similarly to survey inspired decimation (SID), by alternating decimation or backtracking steps on a fraction f of variables, in order to keep the algorithm efficient. The choice between a decimation or a backtracking step is taken accordingly to a stochastic rule, where the parameter r ∈ [0,1) represents the ratio between backtracking steps to decimation steps [1]. When r=0 one obtains survey inspired decimation (SID), while when r!=0 one works with backtracking survey propagation. In this code r=_R_BSP into Header.h file.
      */

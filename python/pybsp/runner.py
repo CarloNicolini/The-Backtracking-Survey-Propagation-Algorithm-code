@@ -1,0 +1,109 @@
+"""Run one bsp trial via subprocess."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+def write_trial_manifest(
+    path: Path,
+    *,
+    cmd: list[str],
+    K: int,
+    alpha: float,
+    N: int,
+    seed: int,
+    flags: list[str],
+    rundir: Path,
+    timeout_s: float,
+    returncode: int,
+    wall_s: float,
+    timed_out: bool,
+) -> None:
+    payload = {
+        "kind": "trial",
+        "rundir": str(rundir.resolve()),
+        "K": K,
+        "alpha": alpha,
+        "N": N,
+        "seed": seed,
+        "flags": flags,
+        "timeout_s": timeout_s,
+        "cmd": cmd,
+        "returncode": returncode,
+        "wall_s": wall_s,
+        "timed_out": timed_out,
+        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def run_trial(
+    bsp: Path,
+    *,
+    K: int,
+    alpha: float,
+    N: int,
+    seed: int,
+    flags: list[str],
+    rundir: Path,
+    timeout_s: float,
+) -> tuple[str, int, float, bool]:
+    """Return (log_text, returncode, wall_s, timed_out).
+
+    All bsp file outputs go into rundir: the process cwd is rundir and
+    --outdir=. keeps Formula_CNF / residuals / whitening / manifest.json there.
+    """
+    rundir.mkdir(parents=True, exist_ok=True)
+    log_path = rundir / "log.txt"
+    cmd = [
+        str(bsp),
+        f"--seed={seed}",
+        *flags,
+        "--outdir=.",
+        "--diag=t",
+        "--diag-every=1000000",
+        "-w",
+        str(K),
+        str(alpha),
+        str(N),
+    ]
+    t0 = time.perf_counter()
+    timed_out = False
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=rundir,
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+        )
+        rc = proc.returncode
+        text = (proc.stdout or "") + (proc.stderr or "")
+    except subprocess.TimeoutExpired as e:
+        timed_out = True
+        rc = 124
+        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+        err = e.stderr.decode() if isinstance(e.stderr, bytes) else (e.stderr or "")
+        text = out + err
+    wall_s = time.perf_counter() - t0
+    log_path.write_text(text)
+    write_trial_manifest(
+        rundir / "pybsp_manifest.json",
+        cmd=cmd,
+        K=K,
+        alpha=alpha,
+        N=N,
+        seed=seed,
+        flags=flags,
+        rundir=rundir,
+        timeout_s=timeout_s,
+        returncode=rc,
+        wall_s=wall_s,
+        timed_out=timed_out,
+    )
+    return text, rc, wall_s, timed_out

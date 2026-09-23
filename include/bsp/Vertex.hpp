@@ -27,17 +27,10 @@
 
 #ifndef Vertex_hpp
 #define Vertex_hpp
-#include "Header.h"
-#include "thermo_sp.hpp"
-#include "thermo_policy.hpp"
+#include <bsp/Header.hpp>
+#include <bsp/thermo_sp.hpp>
+#include <bsp/thermo_policy.hpp>
 
-/***********************************************************************************/
-/***********************************************************************************/
-/***********************************************************************************/
-/***************************** START VERTEX CLASS **********************************/
-/***********************************************************************************/
-/***********************************************************************************/
-/***********************************************************************************/
 
 
 /*a=_sT, b=_sF, c=_sI*/
@@ -87,7 +80,7 @@ public:
         _phi_plus=0.;/*free energy of x_i=true (0 without ThermoSP)*/
         _phi_minus=0.;/*free energy of x_i=false (0 without ThermoSP)*/
         _B_th=0.;/*free-energy bias Phi(-)-Phi(+)*/
-        _sNN=0.0/0.0;/*NN prediction (NaN = none yet / abstained)*/
+        _Ik=0.;/*I(k) release score for --dynamic-i-backtrack*/
         _I_am_white=false;/*white variable*/
     };
 
@@ -161,7 +154,7 @@ public:
     double _phi_plus; /*free energy of the assignment x_i=true*/
     double _phi_minus; /*free energy of the assignment x_i=false*/
     double _B_th; /*free-energy bias Phi_minus-Phi_plus*/
-    double _sNN; /*NN predicted DeltaSigma (NaN if none/abstained)*/
+    double _Ik; /*I(k) = fraction of clusters compatible with the assignment*/
     double prod_V_plus; /*product (1-message) in V_plus*/
     double prod_V_minus; /*product (1-message) in V_minus*/
     vector<double> snap_plus; /*message values of V_plus at the last make_products call*/

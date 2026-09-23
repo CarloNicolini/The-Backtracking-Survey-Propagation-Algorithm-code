@@ -5,9 +5,9 @@
 //  Thermodynamic Survey Propagation: deformed cavity star sums.
 //
 
-#include "thermo_sp.hpp"
+#include <bsp/thermo_sp.hpp>
 
-#include "Header.h"
+#include <bsp/Header.hpp>
 
 #include <cmath>
 #include <vector>

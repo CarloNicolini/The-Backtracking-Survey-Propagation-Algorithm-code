@@ -40,6 +40,6 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(bsp_core PUBLIC m)
 endif()
 
-add_executable(bsp main.cpp)
+add_executable(bsp main.cpp outdir.cpp)
 target_link_libraries(bsp PRIVATE bsp_core cxxopts::cxxopts)
 install(TARGETS bsp RUNTIME DESTINATION bin)

@@ -5,7 +5,7 @@
 //  Thermodynamic Survey Propagation: Gibbs decision policy (pi_T of the note).
 //
 
-#include "thermo_policy.hpp"
+#include <bsp/thermo_policy.hpp>
 
 #include <cmath>
 #include <cstdlib>

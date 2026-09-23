@@ -25,9 +25,8 @@
 //  Copyright © 2018 Raffaele Marino. All rights reserved.
 //
 
-#include "Graph.hpp"
-#include "NnScorer.hpp"
-#include "thermo_sp.hpp"
+#include <bsp/Graph.hpp>
+#include <bsp/thermo_sp.hpp>
 #ifndef _WIN32
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -46,11 +45,6 @@ double g_bsp_theta = 0.0;
 bool g_veto = false;
 double g_epsilon = epsilon;
 double g_damping = 0.0;
-/*Phase 3 dataset options (see Header.h).*/
-string g_dataset_prefix;
-unsigned g_dataset_k = 50;
-unsigned g_dataset_every = 1;
-bool g_oracle = false;
 string g_minisat_path = "minisat";
 unsigned g_oracle_timeout = 10;
 bool g_oracle_dir = false;
@@ -68,9 +62,6 @@ double g_frac = frac;
 static const double k_slope_frac = 0.05;
 static const unsigned k_eta_cut = 128;
 static const double k_r_boost = 0.09;
-string g_nn_path;
-bool g_nn_veto = false;
-double g_nn_cutoff = 0.0;
 
 /***********************************************************************************/
 /***********************************************************************************/
@@ -336,7 +327,6 @@ int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) 
     _diag_step_out<<flush;
     _diag_var_out<<flush;
     _diag_move_out<<flush;
-    _ds_out<<flush;
     cout<<flush;
     cerr<<flush;
     fflush(NULL);
@@ -602,7 +592,7 @@ void Graph::diag_step() {
                      <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
                       <<" theta="<<g_bsp_theta<<" veto="<<g_veto
                       <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree,sNN";
+        _diag_var_out<<"step,vertex,fixed,who,sT,sF,sI,score,abspol,degree";
         if(g_T_cav>0.)_diag_var_out<<",e_mean,log_z";/*ThermoSP cavity statistics*/
         _diag_var_out<<"\n";
         _diag_move_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
@@ -630,7 +620,7 @@ void Graph::diag_step() {
                      <<(v->_who_I_am ? 1 : 0)<<","
                      <<setprecision(10)<<v->_sT<<","<<v->_sF<<","<<v->_sI<<","
                      <<v->_sC<<","<<fabs(v->_sT-v->_sF)<<","
-                     <<v->_degree_i<<","<<v->_sNN;
+                     <<v->_degree_i;
         if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
             ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav);
             _diag_var_out<<","<<_st.e_mean<<","<<log(_st.z);
@@ -769,8 +759,8 @@ int Graph::oracle_dir(Vertex* v) {
     return -1;
 }
 
-/*public member class Graph. Timeout accounting shared by dataset trials
- and oracle-guided decimation: auto-disable after 3 consecutive or 10 total.*/
+/*public member class Graph. Timeout accounting for oracle-guided decimation:
+ auto-disable after 3 consecutive or 10 total minisat timeouts.*/
 void Graph::note_oracle_result(int r) {
     if (r==-2) {
         ++_oracle_timeouts;
@@ -781,219 +771,6 @@ void Graph::note_oracle_result(int r) {
             BSP_WARN<<"oracle auto-disabled after repeated minisat timeouts"<<endl;
         }
     } else _oracle_timeouts=0;
-}
-
-/*public member class Graph. Runs tentative-fix trials for the Phase 3
- DeltaSigma dataset. For each shortlisted unfixed variable and each direction,
- a forked child fixes it, optionally checks the trial residual with an exact
- SAT oracle (minisat), reconverges SP and reports through shared memory; the
- parent is undisturbed so no undo is needed. Labels per trial: oracle SAT flag
- (exact fatality gate: 1/0, -2 on oracle timeout), 1-step DeltaSigma
- (gradation), SP-converged flag.
- The oracle runs BEFORE SP so its result survives SP death in the child.
- Minisat is bounded by g_oracle_timeout seconds per trial and auto-disables
- for the run after repeated timeouts (K=4 near threshold can be
- exponentially hard for DPLL).
- No-op unless --dataset=PREFIX was given. POSIX only (fork/mmap).*/
-void Graph::dataset_trials() {
-    if (g_dataset_prefix.empty()) return;
-#ifdef _WIN32
-    BSP_ERROR<<"--dataset needs fork/mmap (POSIX); not supported on Windows"<<endl;
-    exit(-1);
-#else
-    if (complexity==0. || _N_t==0) return;
-    /*0-based SP-step index, aligned with diag_step()'s numbering for joins*/
-    unsigned step=static_cast<unsigned>(_numb_of_dec_moves+_numb_of_back_moves-3.);
-    if (step % g_dataset_every != 0) return;
-    if (!_ds_header_done) {
-        _ds_out.open((g_dataset_prefix + "_dataset.csv").c_str());
-        if (!_ds_out) {
-            BSP_ERROR<<"Cannot open dataset output with prefix "<<g_dataset_prefix<<endl;
-            exit(-1);
-        }
-        _ds_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
-                <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
-                <<" theta="<<g_bsp_theta<<" veto="<<g_veto
-                <<" eps="<<g_epsilon<<" damp="<<g_damping<<"\n";
-        _ds_out<<"step,move,vertex,dir,sT,sF,sI,bias_cert,score,abspol,margin,"
-               <<"prod_plus,prod_minus,degree,n_inc,len1,len2,len3,len4p,"
-               <<"Sigma_before,Sigma_per_N,step_frac,eta_before,r,"
-               <<"converged,crashed,sat_oracle,delta_sigma,eta_after\n";
-        _ds_header_done=true;
-    }
-    /*shortlist: top-K unfixed by active score (index copy, ptrV untouched)*/
-    vector<Vertex*> cand;
-    cand.reserve(_N_t);
-    for (unsigned i=0; i<_N; ++i)
-        if (!ptrV[i]->_I_am_a_fixed_variable) cand.push_back(ptrV[i]);
-    unsigned k = g_dataset_k < cand.size() ? g_dataset_k : (unsigned)cand.size();
-    if (k==0) return;
-    partial_sort(cand.begin(), cand.begin()+k, cand.end(), _Vertex_greater_pred());
-    /*shared report area: [converged, delta_sigma, eta_after, sat_oracle]*/
-    double* tout = (double*)mmap(NULL, 4*sizeof(double), PROT_READ|PROT_WRITE,
-                                 MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-    if (tout==MAP_FAILED) {
-        BSP_ERROR<<"mmap failed for dataset trial"<<endl;
-        exit(-1);
-    }
-    double sigma_before=complexity;
-    const char* mv = fl_bsp ? "back" : "dec";
-    for (unsigned ci=0; ci<k; ++ci) {
-        Vertex* v=cand[ci];
-        double sT=v->_sT, sF=v->_sF, sI=v->_sI;
-        double bias=1.-(sT<sF?sT:sF);
-        double abspol=fabs(sT-sF);
-        double margin=(sT+sF>0.) ? abspol/(sT+sF) : 0.;
-        unsigned n_inc=0,len1=0,len2=0,len3=0,len4p=0;
-        for (unsigned j=0; j<v->_I_am_in_cl_at_init.size(); ++j) {
-            unsigned c=*real(v->_I_am_in_cl_at_init[j]);
-            if (!_cl[c]._I_am_in_list_unsat) continue;
-            ++n_inc;
-            unsigned L=(unsigned)_cl[c].size();
-            if (L<=1) ++len1;
-            else if (L==2) ++len2;
-            else if (L==3) ++len3;
-            else ++len4p;
-        }
-        ostringstream tail;
-        tail<<setprecision(10)<<sT<<","<<sF<<","<<sI<<","<<bias<<","<<v->_sC<<","
-            <<abspol<<","<<margin<<","<<v->prod_V_plus<<","<<v->prod_V_minus<<","
-            <<v->_degree_i<<","<<n_inc<<","<<len1<<","<<len2<<","<<len3<<","<<len4p<<","
-            <<sigma_before<<","<<(sigma_before/static_cast<double>(_N))<<","
-            <<(static_cast<double>(_N-_N_t)/static_cast<double>(_N))<<","
-            <<_time_conv_print<<","<<g_r_bsp;
-        for (int dir=0; dir<=1; ++dir) {
-            tout[0]=0; tout[1]=0; tout[2]=0; tout[3]=-1;
-            /*Flush before fork: children inherit stdio buffers, and a child
-             dying via exit(-1) in SP would otherwise flush a stale copy
-             over the parent's file at the shared offset.*/
-            _ds_out<<flush;
-            _diag_step_out<<flush;
-            _diag_var_out<<flush;
-            _diag_move_out<<flush;
-            cout<<flush;
-            cerr<<flush;
-            fflush(NULL);
-            pid_t pid=fork();
-            if (pid < 0) {
-                BSP_ERROR<<"fork failed for dataset trial"<<endl;
-                exit(-1);
-            }
-            if (pid==0) {
-                /*child: fix v to dir, oracle-check, reconverge, report. Never returns.*/
-                close(STDOUT_FILENO); close(STDERR_FILENO);
-                _in_trial=true;
-                _list_fixed_element.push_back(v);
-                v->_it_list_fixed_elem=--_list_fixed_element.end();
-                v->_I_am_a_fixed_variable=true;
-                v->_who_I_am=(dir==1);
-                if (_last_certitude>v->_sC) _last_certitude=v->_sC;
-                clean(v);
-                v->_degree_i=0;
-                if (g_oracle && !_oracle_disabled) {
-                    /*exact SAT label on the trial residual, before SP*/
-                    ostringstream tmp;
-                    tmp<<g_dataset_prefix<<"_or_"<<(int)getpid()<<".cnf";
-                    _M_t=static_cast<unsigned>(_cl_list.size());
-                    print_residual_to(tmp.str());
-                    int sat=minisat_check(tmp.str());
-                    if (sat==-4) _exit(126);/*minisat missing*/
-                    if (sat==-3) _exit(43);/*minisat crashed: unknown, skip SP*/
-                    tout[3]=sat;/*1, 0 or -2 (timeout)*/
-                }
-                stable_partition(ptrV.begin(), ptrV.end(), _Vertex_is_fixed_pred());
-                convergence_messages();/*fatal exit(-1) on failure -> converged=0*/
-                surveys();/*side effects are child-local*/
-                tout[0]=1; tout[1]=complexity-sigma_before;
-                tout[2]=(double)_time_conv_print;
-                _exit(0);
-            }
-            int status=0;
-            while (waitpid(pid, &status, 0) < 0 && errno==EINTR) { /*retry*/ }
-            if (WIFEXITED(status) && WEXITSTATUS(status)==126) {
-                BSP_ERROR<<"minisat not found at '"<<g_minisat_path
-                         <<"'; use --minisat=PATH or --oracle=off"<<endl;
-                exit(-1);
-            }
-            if (g_oracle) {
-                ostringstream tmp;
-                tmp<<g_dataset_prefix<<"_or_"<<(int)pid<<".cnf";
-                unlink(tmp.str().c_str());
-            }
-            int converged=(WIFEXITED(status) && WEXITSTATUS(status)==0) ? 1 : 0;
-            int crashed=(!converged && WIFSIGNALED(status)) ? 1 : 0;
-            note_oracle_result((int)tout[3]);
-            _ds_out<<step<<","<<mv<<","<<v->_vertex<<","<<dir<<","<<tail.str()<<","
-                    <<converged<<","<<crashed<<","<<(int)tout[3]<<","
-                    <<setprecision(10)<<(converged?tout[1]:0.)<<","
-                    <<(converged?(int)tout[2]:-1)<<"\n";
-        }
-    }
-    _ds_out<<flush;
-    munmap(tout, 4*sizeof(double));
-#endif
-}
-
-/*Fill the 15-d feature vector used by bsp-train / GenANN inference.
- Layout matches tools that parse PREFIX_dataset.csv: surveys, bias, products,
- degree, incident unsat count, mean remaining clause length, Sigma/N, step
- fraction, r, and the assignment direction that fix_var_i() would pick.*/
-void Graph::fill_nn_features(Vertex* v, double* f) {
-    double sT=v->_sT, sF=v->_sF, sI=v->_sI;
-    double abspol=fabs(sT-sF);
-    double den=sT+sF;
-    unsigned n_inc=0, len_sum=0;
-    for (unsigned j=0; j<v->_I_am_in_cl_at_init.size(); ++j) {
-        unsigned c=*real(v->_I_am_in_cl_at_init[j]);
-        if (!_cl[c]._I_am_in_list_unsat) continue;
-        ++n_inc;
-        len_sum += (unsigned)_cl[c].size();
-    }
-    f[0]=sT;
-    f[1]=sF;
-    f[2]=sI;
-    f[3]=1.0-((sT<sF)?sT:sF);
-    f[4]=abspol;
-    f[5]=(den>0.0)? abspol/den : 0.0;
-    f[6]=v->prod_V_plus;
-    f[7]=v->prod_V_minus;
-    f[8]=static_cast<double>(v->_degree_i);
-    f[9]=static_cast<double>(n_inc);
-    f[10]=(n_inc>0)? (static_cast<double>(len_sum)/n_inc) : 0.0;
-    f[11]=complexity/static_cast<double>(_N);
-    f[12]=static_cast<double>(_N-_N_t)/static_cast<double>(_N);
-    f[13]=g_r_bsp;
-    f[14]=(sT>sF)? 1.0 : 0.0;
-}
-
-/*Overwrite unfixed _sC with predicted future complexity when a weights file
- is loaded (rank mode). In veto mode (--nn-veto=C) only bury vars scoring
- below C, keeping the hand-crafted bias otherwise. Out-of-distribution
- inputs always keep the hand-crafted score. The raw prediction (or NaN on
- abstention) is kept in _sNN for logging.*/
-void Graph::apply_nn_scores() {
-    if (!bsp_nn_ready()) return;
-    unsigned n=0, kept=0, buried=0;
-    for (unsigned i=0; i<_N; ++i) {
-        Vertex* v=ptrV[i];
-        if (v->_I_am_a_fixed_variable) continue;
-        double x[BSP_NN_NFEAT];
-        fill_nn_features(v, x);
-        double y=0.0/0.0;
-        ++n;
-        if (!bsp_nn_predict(x, y)) { v->_sNN=y; continue; }
-        v->_sNN=y;
-        if (g_nn_veto) {
-            if (y < g_nn_cutoff) { v->_sC=-1e100; ++buried; }
-        } else {
-            v->_sC=y;
-            ++kept;
-        }
-    }
-    if (g_nn_veto)
-        BSP_INFO<<"NN veto buried "<<buried<<"/"<<n<<" unfixed variables"<<endl;
-    else
-        BSP_INFO<<"NN scorer applied to "<<kept<<"/"<<n<<" unfixed variables"<<endl;
 }
 
 
@@ -1338,10 +1115,10 @@ void Graph::sort_V_Back_move() {
             double pi = v->_p_IND();
             double sT_v = v->S(pp, pm, pi);
             double sF_v = v->S(pm, pp, pi);
-            v->_sNN = v->_who_I_am ? (1.0 - sF_v) : (1.0 - sT_v);
+            v->_Ik = v->_who_I_am ? (1.0 - sF_v) : (1.0 - sT_v);
         }
         sort(ptrV.begin(), ptrV.begin() + nfixed,
-             [](const Vertex* a, const Vertex* b) { return a->_sNN > b->_sNN; });
+             [](const Vertex* a, const Vertex* b) { return a->_Ik > b->_Ik; });
     } else {
         sort(ptrV.begin(), ptrV.begin() + nfixed, _Vertex_greater_pred());
     }

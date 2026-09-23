@@ -1,9 +1,15 @@
 build/
 build-dbg/
 build-valgrind/
+compile_commands.json
 data/
-Value_Anal_Compl_*.txt
+bsp_runs/
+Formula_CNF*
+residualformula*
+Solution_tot*
+Sol_SP*
 whitening*.txt
+Value_Anal_Compl_*.txt
 outfile
 *.aux
 *.log

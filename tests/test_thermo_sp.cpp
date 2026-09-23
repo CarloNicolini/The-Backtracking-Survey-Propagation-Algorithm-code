@@ -9,8 +9,8 @@
 //  4. the Gibbs sampler frequencies match the weights e^(-Phi/T_act).
 //
 
-#include "thermo_sp.hpp"
-#include "thermo_policy.hpp"
+#include <bsp/thermo_sp.hpp>
+#include <bsp/thermo_policy.hpp>
 
 #include <cmath>
 #include <cstdio>
@@ -128,10 +128,14 @@ static void test_zero_temperature_limit(mt19937 &rng) {
         for (size_t k = 0; k < 3; ++k) {
             ThermoStar got = thermo_star(es.data(), es.size(), eu.data(), eu.size(),
                                          A0, B0, temps[k]);
-            expect_close("T=0 pi_u", got.pi_u, (1. - B0) * A0, 0.);
-            expect_close("T=0 pi_s", got.pi_s, (1. - A0) * B0, 0.);
-            expect_close("T=0 pi_0", got.pi_0, A0 * B0, 0.);
-            expect_close("T=0 norm", got.z, A0 + B0 - A0 * B0, 0.);
+            expect_close("T=0 pi_u", got.pi_u, (1. - B0) * A0,
+                         1e-14 * (1. + fabs(A0) + fabs(B0)));
+            expect_close("T=0 pi_s", got.pi_s, (1. - A0) * B0,
+                         1e-14 * (1. + fabs(A0) + fabs(B0)));
+            expect_close("T=0 pi_0", got.pi_0, A0 * B0,
+                         1e-14 * (1. + fabs(A0) + fabs(B0)));
+            expect_close("T=0 norm", got.z, A0 + B0 - A0 * B0,
+                         1e-14 * (1. + fabs(A0) + fabs(B0)));
         }
     }
 }

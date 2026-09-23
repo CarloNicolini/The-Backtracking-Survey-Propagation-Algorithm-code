@@ -27,7 +27,7 @@
 
 /*In this file public, non-inline, members for class Vertex are defined.*/
 
-#include "Vertex.hpp"
+#include <bsp/Vertex.hpp>
 
 /*Runtime decimation-scorer selection (see Header.h). Default -1 reproduces
  the legacy compiled-in __H macro behavior exactly.*/

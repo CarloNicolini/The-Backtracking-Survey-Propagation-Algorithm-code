@@ -25,8 +25,8 @@
 //  Copyright © 2018 Raffaele Marino. All rights reserved.
 //
 
-#ifndef Header_h
-#define Header_h
+#ifndef BSP_Header_hpp
+#define BSP_Header_hpp
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -51,10 +51,9 @@
 #include <iomanip>
 #include <list>
 #include <sstream>
-#include "random.h"
-#include "Logger.hpp"
+#include <bsp/random.hpp>
+#include <bsp/Logger.hpp>
 
-//#define NeurNET
 #define WALKSAT
 #define BP
 #define ZERO (1.0E-10)/*all values less than 1.0e-10 are zero*/
@@ -119,14 +118,9 @@ extern double g_epsilon; /*SP convergence threshold, default epsilon*/
 extern double g_damping; /*SP update damping in [0,1), default 0 (off)*/
 bool bsp_pass_margin(double sT, double sF); /*true if margin >= g_bsp_theta*/
 
-/*Phase 3 DeltaSigma dataset (POSIX only, uses fork). Off unless --dataset=PREFIX.*/
-extern string g_dataset_prefix; /*output prefix for _dataset.csv*/
-extern unsigned g_dataset_k; /*shortlist size per step, default 50*/
-extern unsigned g_dataset_every; /*trial cadence in SP steps, default 1*/
-extern bool g_oracle; /*exact SAT-oracle label per trial via minisat, default off*/
+/*Minisat oracle for --oracle-dir (exact 1-step direction check). Off by default.*/
 extern string g_minisat_path; /*minisat binary, default "minisat"*/
-extern unsigned g_oracle_timeout; /*per-trial minisat seconds, default 10 (0 = unbounded)*/
-/*Oracle-guided decimation (exact 1-step lookahead, POSIX). Both off by default.*/
+extern unsigned g_oracle_timeout; /*per-check minisat seconds, default 10 (0 = unbounded)*/
 extern bool g_oracle_dir; /*check both dirs per chosen var, take a SAT one*/
 extern unsigned g_oracle_pick; /*scan top-K for SAT-preserving (var,dir), 0 = off*/
 extern unsigned g_lookahead_k; /*top-K complexity lookahead, 0 = off*/
@@ -140,12 +134,8 @@ extern double g_bt_cost; /*cost of one back move in the Gibbs split, default 0.4
 extern bool g_corr_batch; /*among high-P vars, prefer a distance-2 batch*/
 extern bool g_adaptive_r; /*raise r when the Sigma slope is steep or SP is slow*/
 extern double g_frac; /*decimation batch fraction, default frac*/
-extern string g_nn_path; /*GenANN weights from bsp-train; empty = off*/
-extern bool g_nn_veto; /*veto mode: bury vars scoring below cutoff, else keep bias*/
-extern double g_nn_cutoff; /*veto threshold on predicted DeltaSigma*/
-const int BSP_NN_NFEAT = 15;
 
-#endif /* Header_h */
+#endif /* BSP_Header_hpp */
 
 
 

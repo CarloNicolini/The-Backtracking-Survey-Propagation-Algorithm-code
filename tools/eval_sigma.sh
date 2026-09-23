@@ -3,11 +3,11 @@
 # residual complexity + outcome + eta stats from --diag steps CSVs.
 # Complements tools/eval_grid.sh (which parses stdout at tiny N).
 # Usage (env overrides): K=3 N=500 ALPHAS="4.0 4.2" SEEDS="1 2" \
-#   CONFIGS="cert_r0|--scorer=cert --r=0;nn_r09|--scorer=cert --r=0.9 --nn=WEIGHTS" \
+#   CONFIGS="cert_r0|--scorer=cert --r=0;cert_r09|--scorer=cert --r=0.9" \
 #   OUTDIR=/tmp/eval TRIAL_TIMEOUT=600 ./tools/eval_sigma.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MAIN="${MAIN:-$ROOT/build/bsp}"
+MAIN="${MAIN:-$ROOT/build/release/bsp}"
 OUTDIR="${OUTDIR:-/tmp/eval_sigma}"
 K="${K:-3}"
 N="${N:-500}"

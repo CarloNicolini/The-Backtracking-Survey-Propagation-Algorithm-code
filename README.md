@@ -10,41 +10,44 @@ For any problem, email: marinoraffaele.nunziatella@gmail.com
 
 ## Build (CMake)
 
-Requires CMake ≥ 3.16 and a C++14 compiler (g++ on Linux, AppleClang/Clang on
-macOS, or MSVC on Windows). Network access is needed on the first configure so
+Requires CMake ≥ 3.16 and a C++14 compiler (g++ on Linux, or AppleClang/Clang on
+macOS). Network access is needed on the first configure so
 CMake can FetchContent the cxxopts header library.
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --preset release
+cmake --build --preset release -j
 ```
 
-The executable is `build/bsp`.
+The executable is `build/release/bsp`. For a Debug build, use the `debug` preset
+(`build/debug/bsp`).
 
 ### Options
 
 | CMake option | Default | Meaning |
 |---|---|---|
-| `CMAKE_BUILD_TYPE` | `Release` | `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel` |
-| `BSP_NATIVE_ARCH` | `ON` | Optimize for the host CPU (`-march=native` / MSVC `/arch:AVX2` on x64). Turn **off** for portable binaries. |
+| `CMAKE_BUILD_TYPE` | set by preset | `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel` |
+| `BSP_NATIVE_ARCH` | `ON` | Optimize for the host CPU (`-march=native`). Turn **off** for portable binaries. |
 
 Examples:
 
 ```bash
 # Portable Release binary
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBSP_NATIVE_ARCH=OFF
+cmake --preset release -DBSP_NATIVE_ARCH=OFF
+cmake --build --preset release -j
 
 # Debug build (symbols; useful for Valgrind)
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
+cmake --preset debug -DBSP_NATIVE_ARCH=OFF
+cmake --build --preset debug -j
 ```
 
-Release builds enable strong optimization flags per toolchain (MSVC, AppleClang,
-Linux g++), including link-time optimization (IPO/LTO) when supported.
+Release builds enable strong optimization flags for GCC and Clang, including
+link-time optimization (IPO/LTO) when supported.
 
 Optional install:
 
 ```bash
-cmake --install build --prefix /path/to/prefix
+cmake --install build/release --prefix /path/to/prefix
 ```
 
 ## Usage
@@ -52,19 +55,19 @@ cmake --install build --prefix /path/to/prefix
 Generate a random instance and solve it:
 
 ```bash
-./build/bsp -w <K> <alpha> <N>
+./build/release/bsp -w <K> <alpha> <N>
 ```
 
 Load a CNF file and solve it:
 
 ```bash
-./build/bsp -l <formula.cnf>
+./build/release/bsp -l <formula.cnf>
 ```
 
 Example (3-SAT, clause density 4.0, 50 variables):
 
 ```bash
-./build/bsp -w 3 4.0 50
+./build/release/bsp -w 3 4.0 50
 ```
 
 ## Thermodynamic Survey Propagation (ThermoSP)
@@ -77,7 +80,7 @@ one configuration. The map T = 1/y relates the deformation to the
 finite-energy SP(y) equations.
 
 ```bash
-./build/bsp --cav-temp=0.1 -w 3 4.0 50
+./build/release/bsp --cav-temp=0.1 -w 3 4.0 50
 ```
 
 The option `--act-temp=T` turns the Gibbs decimation policy on. The policy
@@ -87,7 +90,7 @@ The scorer `--scorer=fth` ranks the variables by the absolute free-energy bias
 B = Phi_minus - Phi_plus. Both options need `--cav-temp>0`.
 
 ```bash
-./build/bsp --cav-temp=0.1 --act-temp=0.1 --scorer=fth -w 3 4.0 50
+./build/release/bsp --cav-temp=0.1 --act-temp=0.1 --scorer=fth -w 3 4.0 50
 ```
 
 The option `--fe-backtrack` moves the backtracking step to free energies. The
@@ -99,7 +102,7 @@ cost `--bt-cost=C` charges one back move in that split. Both need
 1.0 against 0.9 for the ratio rule. All free energies scale with
 `--cav-temp`, so scale the cost with it. A zero cost can make the solver loop.
 
-The unit test `build/bsp-test` holds the numeric identities of the deformation.
+The unit test `build/release/bsp-test` holds the numeric identities of the deformation.
 The script `tools/regression_thermo.sh` rebuilds the tree and compares three
 golden solver runs stored in `tests/golden`. Numbers match within 1e-12
 absolute and 1e-6 relative, and all other text matches exactly. Operate the
@@ -128,7 +131,7 @@ point. At m = 0 the tilt is the identity and the solver keeps the uniform
 cluster measure.
 
 ```bash
-./build/bsp --rsb-m=0.5 -w 3 4.0 50
+./build/release/bsp --rsb-m=0.5 -w 3 4.0 50
 ```
 
 ## Memory checking with Valgrind
@@ -137,11 +140,11 @@ Valgrind runs on **Linux** only (not available as a native macOS/Homebrew bottle
 Prefer a Debug build without native-arch tuning:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
-cmake --build build -j
+cmake --preset debug -DBSP_NATIVE_ARCH=OFF
+cmake --build --preset debug -j
 
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
-  ./build/bsp -w 3 3.0 30
+  ./build/debug/bsp -w 3 3.0 30
 ```
 
 On macOS, the same check can be run in a Linux container, for example:
@@ -149,9 +152,9 @@ On macOS, the same check can be run in a Linux container, for example:
 ```bash
 docker run --rm -v "$PWD":/src -w /src ubuntu:24.04 bash -lc '
   apt-get update -qq && apt-get install -y -qq g++ cmake make valgrind
-  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBSP_NATIVE_ARCH=OFF
-  cmake --build build -j
+  cmake --preset debug -DBSP_NATIVE_ARCH=OFF
+  cmake --build --preset debug -j
   valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
-    ./build/bsp -w 3 3.0 30
+    ./build/debug/bsp -w 3 3.0 30
 '
 ```

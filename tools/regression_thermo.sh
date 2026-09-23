@@ -8,7 +8,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-BIN="$ROOT/build/bsp"
+BIN="${BIN:-$ROOT/build/release/bsp}"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
@@ -43,27 +43,31 @@ numdiff() {
     ' "$1" "$2"
 }
 
-cmake --build "$ROOT/build" >/dev/null
-(cd "$ROOT/build" && ctest --output-on-failure)
+cmake --build "$ROOT/build/release" >/dev/null
+(cd "$ROOT/build/release" && ctest --output-on-failure)
 
 # Generation mode from the plan (trivial instance), one long generation run that
 # exercises decimation and backtracking, and one load mode on a data/ instance.
 mkdir -p "$WORK/w30" "$WORK/w100" "$WORK/l80"
-(cd "$WORK/w30" && "$BIN" -w 3 3.0 30 --seed=1 --diag=w >stdout.log 2>stderr.log)
-(cd "$WORK/w100" && "$BIN" -w 3 4.0 100 --seed=5 --diag-every=25 --diag=p >stdout.log 2>stderr.log)
-(cd "$WORK/l80" && "$BIN" -l "$ROOT/data/Formula_CNFK=3N=80alpha=4-SAT_seed=1.cnf" --seed=3 --diag-every=25 --diag=l >stdout.log 2>stderr.log)
+(cd "$WORK/w30" && "$BIN" --outdir=. -w 3 3.0 30 --seed=1 --diag=w >stdout.log 2>stderr.log)
+(cd "$WORK/w100" && "$BIN" --outdir=. -w 3 4.0 100 --seed=5 --diag-every=25 --diag=p >stdout.log 2>stderr.log)
+(cd "$WORK/l80" && "$BIN" --outdir=. -l "$ROOT/data/Formula_CNFK=3N=80alpha=4-SAT_seed=1.cnf" --seed=3 --diag-every=25 --diag=l >stdout.log 2>stderr.log)
 
 status=0
 for name in w30 w100 l80; do
     g="$ROOT/tests/golden/$name"
     r="$WORK/$name"
-    if [ "$(ls "$g")" != "$(ls "$r")" ]; then
-        echo "regression_thermo: $name has different output files" >&2
-        status=1
-        continue
-    fi
     for gp in "$g"/*; do
         f=${gp##*/}
+        # Skip solver-generated manifest: argv and absolute paths differ per machine.
+        if [ "$f" = "manifest.json" ]; then
+            continue
+        fi
+        if [ ! -e "$r/$f" ]; then
+            echo "regression_thermo: $name missing $f" >&2
+            status=1
+            continue
+        fi
         cmp -s "$gp" "$r/$f" && continue
         if ! numdiff "$gp" "$r/$f" >"$WORK/numdiff.msg"; then
             echo "regression_thermo: $name/$f differs ($(cat "$WORK/numdiff.msg"))" >&2
