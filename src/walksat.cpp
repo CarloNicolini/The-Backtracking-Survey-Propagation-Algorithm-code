@@ -1123,7 +1123,7 @@ void initprob(void)
         {
             storeptr = (int *) walksat_alloc( sizeof(int) * STOREBLOCK );
             freestore = STOREBLOCK;
-            fprintf(stderr,"allocating memory...\n");
+            //fprintf(stderr,"allocating memory...\n");
         }
         clause[i] = storeptr;
         do

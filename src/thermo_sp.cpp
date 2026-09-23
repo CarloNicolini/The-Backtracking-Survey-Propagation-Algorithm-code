@@ -17,15 +17,7 @@ using namespace std;
 double g_T_cav = 0.;
 double g_rsb_m = 0.;
 double g_rsb_gamma = 0.;
-
-double thermo_tilt(double eta, double kappa_warn, double kappa_sil, double m) {
-  if (m == 0.) return eta;
-  /*a branch with no cluster count has no weight in mu_m for any m*/
-  double w = (kappa_warn > 0.) ? eta * pow(kappa_warn, m) : 0.;
-  double s = (kappa_sil > 0.) ? (1. - eta) * pow(kappa_sil, m) : 0.;
-  double t = w + s;
-  return (t > 0.) ? w / t : eta;
-}
+double g_gamma_eff = 0.;
 
 /*Coefficients of the polynomial product over one warning group:
  prod_b (1 - eta_b + eta_b z) = sum_p A_p z^p. coef must hold n+1 values and
@@ -58,9 +50,11 @@ ThermoStar thermo_star(const double *eta_s, size_t ns, const double *eta_u,
   else
     out.z = out.pi_u + out.pi_s + out.pi_0;
   if (T <= 0.) return out; /*tropical limit: the corrections vanish*/
-  vector<double> A(ns + 1), B(nu + 1);
-  group_coefficients(eta_s, ns, &A[0]);
-  group_coefficients(eta_u, nu, &B[0]);
+  static thread_local vector<double> A, B;
+  A.resize(ns + 1);
+  B.resize(nu + 1);
+  group_coefficients(eta_s, ns, A.data());
+  group_coefficients(eta_u, nu, B.data());
   double cz = 0., ew = 0.;
   for (size_t p = 1; p <= ns; ++p) {
     for (size_t q = 1; q <= nu; ++q) {

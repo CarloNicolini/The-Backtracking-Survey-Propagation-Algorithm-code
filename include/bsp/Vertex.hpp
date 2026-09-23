@@ -71,6 +71,7 @@ public:
         _I_am_a_fixed_variable=false;/*tell if a variables has beeen fixed*/
         _forced_by_up=false;/*fixed by unit propagation, not by a scored choice*/
         complexity_variable=0.;/*variable node complexity*/
+        energy_variable=0.;/*mean conflict energy of the field star*/
         prod_V_plus=0.;/*products un-negated literal messages*/
         prod_V_minus=0.;/*product negated literal messages*/
         _sT=0.;/*survey sT variable node*/
@@ -115,8 +116,6 @@ public:
 
     double S_C(); /*compute certitude*/
 
-    double d_phi() const; /*free-energy cost of the last assignment*/
-
     long int _var_int(bool f) { /*variable node fixed and expressed as int */
         return (f==true) ? (_vertex_lli):(-1*_vertex_lli);
     }
@@ -160,6 +159,7 @@ public:
     vector<double> snap_plus; /*message values of V_plus at the last make_products call*/
     vector<double> snap_minus; /*message values of V_minus at the last make_products call*/
     double complexity_variable;/*variable node complexity*/
+    double energy_variable;/*mean conflict energy of the field star (ThermoSP only)*/
     unsigned int _vertex; /*vertex label*/
     long int _vertex_lli; /*vertex label for literal*/
     unsigned int _i; /*counter index vectors*/
@@ -240,15 +240,6 @@ inline double Vertex::S(double &a, double &b, double &c) { /*compute sT,sF*/
 inline double Vertex::S_C() { /*compute certitude survey*/
     return bsp_score(_sT, _sF, _sI, _B_th);
 }
-
-/*public member which computes the free-energy cost of the last assignment of
- this variable: Phi(assigned) - min(Phi(+),Phi(-)). A large value marks a
- decision that fights the free energies of its alternatives.*/
-inline double Vertex::d_phi() const {
-    double _best=(_phi_plus<_phi_minus)?_phi_plus:_phi_minus;
-    return (_who_I_am)?(_phi_plus-_best):(_phi_minus-_best);
-}
-
 #endif /* Vertex_hpp */
 
 /***********************************************************************************/

@@ -16,10 +16,11 @@
 extern double g_T_cav;
 
 /*Cluster reweighting exponent of the 1RSB measure mu_m(C) proportional to
- e^(m N s_C). m=0 keeps the uniform cluster measure. It tilts every cavity
- message with the branch cluster counts of the note: the warning mass eta
- carries kappa_warn^m and the silent mass (1-eta) carries kappa_sil^m. Set with
- --rsb-m=M.*/
+ e^(m N s_C). m=0 keeps the uniform cluster measure. SP messages do not carry
+ the internal entropy s_C of a cluster, so the code uses the Maneva-Mossel-
+ Wainwright closure s_C ~ ln2 q_C, with q_C the fraction of free variables.
+ Under this closure m acts as the unfrozen tilt gamma = m ln2 (see
+ g_gamma_eff). Set with --rsb-m=M.*/
 extern double g_rsb_m;
 
 /*Unfrozen-cluster bias of mu_{m,gamma}(C) proportional to exp[N(m s_C+gamma q_C)],
@@ -31,10 +32,9 @@ extern double g_rsb_m;
  biased measure, not the uniform complexity at m=0, gamma=0.*/
 extern double g_rsb_gamma;
 
-/*Tilted warning probability of one message under the 1RSB measure: the two
- masses eta*kappa_warn^m and (1-eta)*kappa_sil^m give this ratio. At m=0 the
- value is eta exactly.*/
-double thermo_tilt(double eta, double kappa_warn, double kappa_sil, double m);
+/*Unfrozen tilt that the star sums use: g_rsb_gamma + g_rsb_m ln2. main.cpp
+ sets it once after parsing the options.*/
+extern double g_gamma_eff;
 
 /*Deformed Pi sums of one cavity star. eta_s holds the messages that push the
  cavity variable to satisfy the target clause, eta_u the messages that push it

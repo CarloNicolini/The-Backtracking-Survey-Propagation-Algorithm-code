@@ -113,7 +113,8 @@ int main(int argc, char* argv[]) {
             cxxopts::value<double>())
         ("act-temp", "Gibbs action temperature (default 0; needs --cav-temp>0)",
             cxxopts::value<double>())
-        ("rsb-m", "1RSB cluster reweighting exponent m (default 0)",
+        ("rsb-m", "1RSB cluster reweighting exponent m (default 0); MMW closure, "
+                  "adds m*ln2 to the unfrozen tilt gamma",
             cxxopts::value<double>())
         ("rsb-gamma", "1RSB unfrozen-cluster bias (default 0; not scorer gamma)",
             cxxopts::value<double>())
@@ -274,6 +275,7 @@ int main(int argc, char* argv[]) {
         g_rsb_m = result["rsb-m"].as<double>();
     if (result.count("rsb-gamma"))
         g_rsb_gamma = result["rsb-gamma"].as<double>();
+    g_gamma_eff = g_rsb_gamma + g_rsb_m * M_LN2;
     if (result.count("minisat"))
         g_minisat_path = result["minisat"].as<string>();
     if (result.count("oracle-timeout"))
@@ -459,7 +461,8 @@ int main(int argc, char* argv[]) {
     BSP_INFO<<"Decimation scorer: "<<bsp_scorer_name()<<endl;
     if (g_T_cav!=0.)BSP_INFO<<"ThermoSP cavity temperature: T="<<g_T_cav<<endl;
     if (g_T_act!=0.)BSP_INFO<<"Gibbs action temperature: T_act="<<g_T_act<<endl;
-    if (g_rsb_m!=0.)BSP_INFO<<"1RSB cluster reweighting: m="<<g_rsb_m<<endl;
+    if (g_rsb_m!=0.)BSP_INFO<<"1RSB cluster reweighting: m="<<g_rsb_m
+                            <<" (MMW closure, effective gamma="<<g_gamma_eff<<")"<<endl;
     if (g_rsb_gamma!=0.)BSP_INFO<<"1RSB unfrozen bias: gamma="<<g_rsb_gamma<<endl;
     if (g_fe_backtrack)BSP_INFO<<"Free-energy backtracking on, bt-cost="<<g_bt_cost<<endl;
     if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)

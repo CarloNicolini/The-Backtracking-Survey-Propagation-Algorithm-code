@@ -503,11 +503,27 @@ void Graph::surveys() { /*compute surveys for each variable node*/
     unsigned int _size_init=static_cast<unsigned int>(_list_fixed_element.size());
     for (unsigned int i=_size_init; i<_N; ++i) {
         ptrV[i]->compute_s();/*compute surveys for each variable node*/
-        complexity_variables+=(static_cast<double>(ptrV[i]->_degree_i)-1.)*log(ptrV[i]->complexity_variable);/*update graph variable complexity*/
+        if(g_T_cav>0.) {/*site term of Sigma_e = G + y e (see update_complexity_clauses)*/
+            complexity_variables-=log(ptrV[i]->complexity_variable)+ptrV[i]->energy_variable/g_T_cav;
+        } else {
+            complexity_variables+=(static_cast<double>(ptrV[i]->_degree_i)-1.)*log(ptrV[i]->complexity_variable);/*update graph variable complexity*/
+        }
+    }
+    if (g_dynamic_i || g_fe_backtrack) {/*release scores of the fixed variables at this fixed point*/
+        for (unsigned int i=0; i<_size_init; ++i) ptrV[i]->_Ik=release_I(ptrV[i]);
     }
     complexity=complexity_clauses-complexity_variables;/*compute graph total complexity*/
     if(_numb_of_dec_moves==1 and _numb_of_back_moves==1) _comp_init=complexity;
-    if(complexity_variables==0.) complexity=0;
+    /*Paramagnetic phase: no variable of degree >= 2 can receive warnings in both
+     directions, so every hard site factor 1-pi^+pi^- is 1. This is the legacy
+     test complexity_variables==0, written on the hard factors so that it also
+     holds with --rsb-gamma, where a warning-free site has z=e^gamma.*/
+    bool _para=true;
+    for (unsigned int i=_size_init; i<_N && _para; ++i) {
+        Vertex *v=ptrV[i];
+        if (v->_degree_i>=2 && v->_p_IND()+v->_p_MINUS()+v->_p_PLUS()!=1.) _para=false;
+    }
+    if(_para) complexity=0;
     /*Variant 3: keep the 2016 ratio, but spend extra releases when the last
      step removed a large fraction of Sigma or SP took many iterations.
      The total loss between two endpoints does not rank paths; the slope does.*/
@@ -542,7 +558,7 @@ void Graph::surveys() { /*compute surveys for each variable node*/
             double _q_bt=-1e300;/*value of the best release, DeltaPhi minus the cost*/
             for(unsigned int i=0; i<_n_fixed; ++i) {
                 if(ptrV[i]->_forced_by_up)continue;/*UP releases are futile: UP re-forces them*/
-                double _gain=ptrV[i]->d_phi()-g_bt_cost;
+                double _gain=-g_T_cav*log(ptrV[i]->_Ik)-g_bt_cost;
                 if(_gain>_q_bt)_q_bt=_gain;
             }
             if(_q_bt==-1e300) {/*no release candidate: only a decimation is possible*/
@@ -622,7 +638,7 @@ void Graph::diag_step() {
                      <<v->_sC<<","<<fabs(v->_sT-v->_sF)<<","
                      <<v->_degree_i;
         if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
-            ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_rsb_gamma);
+            ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_gamma_eff);
             _diag_var_out<<","<<_st.e_mean<<","<<log(_st.z);
         }
         _diag_var_out<<"\n";
@@ -644,7 +660,7 @@ void Graph::diag_move(const char* action, Vertex* v, int dir) {
     if (g_diag_prefix.empty() || !_diag_header_done) return;
     _diag_move_out<<(_diag_step_idx-1)<<","<<action<<","<<v->_vertex<<","<<dir;
     if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
-        ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_rsb_gamma);
+        ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_gamma_eff);
         _diag_move_out<<","<<_st.e_mean<<","<<log(_st.z);
     }
     _diag_move_out<<endl;
@@ -850,8 +866,8 @@ START:
                         if(i!=l && _cl[C]._go_forward[l]) {
                             _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
                             _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
-                            if(g_T_cav>0. || g_rsb_gamma!=0.) {/*ThermoSP or unfrozen bias*/
-                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav,g_rsb_gamma);
+                            if(g_T_cav>0. || g_gamma_eff!=0.) {/*ThermoSP or unfrozen bias*/
+                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav,g_gamma_eff);
                                 _new*=_st.pi_u;
                                 norm*=_st.z;
                             } else {
@@ -861,10 +877,6 @@ START:
                         }
                         ++l;
                         if(l==s)break;
-                    }
-                    if(g_rsb_m!=0.) {/*1RSB branch cluster counts of this arc*/
-                        _cl[C].kappa_warn[i]=_new;/*all other literals push the warning*/
-                        _cl[C].kappa_sil[i]=norm-_new;/*the complement is silence*/
                     }
                     _new=compute_message(_new,norm);/*set to 0 a message iff the message is smaller than 1e-16*/
                     if(_new==1.) {
@@ -891,9 +903,6 @@ START:
         i=0;
         while (1) {
             double _eta=_cl[C].update[i];
-            if(g_rsb_m!=0.) {/*1RSB: the stored message carries the tilted masses*/
-                _eta=thermo_tilt(_eta,_cl[C].kappa_warn[i],_cl[C].kappa_sil[i],g_rsb_m);
-            }
             *_cl[C].v_survey_cl_to_i[i]=_eta;
             _cl[C].div_s[i]=Div_s(_eta);
             ++i;
@@ -920,12 +929,39 @@ START:
     }
 }
 
-/*public member class Graph. This member  updates only clause complexity.*/
+/*public member class Graph. This member  updates only clause complexity.
+ With g_T_cav>0 it gives the clause and edge part of the complexity
+ Sigma_e = G + y e of the SP-y Bethe functional (paper/sections/spy.tex), with
+ y=1/T_cav, G = sum_a F_a + sum_i F_i - sum_(i,a) F_ia and e = -dG/dy:
+   F_a  = log[1-(1-e^-y) prod_j nu_{j->a}]
+   F_ia = log[1-(1-e^-y) nu_{i->a} eta_{a->i}]
+ The site part F_i + y e_i is in surveys().*/
 void Graph::update_complexity_clauses() {
     double _ps=1.,_pu=1.;/*products for clause complexity*/
     unsigned long j;
     unsigned int C;
     //cout<<"This is the value where I start: "<<_M-_m<<endl;
+    if(g_T_cav>0.) {
+        const double y=1./g_T_cav, ey=exp(-y);
+        for(unsigned int __k=_m; __k<_M; ++__k) {
+            C=(vec_list_cl[__k])->_c;
+            double prod_nu=1., edges=0.;
+            for (j=0; j<_cl[C]._size_cl_init; ++j) {
+                if(_cl[C]._go_forward[j]!=1) continue;
+                _prod_S=_Pr_S(_cl[C].v_V[j],_cl[C].v_lit[j], _cl[C].div_s[j]);
+                _prod_U=_Pr_U(_cl[C].v_V[j],_cl[C].v_lit[j]);
+                ThermoStar _st=_cl[C].v_V[j]->cavity_star(_cl[C].v_lit[j],_cl[C].v_survey_cl_to_i[j],_prod_S,_prod_U,g_T_cav,g_gamma_eff);
+                double nu=_st.pi_u/_st.z;
+                double x=nu*(*_cl[C].v_survey_cl_to_i[j]);
+                double d=1.-(1.-ey)*x;
+                edges+=log(d)+y*ey*x/d;
+                prod_nu*=nu;
+            }
+            double d=1.-(1.-ey)*prod_nu;
+            complexity_clauses+=log(d)+y*ey*prod_nu/d-edges;
+        }
+        return;
+    }
     for(unsigned int __k=_m; __k<_M; ++__k) {
         C=(vec_list_cl[__k])->_c;
         _ps=1.;/*initialize to one product __ps*/
@@ -935,8 +971,8 @@ void Graph::update_complexity_clauses() {
             if(_cl[C]._go_forward[j]==1) {
                 _prod_S=_Pr_S(_cl[C].v_V[j],_cl[C].v_lit[j], _cl[C].div_s[j]);
                 _prod_U=_Pr_U(_cl[C].v_V[j],_cl[C].v_lit[j]);
-                if(g_T_cav>0. || g_rsb_gamma!=0.) {/*same star sums as the message update*/
-                    ThermoStar _st=_cl[C].v_V[j]->cavity_star(_cl[C].v_lit[j],_cl[C].v_survey_cl_to_i[j],_prod_S,_prod_U,g_T_cav,g_rsb_gamma);
+                if(g_T_cav>0. || g_gamma_eff!=0.) {/*same star sums as the message update*/
+                    ThermoStar _st=_cl[C].v_V[j]->cavity_star(_cl[C].v_lit[j],_cl[C].v_survey_cl_to_i[j],_prod_S,_prod_U,g_T_cav,g_gamma_eff);
                     _ps*=_st.z;/*update product for clause complexity*/
                     _pu*=_st.pi_u;/*update product for clause complexity*/
                 } else {
@@ -995,8 +1031,6 @@ void Graph::split_and_collect_information() { /*split the graph in different vec
             _cl[l].old_s.push_back(_rn);
             _cl[l].update.push_back(_rn);
             _cl[l].div_s.push_back(Div_s(_rn));
-            _cl[l].kappa_warn.push_back(1.);/*neutral 1RSB branch counts*/
-            _cl[l].kappa_sil.push_back(1.);
             pos++;/*update position*/
             if(_ivec[i]>0) { /*check if literal is negated or not*/
                 _cl[l]._lit.push_back(true);/*store literal in Boolean list _lit*/
@@ -1086,50 +1120,57 @@ void Graph::update_products() { /*update products*/
 /***********************************************************************************/
 
 /*Sort the fixed prefix for a backtracking move. With --dynamic-i-backtrack
- the release score is I(k), the fraction of clusters still compatible with
- the assigned value, rebuilt from the current incoming surveys:
-   fixed to true  -> I(k) = 1 - s_F
-   fixed to false -> I(k) = 1 - s_T
- Smaller I(k) means the assignment kills more clusters, so it is released
- first. The sort is descending so that backtrack(), which releases from the
- end, picks the smallest I(k). Without the flag the 2016 stored bias is used.*/
+ or --fe-backtrack the release score is I(k), the fraction of clusters still
+ compatible with the assigned value (see release_I). Smaller I(k) means the
+ assignment kills more clusters, so it is released first. The sort is
+ descending so that backtrack(), which releases from the end, picks the
+ smallest I(k). Without the flags the 2016 stored bias is used.*/
 void Graph::sort_V_Back_move() {
     unsigned nfixed = _list_fixed_element.size();
-    if (g_fe_backtrack && nfixed > 0) {
-        /*Free-energy release order: the assignments with the largest DeltaPhi
-         go first. The sort is ascending so that backtrack(), which releases
-         from the end, picks the largest free-energy cost. Variables fixed by
-         unit propagation go to the front: they are not release candidates and
-         backtrack() stops at them.*/
+    if ((g_dynamic_i || g_fe_backtrack) && nfixed > 0) {
+        /*_Ik comes from release_I at the current fixed point (see surveys()).
+         The free-energy gain -T_cav log I(k) of --fe-backtrack has the same
+         order. Variables fixed by unit propagation go to the front, because
+         backtrack() stops at the first one it meets from the end.*/
         sort(ptrV.begin(), ptrV.begin() + nfixed,
              [](const Vertex* a, const Vertex* b) {
                  if (a->_forced_by_up != b->_forced_by_up) return a->_forced_by_up;
-                 return a->d_phi() < b->d_phi();
+                 return a->_Ik > b->_Ik;
              });
-    } else if (g_dynamic_i && nfixed > 0) {
-        for (unsigned i = 0; i < nfixed; ++i) {
-            Vertex* v = ptrV[i];
-            v->make_products();
-            double pp, pm, pi;
-            if (g_T_cav>0. || g_rsb_gamma!=0.) {
-                ThermoStar _st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_rsb_gamma);
-                pp=_st.pi_s;
-                pm=_st.pi_u;
-                pi=_st.pi_0;
-            } else {
-                pp = v->_p_PLUS();
-                pm = v->_p_MINUS();
-                pi = v->_p_IND();
-            }
-            double sT_v = v->S(pp, pm, pi);
-            double sF_v = v->S(pm, pp, pi);
-            v->_Ik = v->_who_I_am ? (1.0 - sF_v) : (1.0 - sT_v);
-        }
-        sort(ptrV.begin(), ptrV.begin() + nfixed,
-             [](const Vertex* a, const Vertex* b) { return a->_Ik > b->_Ik; });
     } else {
         sort(ptrV.begin(), ptrV.begin() + nfixed, _Vertex_greater_pred());
     }
+}
+
+/*I(k) = 1 - w_k^{-s_k} of a fixed variable k (eq. Ik of paper/sections/response.tex).
+ The clauses satisfied by k or by any other variable send no warning. Each
+ unsatisfied clause a contains k with a false literal and sends the warning
+ eta_{a->k} = prod_j nu_{j->a} over its live literals j, computed from the
+ current products. The stored message slots of k are not used: they keep the
+ value of the moment when k was fixed. The unfrozen tilt gives the free mass
+ B0 = prod_a (1-eta_{a->k}) the weight e^gamma.*/
+double Graph::release_I(Vertex *k) {
+    double B0=1.;
+    for (unsigned j=0; j<k->_I_am_in_cl_at_init.size(); ++j) {
+        Clause &c=_cl[*real(k->_I_am_in_cl_at_init[j])];
+        if (!c._I_am_in_list_unsat) continue;
+        double eta=1.;
+        for (unsigned l=0; l<c._size_cl_init; ++l) {
+            if (!c._go_forward[l]) continue;
+            _prod_S=_Pr_S(c.v_V[l],c.v_lit[l],c.div_s[l]);
+            _prod_U=_Pr_U(c.v_V[l],c.v_lit[l]);
+            if (g_T_cav>0. || g_gamma_eff!=0.) {
+                ThermoStar st=c.v_V[l]->cavity_star(c.v_lit[l],c.v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav,g_gamma_eff);
+                eta*=st.pi_u/st.z;
+            } else {
+                eta*=__pu()/__norm();
+            }
+        }
+        B0*=1.-eta;
+    }
+    double free_mass=B0*exp(g_gamma_eff);
+    double I=free_mass/(1.-B0+free_mass);
+    return (I>1e-300)?I:1e-300;
 }
 
 

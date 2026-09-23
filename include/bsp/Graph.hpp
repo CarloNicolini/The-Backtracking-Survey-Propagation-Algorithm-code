@@ -120,8 +120,6 @@ public:
   vector<double> update;
   vector<double> old_s;
   vector<double> div_s;
-  vector<double> kappa_warn; /*1RSB branch cluster counts of the warning state*/
-  vector<double> kappa_sil;  /*1RSB branch cluster counts of the silent state*/
   vector<unsigned int>
       _vecpos; /*vector of integer that describes literal position*/
   vector<long int> _var;
@@ -180,8 +178,10 @@ inline bool Clause::_logic_operator() { /*logical operator in each clause*/
               code*/
   for (unsigned int i = 0; i < _vb.size();
        ++i) { /*loop for checking if a clause is satisfied or not*/
-    flag =
-        flag or _vb[i]; /*logical operator or between literals into a clause*/
+    if (_vb[i]) {
+      flag = true;
+      break;
+    }
   }
 #endif
 
@@ -348,6 +348,8 @@ public:
   void sort_V_Dec_move(); /*sort ptrV for decimation move*/
 
   void sort_V_Back_move(); /*sort ptrV for backtracking move*/
+
+  double release_I(Vertex *k); /*I(k) of a fixed variable from the current fixed point*/
 
   void choose_var_to_fix_and_clean(); /*choose a variable to fix and clean the
                                          graph*/

@@ -77,7 +77,11 @@ T. The default T = 0 keeps the hard SP factors and the current behavior. For
 T > 0 the solver aggregates the cavity warning configurations with the Gibbs
 weight e^(-min(p,q)/T). Here min(p,q) counts the conflicting warning pairs of
 one configuration. The map T = 1/y relates the deformation to the
-finite-energy SP(y) equations.
+finite-energy SP(y) equations. For T > 0 the printed complexity is
+Sigma_e = G + y e of the SP-y Bethe functional (`paper/sections/spy.tex`), and
+at T -> 0 it equals the legacy complexity. A value T = 0.05 means y = 20, and
+the Gibbs weight of one conflict is then e^-20: the deformation has an effect
+only for y of order one, that is T between about 0.3 and 1.
 
 ```bash
 ./build/release/bsp --cav-temp=0.1 -w 3 4.0 50
@@ -94,7 +98,10 @@ B = Phi_minus - Phi_plus. Both options need `--cav-temp>0`.
 ```
 
 The option `--fe-backtrack` moves the backtracking step to free energies. The
-solver releases the assignments with the largest free-energy cost first. It
+solver releases the assignments with the largest free-energy cost
+-T log I(k) first, where I(k) is the release score of
+`--dynamic-i-backtrack`. Both rules compute I(k) from the messages of the
+current fixed point. It
 draws the move type with a Gibbs split between a release and a decimation. The
 cost `--bt-cost=C` charges one back move in that split. Both need
 `--cav-temp>0`. The default cost 0.4 is calibrated at `--cav-temp=0.05`
@@ -115,20 +122,17 @@ script after each change to the solver.
 ### 1RSB cluster reweighting
 
 The option `--rsb-m=M` deforms the cluster measure with mu_m(C) proportional to
-e^(m N s_C), where s_C is the internal entropy of the cluster C. The derivation
-runs as follows. The 1RSB free entropy weights each branch of a cavity star with
-its cluster count to the power m. The warning state of one message carries the
-branch count kappa_warn, and the silent state carries kappa_sil. The two masses
-of the message are then eta kappa_warn^m and (1-eta) kappa_sil^m. A product over
-messages splits into two factors. One factor is the product of the mass sums,
-and it cancels in every message ratio. The other factor is a product of tilted
-ratios, so the star sums keep their form with the tilted message
-eta_tilde = eta kappa_warn^m / (eta kappa_warn^m + (1-eta) kappa_sil^m). The
-branch counts are the sector sums of the same star: kappa_warn is the product of
-the Pi_u factors over the other literals, and kappa_sil is the rest of the
-partition sum. The messages and the branch counts iterate together to a fixed
-point. At m = 0 the tilt is the identity and the solver keeps the uniform
-cluster measure.
+e^(m N s_C), where s_C is the internal entropy of the cluster C. SP messages
+carry warnings only, and they do not carry s_C. The code therefore uses the
+Maneva-Mossel-Wainwright closure s_C = ln2 q_C, where q_C is the fraction of
+free variables of the cluster. Under this closure `--rsb-m=M` is the unfrozen
+tilt of the next section with gamma = M ln2, and the two flags add up. The
+exact measure needs the entropic 1RSB equations, with surveys over BP messages.
+At m = 0 the solver keeps the uniform cluster measure.
+
+A positive tilt drives the surveys toward the trivial fixed point. At N = 500
+the solver then gives the whole formula to WalkSAT after a few steps, and a
+solved instance there measures WalkSAT, not SP.
 
 ```bash
 ./build/release/bsp --rsb-m=0.5 -w 3 4.0 50
@@ -143,7 +147,9 @@ stay as they are, and the finite-temperature balanced conflicts (p=q>0) are not
 boosted. The clause message is still eta = pi_u / z. At gamma = 0 the factors
 match ordinary SP. This flag is not `--scorer=gamma:<g>`, which only ranks
 variables for decimation. With gamma != 0 the printed complexity is the free
-entropy of the biased measure.
+entropy of the biased measure. The paramagnetic test, which hands the formula
+to WalkSAT, uses the hard site factors 1-pi^+pi^-, because a warning-free
+site has z = e^gamma under the tilt.
 
 ```bash
 ./build/release/bsp --rsb-gamma=0.5 -w 3 4.0 50

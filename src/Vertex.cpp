@@ -109,11 +109,12 @@ bool bsp_pass_margin(double sT, double sF) {
 void Vertex::compute_s() { /*compute surveys variable node*/
     double _p_plus=0.,_p_minus=0.,_p_I=0.;/*declaration local variables*/
     complexity_variable=0.;/*set variable complexity to zero*/
-    if(g_T_cav>0. || g_rsb_gamma!=0.) {/*ThermoSP or unfrozen bias: field star*/
-        ThermoStar _st=cavity_star(true,NULL,prod_V_plus,prod_V_minus,g_T_cav,g_rsb_gamma);
+    if(g_T_cav>0. || g_gamma_eff!=0.) {/*ThermoSP or unfrozen bias: field star*/
+        ThermoStar _st=cavity_star(true,NULL,prod_V_plus,prod_V_minus,g_T_cav,g_gamma_eff);
         _p_plus=_st.pi_s;/*p>q region*/
         _p_minus=_st.pi_u;/*q>p region*/
         _p_I=_st.pi_0;
+        energy_variable=_st.e_mean;/*mean conflict energy of the site, for Sigma_e*/
         if(g_T_cav>0.) {/*free energies need a cavity temperature*/
             /*1e-300 floors the log of an impossible direction, so an
              unconstrained variable keeps bias 0*/
@@ -141,16 +142,18 @@ void Vertex::compute_s() { /*compute surveys variable node*/
 
 /*public member which updates products (1-survey) for V_plus and V_minus sets. These products are usful for computing SP and BP equations in an easy way.*/
 void Vertex::make_products() { /*make products for set V_plus and V_minus*/
-    bool _snap=(g_T_cav>0. or g_rsb_m!=0. or g_rsb_gamma!=0.);/*cache values for the star sums*/
+    bool _snap=(g_T_cav>0. or g_gamma_eff!=0.);/*cache values for the star sums*/
 
     prod_V_plus=1.;/*set the product of V_plus to 1*/
-    if(_snap)snap_plus.resize(_surveys_cl_to_i_plus.size());/*cache values for ThermoSP stars*/
+    if(_snap && snap_plus.size()!=_surveys_cl_to_i_plus.size())
+        snap_plus.resize(_surveys_cl_to_i_plus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_plus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
         if(_snap)snap_plus[i]=*_surveys_cl_to_i_plus[i];
         prod_V_plus*=(1.- *_surveys_cl_to_i_plus[i]);/*compute products for V_plus*/
     }
     prod_V_minus=1.;/*set the product of V_minus to 1*/
-    if(_snap)snap_minus.resize(_surveys_cl_to_i_minus.size());/*cache values for ThermoSP stars*/
+    if(_snap && snap_minus.size()!=_surveys_cl_to_i_minus.size())
+        snap_minus.resize(_surveys_cl_to_i_minus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_minus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
         if(_snap)snap_minus[i]=*_surveys_cl_to_i_minus[i];
         prod_V_minus*=(1.- *_surveys_cl_to_i_minus[i]);/*compute products for V_minus*/
@@ -170,7 +173,9 @@ ThermoStar Vertex::cavity_star(bool b, const double *exclude, double A0, double 
     const vector<double *> &_u_ptr=(b)?_surveys_cl_to_i_minus:_surveys_cl_to_i_plus;
     const vector<double> &_s_val=(b)?snap_plus:snap_minus;
     const vector<double> &_u_val=(b)?snap_minus:snap_plus;
-    vector<double> _es,_eu;
+    static thread_local vector<double> _es, _eu;
+    _es.clear();
+    _eu.clear();
     _es.reserve(_s_ptr.size());
     _eu.reserve(_u_ptr.size());
     for (unsigned long i=0; i<_s_ptr.size(); ++i)

@@ -113,4 +113,28 @@ if cmp -s "$WORK/gbase.trace" "$WORK/g05.trace"; then
     status=1
 fi
 
+# --rsb-m=M is the MMW closure gamma = M ln2, so both flags give one trace.
+mkdir -p "$WORK/m03" "$WORK/gm03"
+m03_rc=0
+gm03_rc=0
+(cd "$WORK/m03" && "$BIN" --outdir=. --rsb-m=0.3 -w 3 3.0 20 --seed=7 >stdout.log 2>stderr.log) || m03_rc=$?
+(cd "$WORK/gm03" && "$BIN" --outdir=. --rsb-gamma=0.20794415416798359 -w 3 3.0 20 --seed=7 >stdout.log 2>stderr.log) || gm03_rc=$?
+trace_sigma "$WORK/m03/stdout.log" > "$WORK/m03.trace"
+trace_sigma "$WORK/gm03/stdout.log" > "$WORK/gm03.trace"
+if [ "$m03_rc" -ne "$gm03_rc" ] || ! numdiff "$WORK/m03.trace" "$WORK/gm03.trace" >"$WORK/numdiff.msg"; then
+    echo "regression_thermo: --rsb-m=0.3 differs from --rsb-gamma=0.3 ln2" >&2
+    status=1
+fi
+
+# At T -> 0 the Bethe complexity Sigma_e = G + y e must equal the legacy Sigma.
+mkdir -p "$WORK/t0" "$WORK/tlow"
+(cd "$WORK/t0" && "$BIN" --outdir=. -w 3 4.0 100 --seed=5 >stdout.log 2>stderr.log)
+(cd "$WORK/tlow" && "$BIN" --outdir=. --cav-temp=1e-9 -w 3 4.0 100 --seed=5 >stdout.log 2>stderr.log)
+trace_sigma "$WORK/t0/stdout.log" > "$WORK/t0.trace"
+trace_sigma "$WORK/tlow/stdout.log" > "$WORK/tlow.trace"
+if ! numdiff "$WORK/t0.trace" "$WORK/tlow.trace" >"$WORK/numdiff.msg"; then
+    echo "regression_thermo: Sigma_e at --cav-temp=1e-9 differs from T=0 ($(cat "$WORK/numdiff.msg"))" >&2
+    status=1
+fi
+
 exit "$status"

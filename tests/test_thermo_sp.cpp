@@ -180,53 +180,9 @@ static void test_gibbs_sampler() {
                  0., 0.);
 }
 
-/*The 1RSB tilt of the note: the masses eta*kappa_warn^m and (1-eta)*kappa_sil^m
- give the same star as the effective messages thermo_tilt, up to the product of
- the message masses.*/
-static void test_rsb_tilt(mt19937 &rng) {
-    uniform_int_distribution<int> deg(0, 5);
-    uniform_real_distribution<double> kap(0.2, 4.);
-    const double ms[] = {-0.7, 0., 0.5, 1.3};
-    for (int trial = 0; trial < 100; ++trial) {
-        vector<double> es, eu;
-        draw_group(rng, (size_t)deg(rng), es);
-        draw_group(rng, (size_t)deg(rng), eu);
-        for (size_t k = 0; k < sizeof(ms) / sizeof(ms[0]); ++k) {
-            vector<double> ja(es.size()), j0(es.size()), et_s(es.size());
-            vector<double> ua(eu.size()), u0(eu.size()), et_u(eu.size());
-            double fac = 1.;
-            for (size_t b = 0; b < es.size(); ++b) {
-                double kw = kap(rng), ks = kap(rng);
-                ja[b] = es[b] * pow(kw, ms[k]);
-                j0[b] = (1. - es[b]) * pow(ks, ms[k]);
-                fac *= ja[b] + j0[b];
-                et_s[b] = thermo_tilt(es[b], kw, ks, ms[k]);
-                if (ms[k] == 0.) expect_close("tilt m=0", et_s[b], es[b], 0.);
-            }
-            for (size_t b = 0; b < eu.size(); ++b) {
-                double kw = kap(rng), ks = kap(rng);
-                ua[b] = eu[b] * pow(kw, ms[k]);
-                u0[b] = (1. - eu[b]) * pow(ks, ms[k]);
-                fac *= ua[b] + u0[b];
-                et_u[b] = thermo_tilt(eu[b], kw, ks, ms[k]);
-            }
-            double A0, B0;
-            hard_products(et_s, et_u, A0, B0);
-            ThermoStar got = thermo_star(et_s.data(), et_s.size(), et_u.data(),
-                                         et_u.size(), A0, B0, 0.4);
-            ThermoStar want = brute_star(ja, j0, ua, u0, 0.4);
-            double tol = 1e-12 * (fabs(want.z) + 1.);
-            expect_close("tilt pi_u", got.pi_u * fac, want.pi_u, tol);
-            expect_close("tilt pi_s", got.pi_s * fac, want.pi_s, tol);
-            expect_close("tilt pi_0", got.pi_0 * fac, want.pi_0, tol);
-            expect_close("tilt z", got.z * fac, want.z, tol);
-        }
-    }
-}
-
 /*The unfrozen bias multiplies only the hard free mass A0*B0. Frozen sectors
- stay put, balanced conflicts at T>0 are not boosted, eta=pi_u/z falls when
- that mass is positive, and thermo_tilt at m=0 stays the identity.*/
+ stay put, balanced conflicts at T>0 are not boosted, and eta=pi_u/z falls when
+ that mass is positive.*/
 static void test_rsb_gamma() {
     const double es[] = {0.2};
     const double eu[] = {0.3};
@@ -261,7 +217,6 @@ static void test_rsb_gamma() {
             }
         }
     }
-    expect_close("tilt m=0 with gamma aside", thermo_tilt(0.4, 1.7, 0.3, 0.), 0.4, 0.);
 }
 
 int main() {
@@ -270,7 +225,6 @@ int main() {
     test_zero_temperature_limit(rng);
     test_partition_sum(rng);
     test_gibbs_sampler();
-    test_rsb_tilt(rng);
     test_rsb_gamma();
     if (failures == 0) printf("bsp-test: all thermo_sp identities hold\n");
     else printf("bsp-test: %d failures\n", failures);

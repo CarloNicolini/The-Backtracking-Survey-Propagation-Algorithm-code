@@ -11,6 +11,14 @@ target_include_directories(bsp_core
 )
 target_compile_features(bsp_core PUBLIC cxx_std_14)
 
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(bsp_core PUBLIC OpenMP::OpenMP_CXX)
+  message(STATUS "BSP OpenMP: ON")
+else()
+  message(STATUS "BSP OpenMP: OFF (serial loops)")
+endif()
+
 # Historical baseline: g++ -Ofast *.cpp (GCC / Clang / AppleClang only).
 target_compile_options(bsp_core PRIVATE
   $<$<CONFIG:Release>:-O3;-ffast-math;-fno-math-errno;-funroll-loops;-fomit-frame-pointer>
