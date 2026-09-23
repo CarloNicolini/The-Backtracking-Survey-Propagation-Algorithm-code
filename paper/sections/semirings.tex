@@ -1,0 +1,205 @@
+\section{Semianelli termodinamici}
+\label{sec:semirings}
+
+Questa sezione richiama le definizioni di Marcolli e Thorngren (MT)~\citep{marcolli2014thermodynamic}.
+Le Proposizioni~\ref{prop:shannon} e~\ref{prop:kl} sono note e le dimostriamo per completezza.
+La Proposizione~\ref{prop:tsallis} è una derivazione nostra, che usa la distribuzione di Curado e Tsallis~\citep{curado1991generalized}.
+Lavoriamo nelle coordinate min-plus, in cui la ``somma'' tropicale è il minimo e il ``prodotto'' è la somma ordinaria.
+In queste coordinate un numero $x$ ha il ruolo di un'energia.
+
+\subsection{Definizione}
+
+Sia $\Delta_n=\{p\in[0,1]^n:\ \sum_ip_i=1\}$ il simplesso delle distribuzioni su $n$ elementi.
+Sia $S$ una funzione di entropia su $\Delta_n$, e sia $T\ge0$ una temperatura.
+
+\begin{definizione}[MT, Def.~4.1]
+\label{def:thermo}
+La somma termodinamica di $x_1,\dots,x_n\in\R\cup\{+\infty\}$ è
+\begin{equation}
+\bigoplus_{S,T}\,(x_1,\dots,x_n)=\min_{p\in\Delta_n}\Bigl[\sum_{i=1}^n p_ix_i-T\,S(p)\Bigr].
+\label{eq:thermo-sum}
+\end{equation}
+Nel caso binario si scrive $x\oplus_{S,T}y=\min_{p\in[0,1]}[px+(1-p)y-TS(p)]$.
+\end{definizione}
+
+La struttura $(\R\cup\{+\infty\},\oplus_{S,T},+)$ è il semianello termodinamico.
+Per $T=0$ la~\eqref{eq:thermo-sum} è il minimo, e si ottiene il semianello tropicale.
+Il termine $\sum_ip_ix_i$ è un'energia media e il termine $-TS(p)$ è il costo entropico, quindi la~\eqref{eq:thermo-sum} è un'energia libera.
+
+\begin{osservazione}[Proprietà algebriche, MT Teor.~3.1 e 4.2]
+L'operazione $\oplus_{S,T}$ è commutativa se e solo se $S(p)=S(1-p)$.
+L'elemento $+\infty$ è neutro se e solo se $S(0)=S(1)=0$.
+L'operazione è associativa se e solo se $S$ soddisfa la relazione di ricorsività
+\begin{equation}
+S(p_1)+(1-p_1)\,S\!\Bigl(\frac{p_2}{1-p_1}\Bigr)=S(p_1+p_2)+(p_1+p_2)\,S\!\Bigl(\frac{p_1}{p_1+p_2}\Bigr).
+\label{eq:assoc}
+\end{equation}
+A meno di una costante moltiplicativa, l'unica entropia che soddisfa le tre condizioni è quella di Shannon, $\Sh(p)=-p\log p-(1-p)\log(1-p)$.
+\end{osservazione}
+
+L'associatività conta per il message passing.
+BP e SP aggregano molti messaggi in ingresso con la stessa operazione.
+Se l'operazione non è associativa, il risultato dipende dall'ordine in cui si combinano i messaggi.
+La legge distributiva generalizzata di Aji e McEliece~\citep{aji2000generalized} richiede un semianello commutativo, cioè una somma associativa e commutativa e un prodotto che distribuisce sulla somma.
+
+\subsection{Shannon: la somma di Gibbs--Maslov}
+
+\begin{proposizione}[MT, Prop.~4.3]
+\label{prop:shannon}
+Con l'entropia di Shannon $S=H(p)=-\sum_ip_i\log p_i$ e $T>0$ vale
+\begin{equation}
+\bigoplus_{\Sh,T}(x_1,\dots,x_n)=-T\log\sum_{i=1}^ne^{-x_i/T},
+\label{eq:shannon-sum}
+\end{equation}
+e il minimo è raggiunto nella distribuzione di Gibbs $p_i^*=e^{-x_i/T}/\sum_je^{-x_j/T}$.
+\end{proposizione}
+
+\begin{proof}
+Poniamo $Z=\sum_je^{-x_j/T}$ e $g_i=e^{-x_i/T}/Z$.
+Allora $x_i=-T\log g_i-T\log Z$.
+Sostituendo si ottiene, per ogni $p\in\Delta_n$,
+\begin{equation*}
+\sum_ip_ix_i-TH(p)=-T\log Z+T\sum_ip_i\log\frac{p_i}{g_i}=-T\log Z+T\,\KL(p\,\|\,g).
+\end{equation*}
+L'entropia relativa $\KL(p\|g)$ è non negativa e vale zero se e solo se $p=g$.
+Quindi il minimo vale $-T\log Z$ ed è raggiunto in $p=g$.
+\end{proof}
+
+Questa identità è il principio variazionale di Gibbs.
+La mappa $x\mapsto e^{-x/T}$ trasforma $\oplus_{\Sh,T}$ nella somma ordinaria e $+$ nel prodotto ordinario.
+Quindi, a $T$ fisso, il semianello di Shannon è isomorfo al semianello $(\R_{\ge0},+,\times)$ di BP.
+A $T$ fisso esso non contiene nuova algebra: $T$ è una scala.
+L'informazione nuova sta nella famiglia in $T$ e nel limite $T\to0$, in cui la~\eqref{eq:shannon-sum} tende a $\min_ix_i$.
+Il parametro $T$ coincide con il parametro $h$ della dequantizzazione di Maslov~\citep{litvinov2007maslov}.
+Per questa ragione il semianello di Shannon si chiama anche semianello di Gibbs--Maslov.
+
+\subsection{Entropia relativa}
+
+\begin{proposizione}
+\label{prop:kl}
+Sia $\pi\in\Delta_n$ con $\pi_i>0$.
+Con $S(p)=-\KL(p\|\pi)$ e $T>0$ vale
+\begin{equation}
+\bigoplus_{\KL(\cdot\|\pi),T}(x_1,\dots,x_n)=\min_{p\in\Delta_n}\Bigl[\sum_ip_ix_i+T\,\KL(p\,\|\,\pi)\Bigr]=-T\log\sum_{i=1}^n\pi_i\,e^{-x_i/T}.
+\label{eq:kl-sum}
+\end{equation}
+\end{proposizione}
+
+\begin{proof}
+Si ripete la dimostrazione precedente con $g_i=\pi_ie^{-x_i/T}/Z_\pi$ e $Z_\pi=\sum_j\pi_je^{-x_j/T}$.
+Si ottiene $\sum_ip_ix_i+T\KL(p\|\pi)=-T\log Z_\pi+T\KL(p\|g)$.
+\end{proof}
+
+MT studiano il caso binario nella Sezione~8.
+Con $\pi$ uniforme si ha $\KL(p\|\pi)=\log n-H(p)$, e la~\eqref{eq:kl-sum} è la~\eqref{eq:shannon-sum} più la costante $T\log n$.
+Con $\pi$ non uniforme l'operazione non è commutativa, perché il peso $\pi_i$ è legato alla posizione $i$.
+La~\eqref{eq:kl-sum} è la forma che compare nelle equazioni di cavità: la distribuzione $\pi$ è la probabilità a priori delle configurazioni dei messaggi in ingresso, e $x_i$ è il costo in energia della configurazione $i$ (Sezione~\ref{sec:spy}).
+
+\subsection{Rényi}
+
+L'entropia di Rényi di ordine $\alpha>0$, $\alpha\ne1$, è
+\begin{equation}
+\Ry_\alpha(p)=\frac{1}{1-\alpha}\log\sum_ip_i^{\alpha},
+\label{eq:renyi}
+\end{equation}
+e tende a $H(p)$ per $\alpha\to1$~\citep{renyi1961measures}.
+È additiva su sistemi indipendenti ma non soddisfa la~\eqref{eq:assoc}.
+Quindi $\oplus_{\Ry_\alpha,T}$ è commutativa ma non associativa.
+Il Lemma~6.1 di MT mostra che il difetto di associatività si corregge con la permutazione $(p_1,p_2,p_3)\mapsto(p_3,p_2,p_1)$.
+Per $T\to0$ anche $\oplus_{\Ry_\alpha,T}$ tende al minimo.
+Nella Sezione~\ref{sec:qaxis} l'entropia di Rényi non entra come operazione di messaggio ma come misura dei pesi dei cluster.
+
+\subsection{Tsallis e la somma deformata}
+
+L'entropia di Tsallis di indice $q>0$, $q\ne1$, è
+\begin{equation}
+S_q(p)=\frac{1-\sum_ip_i^{\,q}}{q-1},
+\label{eq:tsallis}
+\end{equation}
+e tende a $H(p)$ per $q\to1$~\citep{tsallis1988possible}.
+Non è additiva su sistemi indipendenti: $S_q(A\star B)=S_q(A)+S_q(B)+(1-q)S_q(A)S_q(B)$.
+Anche $\oplus_{S_q,T}$ non è associativa.
+MT (Sezione~7.1, eq.~(7.4)) introducono un'operazione deformata.
+Nelle coordinate min-plus essa si scrive
+\begin{equation}
+x\oplus_{S,T,q}y=\min_{p\in[0,1]}\bigl[p^{q}x+(1-p)^{q}y-T\,S(p)\bigr].
+\label{eq:tsallis-op}
+\end{equation}
+Il Teorema~7.2 di MT afferma che l'operazione~\eqref{eq:tsallis-op} è associativa se e solo se $S$ soddisfa la versione deformata della~\eqref{eq:assoc}, in cui i fattori $(1-p_1)$ e $(p_1+p_2)$ sono elevati alla $q$.
+Il Teorema~7.1 afferma che l'entropia di Tsallis è l'unica entropia commutativa, con la proprietà di identità, che soddisfa questa condizione.
+La deformazione sposta la potenza $q$ dal termine di entropia al termine di energia: l'energia media diventa $U_q=\sum_ip_i^{q}x_i$.
+Questa è la ``seconda scelta'' di Curado e Tsallis~\citep{curado1991generalized}.
+
+\begin{proposizione}[Forma chiusa della somma di Tsallis]
+\label{prop:tsallis}
+Siano $x_i\ge0$ e $T>0$.
+Poniamo $\lnq u=(u^{1-q}-1)/(1-q)$ ed $\eq(u)=[1+(1-q)u]_+^{1/(1-q)}$, dove $[z]_+=\max(z,0)$.
+Allora
+\begin{equation}
+F_q(x;T)\equiv\min_{p\in\Delta_n}\Bigl[\sum_ip_i^{\,q}x_i-T\,S_q(p)\Bigr]=-T\,\lnq\sum_{i=1}^n\eq(-x_i/T),
+\label{eq:tsallis-closed}
+\end{equation}
+e il minimo è raggiunto in $p_i^*\propto\eq(-x_i/T)$.
+Per $q\to1$ la~\eqref{eq:tsallis-closed} tende alla~\eqref{eq:shannon-sum}.
+\end{proposizione}
+
+\begin{proof}
+Riscriviamo la funzione obiettivo come
+\begin{equation*}
+\mathcal F(p)=\sum_ip_i^{\,q}x_i+\frac{T}{q-1}\Bigl(\sum_ip_i^{\,q}-1\Bigr)=\frac{T}{q-1}\Bigl[\sum_ip_i^{\,q}\,u_i-1\Bigr],\qquad u_i=1+\frac{(q-1)x_i}{T}.
+\end{equation*}
+Caso $q>1$.
+Si ha $u_i>0$, e $\mathcal F$ è strettamente convessa, perché $p\mapsto p^q$ è strettamente convessa e il coefficiente $u_iT/(q-1)$ è positivo.
+Il punto stazionario del lagrangiano $\mathcal F(p)+\lambda(\sum_ip_i-1)$ è quindi il minimo globale.
+La condizione di stazionarietà è $q\,p_i^{\,q-1}u_iT/(q-1)=-\lambda$, quindi $p_i\propto u_i^{-1/(q-1)}=\eq(-x_i/T)$.
+Poniamo $Z_q=\sum_ju_j^{-1/(q-1)}$, così che $p_i=u_i^{-1/(q-1)}/Z_q$.
+Allora $p_i^{\,q}u_i=u_i^{-1/(q-1)}Z_q^{-q}$, e $\sum_ip_i^{\,q}u_i=Z_q^{1-q}$.
+Il valore minimo è $T(Z_q^{1-q}-1)/(q-1)=-T\lnq Z_q$.
+
+Caso $0<q<1$.
+Si ha $\mathcal F(p)=\frac{T}{1-q}\bigl[1-\sum_ip_i^{\,q}u_i\bigr]$.
+Se $u_i\le0$, il termine $-p_i^{\,q}u_i$ è non negativo e il minimo pone $p_i=0$.
+Questo è il taglio (cutoff) della distribuzione di Tsallis per $q<1$.
+Sugli indici con $u_i>0$ la funzione $-\sum_ip_i^qu_i$ è strettamente convessa, e il calcolo del caso precedente dà lo stesso risultato con $Z_q=\sum_{u_j>0}u_j^{1/(1-q)}=\sum_j\eq(-x_j/T)$.
+
+Per $q\to1$ si ha $\eq(u)\to e^{u}$ e $\lnq\to\log$.
+\end{proof}
+
+Abbiamo verificato numericamente la~\eqref{eq:tsallis-closed} con una minimizzazione diretta sul simplesso per alcuni valori di $(q,T)$.
+
+\begin{corollario}[Limite $T\to0$ della somma di Tsallis]
+\label{cor:tsallis-T0}
+Siano $x_i>0$.
+Per $0<q\le1$ si ha $\lim_{T\to0}F_q(x;T)=\min_ix_i$.
+Per $q>1$ si ha
+\begin{equation}
+\lim_{T\to0}F_q(x;T)=\min_{p\in\Delta_n}\sum_ip_i^{\,q}x_i=\Bigl(\sum_ix_i^{-1/(q-1)}\Bigr)^{-(q-1)}.
+\label{eq:power-mean}
+\end{equation}
+Questo valore è strettamente minore di $\min_ix_i$ se almeno due $x_i$ sono finiti, e tende a $\min_ix_i$ per $q\to1^+$.
+\end{corollario}
+
+\begin{proof}
+Per $T\to0$ il termine $-TS_q$ scompare, perché $S_q$ è limitata sul simplesso.
+Resta il minimo di $U_q(p)=\sum_ip_i^qx_i$.
+Per $q<1$ la funzione $U_q$ è concava, quindi il minimo è in un vertice del simplesso e vale $\min_ix_i$.
+Per $q=1$ la funzione è lineare e il risultato è lo stesso.
+Per $q>1$ la funzione è strettamente convessa.
+La stazionarietà dà $p_i\propto x_i^{-1/(q-1)}$, e sostituendo si ottiene la~\eqref{eq:power-mean}.
+Ogni termine della somma in~\eqref{eq:power-mean} è positivo, quindi la somma supera $(\min_ix_i)^{-1/(q-1)}$ e il valore è minore di $\min_ix_i$.
+Per $q\to1^+$ l'esponente $1/(q-1)$ tende a infinito, e la media di potenze tende al minimo.
+\end{proof}
+
+Il corollario dice che la somma di Tsallis deformata con $q>1$ non si dequantizza al semianello tropicale.
+Il suo limite $T\to0$ è una media di potenze, non il minimo.
+I due limiti iterati danno entrambi il minimo: $\lim_{T\to0}\lim_{q\to1}F_q=\min_ix_i$ e $\lim_{q\to1^+}\lim_{T\to0}F_q=\min_ix_i$.
+Il quadrato dei limiti quindi commuta, ma a $q>1$ fisso il limite $T\to0$ ha un vertice diverso dal minimo.
+Questo fatto compare nel diagramma della Sezione~\ref{sec:diagrams}.
+
+\subsection{Funzione successore e cumulanti}
+
+MT definiscono la funzione successore $\lambda(x,T)=x\oplus_{S,T}0$ (Sezione~9).
+Essa è la trasformata di Legendre di $TS$.
+La Proposizione~9.4 di MT afferma che $-\lambda/T$ è la funzione generatrice dei cumulanti dell'energia.
+Nel caso di Shannon questa è la relazione usuale fra energia libera e cumulanti.
+Nella Sezione~\ref{sec:spy} la useremo nella forma seguente: $G(y)=-y\Phi(y)$ è la funzione generatrice dei cumulanti dell'energia degli stati, per variabile, e la trasformata~\eqref{eq:Phi-y} è la relazione di Gärtner--Ellis fra questa funzione e la complessità~\citep{touchette2009large}.

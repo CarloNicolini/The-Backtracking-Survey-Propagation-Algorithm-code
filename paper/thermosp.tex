@@ -1,0 +1,79 @@
+\documentclass{article}
+\usepackage{iclr2027_conference,times}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{amsmath,amssymb,amsfonts,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{tikz-cd}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{microtype}
+
+\title{Semianelli termodinamici e survey propagation\\
+\large Una mappa delle deformazioni di SP e BSP nel $K$-SAT casuale}
+
+\author{Carlo Nicolini\\
+Raffaele Marino\\
+\texttt{c.nicolini@ipazia.com}}
+
+\newtheorem{proposizione}{Proposizione}
+\newtheorem{lemma}[proposizione]{Lemma}
+\newtheorem{corollario}[proposizione]{Corollario}
+\theoremstyle{definition}
+\newtheorem{definizione}[proposizione]{Definizione}
+\theoremstyle{remark}
+\newtheorem{osservazione}[proposizione]{Osservazione}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Sig}{\Sigma}
+\newcommand{\Tact}{T_{\mathrm{act}}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\Sh}{\mathrm{Sh}}
+\newcommand{\Ry}{\mathrm{Ry}}
+\newcommand{\Ts}{\mathrm{Ts}}
+\newcommand{\lnq}{\ln_q}
+\newcommand{\eq}{e_q}
+\newcommand{\us}{\partial^{s}_{a} i}
+\newcommand{\uu}{\partial^{u}_{a} i}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Nel $K$-SAT casuale, vicino alla soglia di soddisfacibilità, le soluzioni si dividono in un numero esponenziale di cluster.
+La survey propagation (SP) conta questi cluster e guida la decimazione.
+Il backtracking survey propagation (BSP) aggiunge mosse che liberano variabili già fissate.
+Esistono già molte deformazioni di SP: la versione energetica SP-$y$, la versione entropica con parametro di Parisi $m$, la famiglia SP$(\rho)$ di Maneva, Mossel e Wainwright.
+La maggior parte del lavoro non propone un nuovo algoritmo.
+Organizziamo le deformazioni note in un unico quadro, quello dei semianelli termodinamici di Marcolli e Thorngren, e deriviamo passo per passo tutte le equazioni.
+Mostriamo che la somma termodinamica di Shannon descrive due livelli distinti: l'aggregazione locale dei warning, con un'entropia relativa, e il potenziale 1RSB sui cluster.
+Mostriamo che l'ordine di Rényi dei pesi dei cluster coincide con il parametro di Parisi $m$ e dà lo spettro multifrattale dei cluster.
+Per l'entropia di Tsallis ricaviamo la forma chiusa della somma deformata, il suo limite a temperatura nulla e il suo effetto sul potenziale dei cluster.
+Con $q$ fisso la deformazione degenera nei limiti noti.
+Con $q-1$ di ordine $1/N$ essa dà un ensemble canonico generalizzato, cioè SP-$y$ con un $y$ efficace che dipende dall'energia.
+Infine ricaviamo un'identità esatta per la variazione della complessità quando si fissa o si libera una variabile, e la confrontiamo con i criteri di BSP e di Battaglia, Kolář e Zecchina.
+Dall'identità e dalle equazioni di Bellman soft del Soft Actor-Critic ricaviamo una variante di BSP con un look-ahead soft a due passi, e verifichiamo in Lean~4 le affermazioni algebriche su cui si basa.
+Un insieme di diagrammi commutativi riassume quali limiti portano a quali algoritmi.
+\end{abstract}
+
+\input{sections/intro}
+\input{sections/notation}
+\input{sections/sp_bsp}
+\input{sections/semirings}
+\input{sections/spy}
+\input{sections/qaxis}
+\input{sections/response}
+\input{sections/softq}
+\input{sections/diagrams}
+\input{sections/discussion}
+
+\bibliography{thermosp}
+\bibliographystyle{iclr2027_conference}
+
+\end{document}

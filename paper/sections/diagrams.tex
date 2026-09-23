@@ -1,0 +1,85 @@
+\section{Diagrammi dei limiti}
+\label{sec:diagrams}
+
+Questa sezione riassume le derivazioni in quattro diagrammi.
+Ogni freccia è un limite o una scelta di parametri, e l'etichetta dice quale.
+Una freccia tratteggiata indica un limite formale, senza un significato fisico diretto.
+Dopo ogni diagramma diciamo quali cammini commutano, cioè portano allo stesso oggetto.
+
+\subsection{Potenziali 1RSB}
+
+\begin{equation*}
+\begin{tikzcd}[column sep=4.2em,row sep=3.2em]
+& \Xi(\beta,m) \arrow[dl,"{\beta\to\infty,\ m\ \text{fisso}}"'] \arrow[dr,"{\beta\to\infty,\ \beta m=y}"] & \\
+\varphi(m)\ \text{(entropico)} \arrow[d,"m=1"'] \arrow[dr,"m\to0"'] & & G(y)=-y\Phi(y)\ \text{(SP-}y) \arrow[dl,"y\to\infty"] \arrow[d,dashed,"y\to0"] \\
+\text{BP sulle soluzioni} & \Sig_{\mathrm{SP}}\ \text{(SP)} & \sup_e\Sig_e(e)
+\end{tikzcd}
+\end{equation*}
+
+Il cammino di sinistra conta i cluster di soluzioni pesati con $|C|^m$ e poi prende $m\to0$.
+Il cammino di destra pesa gli stati con $e^{-yE_\alpha}$ e poi prende $y\to\infty$.
+I due cammini commutano nella fase SAT, nel senso della Sezione~\ref{sec:notation}: le equazioni entropiche a $m\to0$, ristrette ai messaggi congelati, sono le equazioni SP.
+Il vertice $m=1$ è BP sulla misura uniforme delle soluzioni.
+La freccia $y\to0$ è tratteggiata perché il ramo a $y$ piccolo esce dalla regione di stabilità della 1RSB.
+Sul lato sinistro l'ordine di Rényi dei pesi dei cluster è $m$ (Proposizione~\ref{prop:renyi-m}), e per $\alpha_c<\alpha<\alpha_s$ tutti gli ordini $m\ge m^*$ danno $h_m=0$.
+Per $\alpha\to\alpha_s$ si ha $m^*\to0$, e la parte utile del lato sinistro si riduce al vertice SP.
+
+\subsection{Semianelli termodinamici}
+
+\begin{equation*}
+\begin{tikzcd}[column sep=5.2em,row sep=3.6em]
+\oplus_{\KL(\cdot\|\pi),T} \arrow[r,"\pi\ \text{uniforme}"] & \oplus_{\Sh,T} \arrow[d,"T\to0"] & \oplus_{S_q,T,q} \arrow[l,"q\to1"'] \arrow[dl,"{T\to0,\ q\le1}"'] \arrow[d,"{T\to0,\ q>1}"] \\
+\oplus_{\Ry_\alpha,T} \arrow[ur,"\alpha\to1"] \arrow[r,"T\to0"'] & \min\ \text{(tropicale)} & M_q\ \text{(media di potenze)} \arrow[l,"q\to1^+"]
+\end{tikzcd}
+\end{equation*}
+
+Qui $\oplus_{S_q,T,q}$ è la somma di Tsallis deformata~\eqref{eq:tsallis-op}, e $M_q$ è la media di potenze~\eqref{eq:power-mean}.
+La freccia da $\oplus_{\KL(\cdot\|\pi),T}$ a $\oplus_{\Sh,T}$ vale a meno della costante $T\log n$.
+Tutti i quadrati commutano come limiti iterati.
+L'unico vertice non tropicale è $M_q$: a $q>1$ fisso il limite $T\to0$ della somma di Tsallis non è il minimo (Corollario~\ref{cor:tsallis-T0}).
+Fra le operazioni del diagramma, sono associative e commutative solo $\oplus_{\Sh,T}$, il minimo e, con il prodotto deformato di MT, $\oplus_{S_q,T,q}$.
+L'operazione $\oplus_{\Ry_\alpha,T}$ è commutativa ma non associativa.
+L'operazione $\oplus_{\KL(\cdot\|\pi),T}$ con $\pi$ non uniforme non è commutativa.
+
+\subsection{Dai semianelli ai livelli di SP}
+
+\begin{equation*}
+\begin{tikzcd}[column sep=3.4em,row sep=3.4em]
+\mathcal Z_q(y),\ q-1=\kappa/N \arrow[r,"\text{Cor.~\ref{cor:yeff}}"] \arrow[d,"\kappa\to0"'] & \text{SP-}y\ \text{a}\ y_{\mathrm{eff}} \arrow[d,"y_{\mathrm{eff}}\to y"] & \\
+\oplus_{\Sh,1/y}\{E_\alpha\}=N\Phi(y) \arrow[r,"\eqref{eq:reweight}"] & \text{SP-}y:\ \oplus_{\KL(\cdot\|P_0),1/y}\{\Delta E(\omega)\} \arrow[r,"y\to\infty"] & \text{SP} \\
+\mathcal Z_q(y),\ q>1\ \text{fisso} \arrow[u,dashed,"{=\lim_{y\to0}}"'] & & \mathcal Z_q(y),\ q<1\ \text{fisso} \arrow[u,"{=\lim_{y\to\infty}}"']
+\end{tikzcd}
+\end{equation*}
+
+La riga centrale è la derivazione della Sezione~\ref{sec:spy}.
+La somma di Shannon sulle energie degli stati genera il reweighting di cavità, e il reweighting dà le somme di settore con entropia relativa.
+La riga alta è la deformazione di Tsallis in scala $1/N$: essa dà di nuovo SP-$y$, con un $y$ efficace.
+La riga bassa contiene le deformazioni di Tsallis a $q$ fisso, che degenerano nei due estremi dell'asse $y$ (Proposizione~\ref{prop:tsallis-regimes}).
+Le frecce della riga bassa sono uguaglianze fra potenziali: con $q>1$ fisso si ottiene il potenziale del limite $y\to0$, con $q<1$ fisso quello del limite $y\to\infty$.
+
+\subsection{Algoritmi}
+
+\begin{equation*}
+\begin{tikzcd}[column sep=3.6em,row sep=3.4em]
+\text{SP-Y}(y,r),\ b_{\mathrm{back}} \arrow[r,"y\to\infty"] \arrow[d,"r=0"'] & \text{BSP}(r),\ b_{\mathrm{back}}|_{y=\infty} \arrow[d,"r=0"] & \text{BSP}(r),\ b_k \arrow[dl,"r=0"] \\
+\text{SP-}y\ \text{e decimazione} \arrow[r,"y\to\infty"'] & \text{SID} &
+\end{tikzcd}
+\end{equation*}
+
+Il quadrato a sinistra commuta.
+Il vertice in alto al centro non è BSP: è BSP con l'indice~\eqref{eq:bkz-index} a $y=\infty$ al posto del bias~\eqref{eq:bias}.
+BSP e questa variante differiscono solo nella regola di rilascio, e coincidono per $r=0$.
+La Sezione~\ref{sec:response} dà una terza regola di rilascio, $I_k$ in~\eqref{eq:Ik}, che si colloca nello stesso vertice.
+
+\begin{equation*}
+\begin{tikzcd}[column sep=4.4em,row sep=3.4em]
+& \text{BP sulle soluzioni} & \\
+\text{BP}(\omega_o,\omega_*) \arrow[r,"\omega_o+\omega_*=1"] \arrow[d,"{\omega_o=0,\ \omega_*=e^\gamma}"'] & \text{SP}(\rho),\ \rho=\omega_* \arrow[r,"\rho=1"] \arrow[u,"\rho=0"'] & \text{SP} \\
+\text{tilt}\ \gamma\ \text{(messaggi completi)} \arrow[urr,"\gamma=0"'] & &
+\end{tikzcd}
+\end{equation*}
+
+Questo diagramma è il piano di MMW.
+La retta $\omega_o+\omega_*=1$ è la famiglia SP$(\rho)$, e su di essa i messaggi si chiudono su una sola survey.
+La retta $\omega_o=0$ è il tilt $\gamma$ verso gli stati $*$.
+Essa incontra la retta di SP$(\rho)$ solo nel punto SP, per la Proposizione~\ref{prop:gamma}.

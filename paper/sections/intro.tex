@@ -1,0 +1,45 @@
+\section{Introduzione}
+\label{sec:intro}
+
+Il problema di soddisfacibilità booleana casuale ($K$-SAT) è un banco di prova per la meccanica statistica dei sistemi disordinati e per gli algoritmi di ricerca~\citep{mezard2009information}.
+Al crescere della densità di clausole $\alpha$ le soluzioni si dividono in cluster, poi la misura si condensa su pochi cluster, infine le soluzioni scompaiono alla soglia $\alpha_s$~\citep{mezard2002analytic,krzakala2007clusters,montanari2008clusters}.
+Il metodo della cavità con rottura di simmetria di replica a un passo (1RSB) descrive questa geometria~\citep{mezard2001bethe,mezard2003cavity}.
+La survey propagation (SP) è il limite della 1RSB che conta i cluster senza pesarli~\citep{mezard2002analytic,mezard2002random,braunstein2005survey}.
+La decimazione guidata da SP fissa le variabili più polarizzate e ricalcola i messaggi sulla formula ridotta.
+Il BSP di Marino, Parisi e Ricci-Tersenghi~\citep{marino2016bsp} alterna la decimazione con mosse di backtracking e raggiunge densità più vicine alla soglia $\alpha_s$.
+
+Le deformazioni di SP sono note da tempo.
+Mézard e Zecchina~\citep{mezard2002random} introducono un parametro di reweighting $y$ che pesa gli stati con la loro energia, e Battaglia, Kolář e Zecchina~\citep{battaglia2004minimizing} usano la versione SP-$y$ con backtracking per minimizzare l'energia nella fase UNSAT.
+Mézard, Palassini e Rivoire~\citep{mezard2005landscape} e Krzakala e coautori~\citep{krzakala2007clusters} pesano i cluster di soluzioni con la loro dimensione elevata al parametro di Parisi $m$.
+Braunstein e Zecchina~\citep{braunstein2004surveybp} e Maneva, Mossel e Wainwright~\citep{maneva2007survey} mostrano che SP è belief propagation (BP) su uno spazio esteso, e la famiglia SP$(\rho)$ interpola fra SP e BP.
+Wemmenhove e Kappen~\citep{wemmenhove2006finite} studiano SP a temperatura finita.
+
+Marcolli e Thorngren~\citep{marcolli2014thermodynamic} definiscono i semianelli termodinamici.
+In essi la somma di due numeri è un problema variazionale con un termine di entropia e una temperatura $T$.
+Con l'entropia di Shannon si ottiene l'operazione $-T\log(e^{-x/T}+e^{-y/T})$, che per $T\to 0$ diventa il minimo tropicale.
+Con altre entropie (Rényi, Tsallis, entropia relativa) l'operazione perde alcune proprietà algebriche o richiede una deformazione del prodotto.
+La domanda di questo lavoro è la seguente.
+Quali deformazioni di SP sono esattamente deformazioni di semianello, a quale livello della teoria agiscono, e quali limiti le collegano a SP, a BP, a SP-$y$ e a BSP?
+
+\paragraph{Cosa è noto e cosa è nostro.}
+Le equazioni SP, SP-$y$, SP$(\rho)$, il potenziale 1RSB, il criterio di bias di BSP e l'indice di backtracking di Battaglia, Kolář e Zecchina sono risultati noti, e li citiamo come tali.
+Anche i semianelli termodinamici e le loro proprietà di associatività sono risultati noti~\citep{marcolli2014thermodynamic}.
+I nostri contributi sono osservazioni con dimostrazione, che collegano questi risultati.
+\begin{enumerate}
+\item Una derivazione passo per passo di SP-$y$ per il $K$-SAT, scritta come somma termodinamica con entropia relativa rispetto alla distribuzione dei warning (Sezione~\ref{sec:spy}).
+\item La distinzione fra due livelli: la somma di Shannon sui cluster definisce il potenziale $\Phi(y)$, e da essa segue il reweighting locale $e^{-y\Delta E}$. La temperatura locale e il parametro $y$ quindi non sono indipendenti (Sezione~\ref{sec:spy}).
+\item L'identità fra l'ordine di Rényi dei pesi dei cluster e il parametro di Parisi $m$, con la lettura multifrattale e il comportamento vicino ad $\alpha_s$ (Sezione~\ref{sec:qaxis}).
+\item La forma chiusa della somma di Tsallis deformata, il suo limite $T\to0$ e l'effetto di una deformazione di Tsallis sul potenziale dei cluster (Sezioni~\ref{sec:semirings} e~\ref{sec:qaxis}).
+\item Un'identità esatta per la variazione del funzionale di Bethe della complessità quando si fissa una variabile, con il resto di secondo ordine (Sezione~\ref{sec:response}).
+\item Una variante di BSP con un look-ahead soft a due passi, che collega le equazioni di Bellman soft del Soft Actor-Critic~\citep{haarnoja2018soft} all'identità locale, con le affermazioni algebriche verificate in Lean~4 (Sezione~\ref{sec:softq}).
+\item Diagrammi commutativi che riassumono i limiti (Sezione~\ref{sec:diagrams}).
+\end{enumerate}
+Le prove numeriche delle deformazioni fatte finora con il nostro codice sono troppo piccole per distinguere un effetto dal rumore statistico.
+
+\paragraph{Guida alla lettura.}
+La Sezione~\ref{sec:notation} definisce il problema, i cluster e i due limiti del potenziale 1RSB.
+La Sezione~\ref{sec:spbsp} richiama SP, il suo funzionale di complessità e gli algoritmi SID, BSP e SP-$y$ con backtracking.
+La Sezione~\ref{sec:semirings} richiama i semianelli termodinamici e ne deriva le formule che usiamo.
+Le Sezioni~\ref{sec:spy}--\ref{sec:response} contengono le derivazioni.
+La Sezione~\ref{sec:softq} propone la variante con look-ahead soft.
+La Sezione~\ref{sec:diagrams} raccoglie i diagrammi, e la Sezione~\ref{sec:discussion} elenca i problemi aperti.

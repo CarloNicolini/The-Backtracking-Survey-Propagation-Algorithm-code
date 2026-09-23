@@ -1,0 +1,190 @@
+\section{SP-$y$ passo per passo}
+\label{sec:spy}
+
+Questa sezione deriva le equazioni SP-$y$ per il $K$-SAT.
+Le equazioni sono di Mézard e Zecchina~\citep{mezard2002random} e di Battaglia, Kolář e Zecchina~\citep{battaglia2004minimizing}.
+Le scriviamo con l'energia $1$ per clausola violata.
+Le convenzioni sull'energia e sulla normalizzazione delle survey cambiano fra quei lavori, e nel confronto il parametro $y$ può differire per un fattore $2$.
+Il contributo di questa sezione è la lettura in termini di semianelli, a due livelli distinti.
+
+\subsection{Livello dei cluster: il potenziale come somma di Shannon}
+
+Sia $\{E_\alpha\}$ l'insieme delle energie degli stati.
+Per la Proposizione~\ref{prop:shannon} con $T=1/y$ si ha
+\begin{equation}
+N\,\Phi_N(y)\equiv-\frac1y\log\sum_\alpha e^{-yE_\alpha}=\bigoplus_{\Sh,1/y}\,\{E_\alpha\}_\alpha
+=\min_{\rho}\Bigl[\sum_\alpha\rho_\alpha E_\alpha-\frac1y\,H(\rho)\Bigr],
+\label{eq:Phi-shannon}
+\end{equation}
+dove $\rho$ è una distribuzione sugli stati.
+Il minimo è la distribuzione di Gibbs $\rho_\alpha^*\propto e^{-yE_\alpha}$.
+Nel limite $N\to\infty$ la distribuzione $\rho^*$ si concentra sugli stati con energia vicina a $Ne^*(y)$.
+Il loro numero è $e^{N\Sig_e(e^*)}$, quindi $H(\rho^*)=N\Sig_e(e^*)+o(N)$.
+La~\eqref{eq:Phi-shannon} diventa $\Phi=e^*-\Sig_e(e^*)/y$, che è la~\eqref{eq:Phi-y}.
+
+\begin{osservazione}
+\label{oss:two-levels}
+La complessità $\Sig_e(e^*)$ è l'entropia di Shannon, per variabile, della misura di Gibbs sugli stati alla temperatura $T=1/y$.
+Il potenziale $\Phi(y)$ è la somma termodinamica di Shannon delle energie degli stati.
+Ci sono due dequantizzazioni.
+Il limite $y\to\infty$, cioè $T\to0$, dà il minimo tropicale $\min_\alpha E_\alpha$.
+Il limite $N\to\infty$, con parametro $1/N$, dà la trasformata di Legendre~\eqref{eq:Phi-y}.
+\end{osservazione}
+
+\subsection{Il reweighting di cavità segue dal livello dei cluster}
+
+Consideriamo il grafo di cavità in cui manca la variabile $j$, e aggiungiamo $j$ con le sue clausole.
+Ogni stato $\alpha$ del grafo di cavità genera uno stato del grafo allargato con energia $E_\alpha+\Delta E_\alpha$, dove $\Delta E_\alpha\ge0$ è il numero minimo di clausole violate che l'aggiunta introduce.
+Allora
+\begin{equation}
+\sum_{\alpha}e^{-y(E_\alpha+\Delta E_\alpha)}=\Bigl(\sum_\alpha e^{-yE_\alpha}\Bigr)\ \E_{\rho^*}\bigl[e^{-y\Delta E}\bigr].
+\label{eq:reweight}
+\end{equation}
+La distribuzione delle grandezze locali nel grafo allargato è quindi la distribuzione nel grafo di cavità moltiplicata per $e^{-y\Delta E}$ e normalizzata.
+Mézard e Zecchina ottengono lo stesso fattore dal punto di vista microcanonico (eq.~(33) di~\citep{mezard2002random}).
+Il numero di stati con energia $E-\Delta E$ nel grafo di cavità è $e^{N\Sig_e((E-\Delta E)/N)}\simeq e^{N\Sig_e(E/N)}\,e^{-y\Delta E}$, con $y=\Sig_e'(e)$.
+
+\begin{osservazione}
+\label{oss:no-free-T}
+Il parametro $y$ dell'aggregazione locale e il parametro $y$ del potenziale dei cluster sono lo stesso numero.
+Una temperatura locale scelta in modo indipendente non corrisponde a nessun potenziale 1RSB.
+\end{osservazione}
+
+\subsection{Livello locale: warning, costo e settori}
+
+Fissiamo il lato $(j,a)$.
+La variabile $j$ riceve i warning $u_{b\to j}$ dalle clausole $b\in\partial j\setminus a$.
+Sia $\omega=(u_{b\to j})_{b\in\partial j\setminus a}$ la configurazione dei warning.
+Contiamo i warning che spingono verso il valore che soddisfa $a$ e quelli che spingono verso il valore opposto:
+\begin{equation}
+p(\omega)=\sum_{b\in\partial^s_aj}u_{b\to j},\qquad q(\omega)=\sum_{b\in\partial^u_aj}u_{b\to j}.
+\end{equation}
+
+\paragraph{Passo 1: la distribuzione a priori.}
+Nel grafo di cavità i warning sono indipendenti, quindi
+\begin{equation}
+P_0(\omega)=\prod_{b\in\partial j\setminus a}\bigl[(1-\eta_{b\to j})\,\delta_{u_{b\to j},0}+\eta_{b\to j}\,\delta_{u_{b\to j},1}\bigr].
+\label{eq:prior}
+\end{equation}
+
+\paragraph{Passo 2: il costo.}
+Ogni warning dice che la clausola $b$ ha tutte le altre variabili congelate contro di sé.
+Se $x_j$ non segue il warning, la clausola $b$ è violata.
+La scelta migliore di $x_j$ segue il lato con più warning, e il costo è
+\begin{equation}
+\Delta E(\omega)=\min\bigl(p(\omega),q(\omega)\bigr).
+\label{eq:cost}
+\end{equation}
+Le clausole che non mandano warning hanno una variabile libera o una variabile che le soddisfa, e non costano nulla.
+
+\paragraph{Passo 3: i settori.}
+Il messaggio da $j$ ad $a$ dipende solo dal lato vincente.
+Definiamo tre settori:
+\begin{equation}
+\Omega_u=\{\omega:\ q>p\},\qquad\Omega_s=\{\omega:\ p>q\},\qquad\Omega_0=\{\omega:\ p=q\}.
+\end{equation}
+Nel settore $u$ la variabile $j$ è congelata contro $a$.
+Nel settore $s$ è congelata a favore di $a$.
+Nel settore $0$ entrambi i valori hanno lo stesso costo e $j$ non è congelata.
+
+\paragraph{Passo 4: il reweighting.}
+Per la~\eqref{eq:reweight} il peso di $\omega$ è $P_0(\omega)\,e^{-y\Delta E(\omega)}$.
+Il peso del settore $\sigma\in\{u,s,0\}$ è
+\begin{equation}
+\widetilde\Pi^\sigma_{j\to a}(y)=\sum_{\omega\in\Omega_\sigma}P_0(\omega)\,e^{-y\min(p(\omega),q(\omega))}.
+\label{eq:sector}
+\end{equation}
+
+\paragraph{Passo 5: la funzione generatrice.}
+Sia $C_{pq}$ la probabilità a priori di avere $p$ warning dal lato $s$ e $q$ dal lato $u$.
+Essa è il coefficiente di $z^pw^q$ nel polinomio
+\begin{equation}
+\mathcal C_{j\to a}(z,w)=\prod_{b\in\partial^s_aj}\bigl(1-\eta_{b\to j}+\eta_{b\to j}\,z\bigr)\prod_{b\in\partial^u_aj}\bigl(1-\eta_{b\to j}+\eta_{b\to j}\,w\bigr).
+\label{eq:genfun}
+\end{equation}
+Nel settore $u$ il minimo è $p$, nel settore $s$ è $q$, nel settore $0$ è $p=q$.
+Quindi
+\begin{equation}
+\widetilde\Pi^u=\sum_{q>p}C_{pq}\,e^{-yp},\qquad
+\widetilde\Pi^s=\sum_{p>q}C_{pq}\,e^{-yq},\qquad
+\widetilde\Pi^0=\sum_{p}C_{pp}\,e^{-yp}.
+\label{eq:sectors-explicit}
+\end{equation}
+Il calcolo dei coefficienti $C_{pq}$ costa $O(d^2)$ operazioni per lato, dove $d$ è il grado della variabile.
+
+\paragraph{Passo 6: le equazioni di messaggio.}
+Normalizzando si ottiene
+\begin{equation}
+\nu_{j\to a}(y)=\frac{\widetilde\Pi^u_{j\to a}}{\widetilde\Pi^u_{j\to a}+\widetilde\Pi^s_{j\to a}+\widetilde\Pi^0_{j\to a}}.
+\label{eq:spy-var}
+\end{equation}
+La clausola $a$ manda un warning a $i$ se e solo se tutte le altre variabili sono nel settore $u$.
+Nella nostra convenzione il costo dei warning è già contato sul lato della variabile, quindi l'equazione di clausola resta un prodotto:
+\begin{equation}
+\eta_{a\to i}=\prod_{j\in\partial a\setminus i}\nu_{j\to a}(y).
+\label{eq:spy-clause}
+\end{equation}
+
+\subsection{Lettura come somma termodinamica}
+
+Il logaritmo del peso di settore è una somma termodinamica con entropia relativa.
+Sia $P_0(\cdot\,|\,\Omega_\sigma)$ la distribuzione a priori condizionata al settore $\sigma$.
+Per la Proposizione~\ref{prop:kl} con $T=1/y$,
+\begin{equation}
+-\frac1y\log\widetilde\Pi^\sigma_{j\to a}=-\frac1y\log P_0(\Omega_\sigma)+\bigoplus_{\KL(\cdot\|P_0(\cdot|\Omega_\sigma)),\,1/y}\bigl\{\Delta E(\omega)\bigr\}_{\omega\in\Omega_\sigma}.
+\label{eq:sector-kl}
+\end{equation}
+Il primo termine è il costo di informazione del settore.
+Il secondo è l'energia libera dei conflitti dentro il settore.
+Il riferimento $P_0$ non è uniforme, quindi l'operazione non è commutativa nel senso di MT: ogni configurazione porta il suo peso a priori.
+Questa non commutatività non crea problemi, perché la somma avviene su un insieme finito di configurazioni etichettate.
+
+\subsection{I due limiti in $y$}
+
+\begin{proposizione}[SP come limite $y\to\infty$]
+\label{prop:y-infty}
+Per $y\to\infty$ le~\eqref{eq:sectors-explicit} tendono alle~\eqref{eq:Pi-u}--\eqref{eq:Pi-0}, e le~\eqref{eq:spy-var}--\eqref{eq:spy-clause} tendono alle equazioni SP.
+\end{proposizione}
+
+\begin{proof}
+Si ha $e^{-y\min(p,q)}\to\mathbf 1[\min(p,q)=0]$.
+Nel settore $u$ resta $p=0<q$, con peso $\sum_{q>0}C_{0q}=\prod_{b\in\partial^s_aj}(1-\eta_{b\to j})\,[1-\prod_{b\in\partial^u_aj}(1-\eta_{b\to j})]=\Pi^u$.
+Nel settore $s$ resta $q=0<p$, con peso $\Pi^s$.
+Nel settore $0$ resta $p=q=0$, con peso $C_{00}=\Pi^0$.
+Le configurazioni con $p,q\ge1$ sono le contraddizioni e hanno peso zero.
+\end{proof}
+
+Per $y\to0$ il peso $e^{-y\Delta E}$ tende a $1$, e i settori diventano le probabilità a priori $P_0(q>p)$, $P_0(p>q)$ e $P_0(p=q)$.
+Il messaggio segue la maggioranza dei warning e le contraddizioni non costano nulla.
+Questo limite è formale.
+La descrizione 1RSB degli stati è stabile solo sotto una energia di soglia~\citep{montanari2004instability}, quindi il ramo a $y$ piccolo non descrive direttamente stati fisici.
+
+\subsection{Il funzionale di Bethe a $y$ finito}
+
+La stessa logica dei costi dà il funzionale di Bethe per $G(y)=-y\Phi(y)$.
+Ogni termine è $\log\E[e^{-y\Delta E}]$ per l'aggiunta di un nodo o di un lato, con le grandezze in ingresso indipendenti.
+\begin{itemize}
+\item Clausola $a$: il costo è $1$ se tutte le variabili sono nel settore $u$, e zero altrimenti. Quindi $F_a(y)=\log\bigl[1-(1-e^{-y})\prod_{j\in\partial a}\nu_{j\to a}\bigr]$.
+\item Sito $i$: con $p$ warning verso $+1$ e $q$ verso $-1$ il costo è $\min(p,q)$. Quindi $F_i(y)=\log\sum_{p,q}C^{(i)}_{pq}\,e^{-y\min(p,q)}$, dove $C^{(i)}_{pq}$ sono i coefficienti di $\prod_{b\in\partial i^+}(1-\eta_{b\to i}+\eta_{b\to i}z)\prod_{b\in\partial i^-}(1-\eta_{b\to i}+\eta_{b\to i}w)$.
+\item Lato $(i,a)$: il costo è $1$ se $i$ è nel settore $u$ rispetto ad $a$ e $a$ manda un warning a $i$. Quindi $F_{ia}(y)=\log\bigl[1-(1-e^{-y})\,\nu_{i\to a}\,\eta_{a\to i}\bigr]$.
+\end{itemize}
+Il funzionale è
+\begin{equation}
+N\,G(y)\simeq\sum_aF_a(y)+\sum_iF_i(y)-\sum_{(i,a)}F_{ia}(y).
+\label{eq:bethe-y}
+\end{equation}
+Per il lato si usa che, se $i$ è nel settore $0$ rispetto ad $a$ e riceve il warning di $a$, il nuovo costo è $\min(p+1,p)=p$ e non cambia.
+Per $y\to\infty$ si ha $1-e^{-y}\to1$ e $\sum_{p,q}C^{(i)}_{pq}e^{-y\min(p,q)}\to1-\pi_i^+\pi_i^-$, e la~\eqref{eq:bethe-y} tende alla~\eqref{eq:bethe-sp}.
+Il termine di clausola coincide con quello di Battaglia, Kolář e Zecchina (eq.~(21) di~\citep{battaglia2004minimizing}), che usano la forma con clausole e siti al posto della forma con lati.
+L'energia e la complessità seguono dalle~\eqref{eq:legendre-y}: $e^*=-G'(y)$ e $\Sig_e=G+ye^*$.
+Nella fase UNSAT si cerca il punto $y^*$ in cui $\Sig_e=0$~\citep{mezard2002random,battaglia2004minimizing}.
+
+\subsection{Varianti e algoritmi sull'asse $y$}
+
+Sull'asse $y$ si trovano tre algoritmi noti.
+Il primo è SID, cioè $y=\infty$ senza backtracking.
+Il secondo è BSP, cioè $y=\infty$ con il backtracking governato da $r$ e dal bias~\eqref{eq:bias}.
+Il terzo è SP-Y, cioè $y$ finito con il backtracking governato da $r$ e dall'indice~\eqref{eq:bkz-index}.
+Battaglia, Kolář e Zecchina propongono anche di aggiornare $y$ durante la decimazione per restare vicino al massimo $y^*$ di $\Phi(y)$.
+Nel nostro codice la funzione \texttt{thermo\_star} calcola le somme di settore~\eqref{eq:sectors-explicit} con $T=1/y$.
+Con i parametri $\gamma=0$ e $m=0$ la variante chiamata ThermoSP è quindi SP-$y$, e non è un algoritmo nuovo.

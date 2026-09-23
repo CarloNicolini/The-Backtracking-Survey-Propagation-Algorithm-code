@@ -1,0 +1,181 @@
+\section{Survey propagation, complessità e BSP}
+\label{sec:spbsp}
+
+Questa sezione richiama risultati noti.
+Fissiamo la notazione che useremo nelle derivazioni.
+
+\subsection{Warning e survey}
+
+Consideriamo un cluster e il lato $(i,a)$.
+Il warning $u_{a\to i}\in\{0,1\}$ vale $1$ se, nel cluster, tutte le variabili $j\in\partial a\setminus i$ sono congelate al valore $-s_{a,j}$.
+In questo caso la clausola $a$ obbliga $x_i=s_{a,i}$.
+La survey $\eta_{a\to i}\in[0,1]$ è la frazione di cluster in cui $u_{a\to i}=1$.
+Il messaggio $\nu_{j\to a}\in[0,1]$ è la frazione di cluster in cui $j$ è congelata dalle clausole diverse da $a$ al valore $-s_{a,j}$, cioè al valore che non soddisfa $a$~\citep{mezard2002analytic,braunstein2005survey}.
+
+Assumiamo che, in assenza di $a$, le variabili $j\in\partial a$ siano indipendenti.
+Questa ipotesi è esatta su un albero ed è l'ipotesi di cavità sul grafo casuale.
+Il warning $u_{a\to i}$ vale $1$ se e solo se ogni $j\in\partial a\setminus i$ è congelata contro $a$, quindi
+\begin{equation}
+\eta_{a\to i}=\prod_{j\in\partial a\setminus i}\nu_{j\to a}.
+\label{eq:sp-clause}
+\end{equation}
+Per la variabile $j$ e la clausola $a$ usiamo gli insiemi~\eqref{eq:su-sets}.
+La variabile $j$ riceve warning da ogni $b\in\partial j\setminus a$ in modo indipendente, con probabilità $\eta_{b\to j}$.
+Distinguiamo tre casi, secondo la provenienza dei warning.
+\begin{align}
+\Pi^u_{j\to a}&=\Bigl[1-\prod_{b\in\partial^u_a j}(1-\eta_{b\to j})\Bigr]\prod_{b\in\partial^s_a j}(1-\eta_{b\to j}),\label{eq:Pi-u}\\
+\Pi^s_{j\to a}&=\Bigl[1-\prod_{b\in\partial^s_a j}(1-\eta_{b\to j})\Bigr]\prod_{b\in\partial^u_a j}(1-\eta_{b\to j}),\label{eq:Pi-s}\\
+\Pi^0_{j\to a}&=\prod_{b\in\partial j\setminus a}(1-\eta_{b\to j}).\label{eq:Pi-0}
+\end{align}
+Il caso $u$ indica almeno un warning verso $-s_{a,j}$ e nessuno verso $s_{a,j}$.
+Il caso $s$ indica il contrario.
+Il caso $0$ indica nessun warning.
+Il caso con warning da entrambi i lati è una contraddizione, e nel conteggio dei cluster di soluzioni ha peso zero.
+Normalizzando sui casi senza contraddizione si ottiene
+\begin{equation}
+\nu_{j\to a}=\frac{\Pi^u_{j\to a}}{\Pi^u_{j\to a}+\Pi^s_{j\to a}+\Pi^0_{j\to a}}.
+\label{eq:sp-var}
+\end{equation}
+Le~\eqref{eq:sp-clause} e~\eqref{eq:sp-var} sono le equazioni SP.
+
+\paragraph{Grandezze di sito.}
+Per ogni variabile $i$ poniamo
+\begin{equation}
+\pi_i^{\pm}=1-\prod_{b\in\partial i^{\pm}}(1-\eta_{b\to i}),
+\qquad
+w_i^{\pm}=\frac{\pi_i^{\pm}(1-\pi_i^{\mp})}{1-\pi_i^+\pi_i^-},
+\qquad
+w_i^{0}=1-w_i^+-w_i^-.
+\label{eq:w}
+\end{equation}
+Il numero $\pi_i^{+}$ è la probabilità che almeno una clausola spinga $i$ verso $+1$.
+Il numero $w_i^{\pm}$ è la frazione di cluster in cui $i$ è congelata a $\pm1$, e $w_i^0$ è la frazione in cui $i$ non è congelata.
+Nella notazione di BSP~\citep{marino2016bsp} si ha $\hat m_{a\to i}=\eta_{a\to i}$ e $m_{i\to a}=\nu_{i\to a}$.
+La~\eqref{eq:sp-var} coincide con l'equazione~(2) di BSP, perché $\Pi^u+\Pi^s+\Pi^0=1-\pi^s\pi^u$, dove $\pi^s$ e $\pi^u$ sono le probabilità di almeno un warning dai due lati.
+
+\subsection{SP come belief propagation su uno spazio esteso}
+
+Braunstein e Zecchina~\citep{braunstein2004surveybp} e Maneva, Mossel e Wainwright (MMW)~\citep{maneva2007survey} mostrano che SP è BP su un modello con un terzo valore $*$.
+Un assegnamento parziale è $x\in\{-1,+1,*\}^N$.
+Esso è non valido per la clausola $a$ in due casi: tutte le variabili di $a$ non soddisfano $a$, oppure tutte tranne una non soddisfano $a$ e quella rimasta vale $*$.
+Una variabile con valore $\pm1$ è vincolata se è l'unica che soddisfa una clausola, ed è libera altrimenti.
+Siano $n_*(x)$ e $n_o(x)$ il numero di variabili con valore $*$ e il numero di variabili libere.
+MMW definiscono sugli assegnamenti validi il peso
+\begin{equation}
+W(x)=\omega_o^{\,n_o(x)}\,\omega_*^{\,n_*(x)}.
+\label{eq:mmw}
+\end{equation}
+Il Teorema~3 di MMW afferma che BP su~\eqref{eq:mmw} con $\omega_*=\rho$ e $\omega_o=1-\rho$ coincide con l'algoritmo SP$(\rho)$.
+Il punto $(\omega_o,\omega_*)=(0,1)$ dà SP.
+Il punto $(1,0)$ dà BP sulla misura uniforme delle soluzioni.
+Per $(0,1)$ i messaggi di BP hanno tre componenti, ma due di esse sono uguali, e la dinamica si chiude su un solo numero per lato, la survey.
+Nella Sezione~\ref{sec:qaxis} useremo la condizione precisa per cui questa riduzione vale.
+
+\subsection{Il funzionale di complessità}
+
+Definiamo il funzionale
+\begin{equation}
+\Sig[\eta]=\sum_a F_a+\sum_i F_i-\sum_{(i,a)}F_{ia},
+\label{eq:bethe-sp}
+\end{equation}
+con i termini
+\begin{equation}
+F_a=\log\Bigl(1-\prod_{j\in\partial a}\nu_{j\to a}\Bigr),\qquad
+F_i=\log\bigl(1-\pi_i^+\pi_i^-\bigr),\qquad
+F_{ia}=\log\bigl(1-\nu_{i\to a}\,\eta_{a\to i}\bigr).
+\label{eq:bethe-terms}
+\end{equation}
+Qui le survey $\eta$ sono le variabili indipendenti, e i messaggi $\nu$ sono funzioni di $\eta$ tramite la~\eqref{eq:sp-var}.
+Ogni termine è il logaritmo della probabilità che l'aggiunta di un nodo o di un lato non produca contraddizioni.
+La Sezione~\ref{sec:spy} ricava questi termini come limite $y\to\infty$ dei termini di SP-$y$.
+In un punto fisso vale $\nu_{i\to a}\eta_{a\to i}=\prod_{j\in\partial a}\nu_{j\to a}$ per la~\eqref{eq:sp-clause}, quindi $F_{ia}=F_a$ per ogni $i\in\partial a$.
+Il funzionale diventa
+\begin{equation}
+\Sig=\sum_i\log\bigl(1-\pi_i^+\pi_i^-\bigr)+\sum_a(1-K_a)\log\Bigl(1-\prod_{j\in\partial a}\nu_{j\to a}\Bigr),
+\label{eq:sigma-bsp}
+\end{equation}
+dove $K_a=|\partial a|$.
+Questa è la forma usata da BSP~\citep[eq.~(4)--(5)]{marino2016bsp}.
+
+\begin{lemma}[Stazionarietà]
+\label{lem:stationary}
+Il funzionale~\eqref{eq:bethe-sp} è stazionario rispetto a tutte le survey $\eta$ in ogni punto fisso di SP.
+La forma compatta~\eqref{eq:sigma-bsp}, letta come funzione delle $\eta$, in generale non lo è.
+\end{lemma}
+
+\begin{proof}
+Fissiamo un lato $(k,b)$ e supponiamo $b\in\partial k^+$; il caso $b\in\partial k^-$ è simmetrico.
+La survey $\eta_{b\to k}$ compare in tre punti: nel termine di sito $F_k$, nel termine di lato $F_{kb}$, e nei messaggi $\nu_{k\to a}$ con $a\in\partial k\setminus b$.
+
+Primo, i messaggi $\nu_{k\to a}$ compaiono solo in $F_a$ e in $F_{ka}$.
+Le derivate sono
+\begin{equation*}
+\frac{\partial F_a}{\partial\nu_{k\to a}}=-\frac{\prod_{j\in\partial a\setminus k}\nu_{j\to a}}{1-\prod_{j\in\partial a}\nu_{j\to a}},\qquad
+\frac{\partial F_{ka}}{\partial\nu_{k\to a}}=-\frac{\eta_{a\to k}}{1-\nu_{k\to a}\eta_{a\to k}}.
+\end{equation*}
+Se vale la~\eqref{eq:sp-clause}, le due derivate sono uguali, e il contributo tramite $\nu_{k\to a}$ si annulla.
+
+Secondo, poniamo $A=\prod_{c\in\partial k^+\setminus b}(1-\eta_{c\to k})$.
+Allora $\pi_k^+=1-A(1-\eta_{b\to k})$, e
+\begin{equation*}
+\frac{\partial F_k}{\partial\eta_{b\to k}}=-\frac{\pi_k^-A}{1-\pi_k^+\pi_k^-}.
+\end{equation*}
+Per il lato $(k,b)$ si ha $\partial^s_bk=\partial k^+\setminus b$ e $\partial^u_bk=\partial k^-$.
+Le~\eqref{eq:Pi-u}--\eqref{eq:Pi-0} danno $\Pi^u=\pi_k^-A$, $\Pi^s=(1-A)(1-\pi_k^-)$, $\Pi^0=A(1-\pi_k^-)$, con somma $1-\pi_k^-(1-A)$.
+Quindi $\nu_{k\to b}=\pi_k^-A/[1-\pi_k^-(1-A)]$.
+Un calcolo diretto dà
+\begin{equation*}
+1-\nu_{k\to b}\eta_{b\to k}=\frac{1-\pi_k^-\bigl(1-A(1-\eta_{b\to k})\bigr)}{1-\pi_k^-(1-A)}=\frac{1-\pi_k^+\pi_k^-}{1-\pi_k^-(1-A)},
+\end{equation*}
+e quindi
+\begin{equation*}
+\frac{\partial F_{kb}}{\partial\eta_{b\to k}}=-\frac{\nu_{k\to b}}{1-\nu_{k\to b}\eta_{b\to k}}=-\frac{\pi_k^-A}{1-\pi_k^+\pi_k^-}=\frac{\partial F_k}{\partial\eta_{b\to k}}.
+\end{equation*}
+Questa identità vale per ogni valore delle survey.
+Il termine di sito e il termine di lato entrano in~\eqref{eq:bethe-sp} con segni opposti, quindi il loro contributo si annulla.
+La derivata totale è zero.
+
+Nella forma~\eqref{eq:sigma-bsp} i termini di lato $F_{ia}$ sono stati sostituiti da $K_a$ copie del termine di clausola.
+Restano due residui rispetto al funzionale di Bethe.
+Primo, il termine di sito $F_k$ non è più cancellato da $-F_{kb}$, e $\partial F_k/\partial\eta_{b\to k}$ non è zero in generale.
+Secondo, il contributo tramite $\nu_{k\to a}$ ha coefficiente $(1-K_a)\,\partial F_a/\partial\nu_{k\to a}$ invece di zero; per $K_a\neq1$ e $\eta_{a\to k}>0$ questo fattore è non nullo.
+Il primo residuo basta già a distruggere la stazionarietà, anche nel caso $K_a=1$ in cui il secondo si annulla.
+\end{proof}
+
+Il lemma è un caso particolare di un fatto generale: i punti fissi di BP sono punti stazionari dell'energia libera di Bethe~\citep{yedidia2005constructing}.
+Qui lo applichiamo al modello esteso di MMW, e la dimostrazione diretta mostra quali identità servono.
+Useremo il lemma nella Sezione~\ref{sec:response}.
+
+\subsection{Decimazione e backtracking}
+
+La decimazione guidata dalle survey (SID)~\citep{mezard2002analytic,braunstein2005survey} alterna due passi.
+Prima si risolvono le equazioni SP sulla formula corrente.
+Poi si fissa una frazione $f$ delle variabili, quelle con il bias più grande, al loro valore più probabile.
+BSP~\citep{marino2016bsp} usa il bias
+\begin{equation}
+b_i=1-\min(w_i^+,w_i^-).
+\label{eq:bias}
+\end{equation}
+Secondo BSP, se si fissa $x_i$ al valore più probabile, il numero di cluster viene moltiplicato per $b_i$.
+La Proposizione~\ref{prop:local} della Sezione~\ref{sec:response} dà la forma esatta di questa affermazione.
+Dopo ogni passo si eliminano le clausole soddisfatte, si accorciano le clausole con un letterale falso, e si risolvono di nuovo le equazioni.
+Se i messaggi diventano tutti nulli, la formula residua viene passata a WalkSat.
+
+BSP aggiunge il passo di backtracking.
+Il bias~\eqref{eq:bias} si calcola anche per una variabile già fissata, con le survey che essa riceve nel punto fisso corrente.
+Con una regola stocastica governata dal rapporto $r\in[0,1)$ fra passi di backtracking e passi di decimazione, BSP libera una frazione $f$ delle variabili fissate con il bias più piccolo.
+Per $r=0$ si ritrova SID.
+Ogni variabile viene assegnata in media $1/(1-r)$ volte, e il costo cresce dello stesso fattore.
+BSP usa $f=10^{-3}$.
+
+Battaglia, Kolář e Zecchina~\citep{battaglia2004minimizing} avevano già proposto un backtracking per SP-$y$ (algoritmo SP-Y).
+Essi fissano la variabile al valore suggerito da $b_{\mathrm{fix}}(j)=|W_j^+-W_j^-|$, dove $W_j^{\pm}$ sono le probabilità che il campo locale sia positivo o negativo.
+Per le variabili fissate usano l'indice con segno
+\begin{equation}
+b_{\mathrm{back}}(j)=-s_j\bigl(W_j^+-W_j^-\bigr),
+\label{eq:bkz-index}
+\end{equation}
+dove $s_j$ è il valore assegnato.
+L'indice è grande quando il campo si è rovesciato contro l'assegnazione.
+Anche SP-Y usa un rapporto $r$ fra mosse di rilascio e mosse di fissaggio.
+Nel limite $y\to\infty$ si ha $W_j^\pm=w_j^\pm$.

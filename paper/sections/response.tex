@@ -1,0 +1,157 @@
+\section{Risposta locale della complessità}
+\label{sec:response}
+
+Questa sezione studia la variazione del funzionale~\eqref{eq:bethe-sp} quando si fissa o si libera una variabile.
+L'identità della Proposizione~\ref{prop:local}, nel caso del valore più probabile, è l'affermazione di BSP sul bias~\eqref{eq:bias}.
+La forma con il segno, il resto di secondo ordine e il confronto con l'indice~\eqref{eq:bkz-index} sono nostri.
+
+\subsection{Il funzionale con una variabile bloccata}
+
+Sia $F$ la formula corrente e sia $\eta^\star$ un punto fisso di SP su $F$.
+Scegliamo una variabile $k$ e un valore $s\in\{-1,+1\}$.
+La formula ridotta $F|_{x_k=s}$ si ottiene eliminando $k$, eliminando le clausole in $\partial k^{s}$, che sono soddisfatte, e accorciando le clausole in $\partial k^{-s}$.
+
+Scriviamo il funzionale di $F|_{x_k=s}$ sul grafo di $F$.
+Definiamo $\Sig^{(k,s)}[\eta]$ come il funzionale~\eqref{eq:bethe-sp} con tre modifiche.
+\begin{enumerate}
+\item Per $a\in\partial k^{-s}$ il messaggio $\nu_{k\to a}$ vale $1$: la variabile $k$ non soddisfa $a$.
+\item Per $a\in\partial k^{s}$ il messaggio $\nu_{k\to a}$ vale $0$: la variabile $k$ soddisfa $a$, e $a$ non manda più warning.
+\item Il termine di sito di $k$ diventa $F_k^{(s)}=\log\prod_{b\in\partial k^{-s}}(1-\eta_{b\to k})=\log(1-\pi_k^{-s})$.
+\end{enumerate}
+
+\begin{lemma}
+\label{lem:clamped}
+Se $\eta_{a\to j}=0$ per ogni $a\in\partial k^{s}$ e $j\in\partial a\setminus k$, allora $\Sig^{(k,s)}[\eta]$ è il funzionale~\eqref{eq:bethe-sp} della formula ridotta $F|_{x_k=s}$.
+Inoltre $\Sig^{(k,s)}$ non dipende dalle survey $\eta_{b\to k}$.
+\end{lemma}
+
+\begin{proof}
+Per $a\in\partial k^{s}$ si ha $F_a=\log(1-0)=0$ e $F_{ka}=0$.
+Se inoltre $\eta_{a\to j}=0$, anche $F_{ja}=0$, e la clausola $a$ non contribuisce ai siti $j$: è come se $a$ non ci fosse.
+Per $a\in\partial k^{-s}$ si ha $F_a=\log(1-\prod_{j\in\partial a\setminus k}\nu_{j\to a})$, che è il termine della clausola accorciata.
+I lati $(k,a)$ con $a\in\partial k^{-s}$ danno $-\sum_{a\in\partial k^{-s}}\log(1-\eta_{a\to k})=-F_k^{(s)}$, che cancella il termine di sito.
+Restano i termini della formula ridotta.
+Le survey $\eta_{b\to k}$ compaiono solo in $F_k^{(s)}$ e nei lati $(k,b)$, e questi termini si cancellano o valgono zero.
+\end{proof}
+
+\subsection{L'identità locale}
+
+\begin{proposizione}[Identità locale]
+\label{prop:local}
+Siano $\pi_k^{\pm}$ e $w_k^{\pm}$ le grandezze~\eqref{eq:w} calcolate con le survey $\eta^\star_{b\to k}$.
+Allora
+\begin{equation}
+\Sig^{(k,s)}[\eta^\star]-\Sig[\eta^\star]=\log\frac{1-\pi_k^{-s}}{1-\pi_k^+\pi_k^-}=\log\bigl(1-w_k^{-s}\bigr).
+\label{eq:local-identity}
+\end{equation}
+\end{proposizione}
+
+\begin{proof}
+I due funzionali differiscono in due punti.
+Il primo è il termine di sito di $k$, che passa da $\log(1-\pi_k^+\pi_k^-)$ a $\log(1-\pi_k^{-s})$.
+Il secondo sono i messaggi $\nu_{k\to a}$, che entrano solo in $F_a-F_{ka}$.
+Nel punto fisso si ha $\eta^\star_{a\to k}=\prod_{j\in\partial a\setminus k}\nu_{j\to a}$, quindi
+\begin{equation*}
+F_a-F_{ka}=\log\bigl(1-\nu_{k\to a}\eta^\star_{a\to k}\bigr)-\log\bigl(1-\nu_{k\to a}\eta^\star_{a\to k}\bigr)=0
+\end{equation*}
+per ogni valore di $\nu_{k\to a}$.
+Questa è l'identità di Bethe $F_a-F_{ka}=\log c_{a\to k}$, dove $c_{a\to k}$ non dipende da $\nu_{k\to a}$.
+Resta solo la variazione del termine di sito.
+L'ultima uguaglianza segue da $1-w_k^{-s}=[1-\pi_k^+\pi_k^--\pi_k^{-s}(1-\pi_k^{s})]/(1-\pi_k^+\pi_k^-)=(1-\pi_k^{-s})/(1-\pi_k^+\pi_k^-)$.
+\end{proof}
+
+Sia ora $\eta^{(s)}$ il punto fisso di SP sulla formula ridotta, esteso con $\eta_{a\to j}=0$ per $a\in\partial k^{s}$.
+La variazione vera della complessità è
+\begin{equation}
+\Delta\Sig_{k,s}=\Sig^{(k,s)}[\eta^{(s)}]-\Sig[\eta^\star]=\log\bigl(1-w_k^{-s}\bigr)+R_{k,s},
+\qquad R_{k,s}=\Sig^{(k,s)}[\eta^{(s)}]-\Sig^{(k,s)}[\eta^\star].
+\label{eq:true-change}
+\end{equation}
+
+\begin{proposizione}[Il resto è di secondo ordine]
+\label{prop:remainder}
+Il funzionale $\Sig^{(k,s)}$ è stazionario in $\eta^{(s)}$.
+Quindi, con $\delta=\eta^\star-\eta^{(s)}$ e $\mathsf H$ la matrice hessiana di $\Sig^{(k,s)}$ in $\eta^{(s)}$,
+\begin{equation}
+R_{k,s}=-\tfrac12\,\delta^{\top}\mathsf H\,\delta+O(\|\delta\|^3).
+\label{eq:remainder}
+\end{equation}
+\end{proposizione}
+
+\begin{proof}
+Sui lati della formula ridotta il Lemma~\ref{lem:clamped} e il Lemma~\ref{lem:stationary} danno la stazionarietà.
+I termini in più, cioè i lati $(j,a)$ con $a\in\partial k^{s}$, hanno derivata nulla rispetto a queste survey, perché contengono il fattore $\eta_{a\to j}=0$.
+Restano le survey $\eta_{a\to j}$ con $a\in\partial k^{s}$.
+La dimostrazione del Lemma~\ref{lem:stationary} si ripete con due differenze.
+La cancellazione fra termine di sito e termine di lato vale per ogni valore delle survey.
+Il termine $F_a$ vale zero, quindi il contributo tramite $\nu_{j\to a}$ è $\eta_{a\to j}/(1-\nu_{j\to a}\eta_{a\to j})$, che è zero in $\eta_{a\to j}=0$.
+Lo sviluppo di Taylor di $\Sig^{(k,s)}[\eta^\star]$ intorno a $\eta^{(s)}$ non ha quindi termine lineare.
+\end{proof}
+
+La proposizione ha una conseguenza diretta per le stime di risposta lineare.
+Una correzione della forma $g^{\top}(\mathsf I-\mathsf J)^{-1}b$, dove $g$ è il gradiente del funzionale, $\mathsf J$ è lo jacobiano delle equazioni SP e $b$ è la perturbazione locale, vale zero, perché $g=0$ nel punto fisso.
+La prima correzione all'identità~\eqref{eq:local-identity} è di secondo ordine nella variazione dei messaggi.
+Il Lemma~\ref{lem:stationary} mostra anche che la forma compatta~\eqref{eq:sigma-bsp} non va usata per questi sviluppi, perché non è stazionaria.
+
+\begin{corollario}[Alberi]
+\label{cor:tree}
+Se il factor graph di $F$ è un albero, allora $R_{k,s}=0$.
+\end{corollario}
+
+\begin{proof}[Idea della dimostrazione]
+Su un albero BP è esatta, e il funzionale nel punto fisso è il logaritmo del numero di assegnamenti parziali validi senza variabili libere del modello di MMW con $(\omega_o,\omega_*)=(0,1)$~\citep{braunstein2004surveybp,maneva2007survey}.
+Il numero si fattorizza sui sottoalberi appesi a $k$.
+Per l'invariante $M^u=M^*$ il peso di un sottoalbero che non manda warning a $k$ non dipende dallo stato di $k$.
+Con $k$ libera, la somma sugli stati di $k$ dà il fattore $1-\pi_k^+\pi_k^-$.
+Con $k$ bloccata a $s$, le clausole in $\partial k^{-s}$ non possono mandare warning, e il fattore è $1-\pi_k^{-s}$.
+Il rapporto è $1-w_k^{-s}$, e la~\eqref{eq:true-change} dà $R_{k,s}=0$.
+\end{proof}
+
+Su un albero quindi $R_{k,s}=0$ anche se $\delta\ne0$: le survey che escono da $k$ cambiano, ma il funzionale non cambia.
+Su un grafo con cicli ci aspettiamo che $R_{k,s}$ dipenda soprattutto dalle variazioni che tornano nell'intorno di $k$ lungo i cicli.
+Questa è un'ipotesi, non un risultato.
+Abbiamo verificato numericamente il Lemma~\ref{lem:stationary} e la~\eqref{eq:true-change} su una formula 3-SAT casuale con $N=600$ e $\alpha=4{,}15$.
+Il gradiente direzionale del funzionale~\eqref{eq:bethe-sp} è nullo entro l'errore numerico, mentre quello della forma~\eqref{eq:sigma-bsp} non lo è.
+Il resto $R_{k,s}$ è piccolo quando $s$ è il valore più probabile, e nel verso opposto può essere dello stesso ordine del termine principale.
+
+\subsection{Conseguenze per la decimazione e il backtracking}
+
+\paragraph{Fissaggio.}
+Se $s$ è il valore più probabile, allora $w_k^{-s}=\min(w_k^+,w_k^-)$ e la~\eqref{eq:local-identity} dà $\log b_k$.
+Questa è l'affermazione di BSP: il numero di cluster viene moltiplicato per $b_k$~\citep{marino2016bsp}.
+La regola di SID e di BSP, che fissa le variabili con $b_k$ più grande, è quindi la regola che minimizza la perdita di complessità stimata.
+
+\paragraph{Degenerazione.}
+Si ha $\log(1-w_k^{-s})=0$ quando $w_k^{-s}=0$.
+Questo accade in due casi molto diversi: $k$ è congelata a $s$ in tutti i cluster ($w_k^{s}=1$), oppure $k$ non è congelata in nessun cluster ($w_k^0=1$).
+In entrambi i casi $b_k=1$.
+Il criterio basato sulla sola complessità non distingue i due casi, e serve un secondo criterio per ordinarli, per esempio la polarizzazione $|w_k^+-w_k^-|$.
+
+\paragraph{Rilascio.}
+Sia $k$ una variabile già fissata al valore $s_k$ nella formula corrente $F$.
+Sia $F'$ la formula in cui $k$ è libera.
+La~\eqref{eq:true-change}, applicata a $F'$, dà
+\begin{equation}
+\Sig(F')-\Sig(F)=-\log\bigl(1-w_k^{-s_k}\bigr)-R_{k,s_k},
+\label{eq:release}
+\end{equation}
+dove $w_k^{\pm}$ sono calcolati con le survey che entrano in $k$.
+BSP calcola queste survey con le variabili fissate e le usa per il bias~\citep{marino2016bsp}.
+Il guadagno stimato del rilascio è quindi $-\log I_k$ con
+\begin{equation}
+I_k=1-w_k^{-s_k}.
+\label{eq:Ik}
+\end{equation}
+Il bias di BSP coincide con $I_k$ solo se $s_k$ è ancora il valore più probabile.
+Se il campo si è rovesciato, cioè $w_k^{-s_k}>w_k^{s_k}$, allora $b_k=1-w_k^{s_k}>I_k$.
+Per esempio, con $w_k^{-s_k}=0{,}9$ e $w_k^{s_k}=0{,}05$ si ha $I_k=0{,}1$ e $b_k=0{,}95$.
+La variabile ha un guadagno stimato di $\log10$, ma il bias di BSP la classifica come sicura.
+L'indice di Battaglia, Kolář e Zecchina~\eqref{eq:bkz-index} vale $w_k^{-s_k}-w_k^{s_k}$ a $y=\infty$ e tiene conto del segno.
+Esso cresce con $w_k^{-s_k}$ come $-\log I_k$, ma sottrae anche $w_k^{s_k}$, quindi i due ordinamenti in generale sono diversi.
+Il punto nuovo di $I_k$ non è il segno, che è già in~\citep{battaglia2004minimizing}, ma il legame esatto con la complessità dato dalla~\eqref{eq:local-identity}.
+
+\paragraph{Una famiglia di politiche.}
+Le regole di scelta si possono scrivere come distribuzioni di Gibbs sui punteggi.
+Per il rilascio, per esempio, si sceglie la variabile $k$ con probabilità proporzionale a $\exp[-\log I_k/\Tact]$, dove $\Tact$ è una temperatura di azione.
+Per $\Tact\to0$ si ottiene la scelta deterministica del punteggio migliore.
+Questa temperatura non ha legame con $y$: essa regola la politica di ricerca, non la misura sui cluster.

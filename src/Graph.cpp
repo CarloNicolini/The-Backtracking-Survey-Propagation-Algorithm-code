@@ -846,6 +846,8 @@ START:
         }
     }
     update_products();
+    const bool thermo=(g_T_cav>0. || g_gamma_eff!=0.);
+    vector<double> star_pu, star_z;/*pi_u and z of the cavity star of each literal*/
     /*convergence*/
     for (unsigned int t=0; t<t_max; ++t) {
         conv_f=false;
@@ -856,6 +858,18 @@ START:
         for(__k=_m; __k<_M; ++__k) { /*for on clause objects*/
             C=(vec_list_cl[__k])->_c;
             s=_cl[C]._size_cl_init;
+            if(thermo) {/*the star of literal l does not depend on the target literal i*/
+                star_pu.resize(s);
+                star_z.resize(s);
+                for (l=0; l<s; ++l) {
+                    if(!_cl[C]._go_forward[l]) continue;
+                    _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
+                    _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
+                    ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav,g_gamma_eff);
+                    star_pu[l]=_st.pi_u;
+                    star_z[l]=_st.z;
+                }
+            }
             i=0;
             while (1) {
                 if (_cl[C]._go_forward[i]) {
@@ -864,13 +878,12 @@ START:
                     l=0;
                     while (1) {
                         if(i!=l && _cl[C]._go_forward[l]) {
-                            _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
-                            _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
-                            if(g_T_cav>0. || g_gamma_eff!=0.) {/*ThermoSP or unfrozen bias*/
-                                ThermoStar _st=_cl[C].v_V[l]->cavity_star(_cl[C].v_lit[l],_cl[C].v_survey_cl_to_i[l],_prod_S,_prod_U,g_T_cav,g_gamma_eff);
-                                _new*=_st.pi_u;
-                                norm*=_st.z;
+                            if(thermo) {/*ThermoSP or unfrozen bias*/
+                                _new*=star_pu[l];
+                                norm*=star_z[l];
                             } else {
+                                _prod_S=_Pr_S(_cl[C].v_V[l],_cl[C].v_lit[l], _cl[C].div_s[l]);
+                                _prod_U=_Pr_U(_cl[C].v_V[l],_cl[C].v_lit[l]);
                                 _new*=__pu();/*new message from cl to variable is computed*/
                                 norm*=__norm();
                             }

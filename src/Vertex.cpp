@@ -142,47 +142,73 @@ void Vertex::compute_s() { /*compute surveys variable node*/
 
 /*public member which updates products (1-survey) for V_plus and V_minus sets. These products are usful for computing SP and BP equations in an easy way.*/
 void Vertex::make_products() { /*make products for set V_plus and V_minus*/
-    bool _snap=(g_T_cav>0. or g_gamma_eff!=0.);/*cache values for the star sums*/
-
     prod_V_plus=1.;/*set the product of V_plus to 1*/
-    if(_snap && snap_plus.size()!=_surveys_cl_to_i_plus.size())
-        snap_plus.resize(_surveys_cl_to_i_plus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_plus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
-        if(_snap)snap_plus[i]=*_surveys_cl_to_i_plus[i];
         prod_V_plus*=(1.- *_surveys_cl_to_i_plus[i]);/*compute products for V_plus*/
     }
     prod_V_minus=1.;/*set the product of V_minus to 1*/
-    if(_snap && snap_minus.size()!=_surveys_cl_to_i_minus.size())
-        snap_minus.resize(_surveys_cl_to_i_minus.size());/*cache values for ThermoSP stars*/
     for (unsigned long i=0; i<_surveys_cl_to_i_minus.size(); ++i) {/*loop for updating vector, where are stored  messages, and products (1-survey) for V_plus and V_minus sets.*/
-        if(_snap)snap_minus[i]=*_surveys_cl_to_i_minus[i];
         prod_V_minus*=(1.- *_surveys_cl_to_i_minus[i]);/*compute products for V_minus*/
     }
+    if(g_T_cav>0.) {/*cache for the ThermoSP star sums; T<=0 reads the products only*/
+        cache_group(_surveys_cl_to_i_plus,nz_plus,nzp_plus,coef_plus);
+        cache_group(_surveys_cl_to_i_minus,nz_minus,nzp_minus,coef_minus);
+    }
+}
+
+/*Keeps the non-zero messages of one group with their slots, and the
+ coefficients of the polynomial of the full group. A zero message multiplies
+ the polynomial by 1, so the coefficients are the same as with all messages.*/
+void Vertex::cache_group(const vector<double *> &slots, vector<double> &nz,
+                         vector<double *> &nzp, vector<double> &coef) {
+    nz.clear();
+    nzp.clear();
+    for (unsigned long i=0; i<slots.size(); ++i) {
+        if(*slots[i]!=0.) {
+            nz.push_back(*slots[i]);
+            nzp.push_back(slots[i]);
+        }
+    }
+    coef.resize(nz.size()+1);
+    thermo_coefficients(nz.data(),nz.size(),coef.data());
 }
 
 /*public member which computes the deformed cavity star sums at this variable.
  The message values come from the last make_products call, so the star sees
  exactly the values behind the legacy products. The message of the clause that
- owns the cavity is passed as exclude and skipped in the groups (it always
- belongs to the s group, the one selected by b, like the div_s correction of the
- legacy factors). A0 and B0 are the hard factors of the two groups with the
- cavity message already excluded: pass the exact values of _Pr_S and _Pr_U, or
- prod_V_plus and prod_V_minus for the field star.*/
+ owns the cavity is passed as exclude. It always belongs to the s group, the
+ one selected by b, like the div_s correction of the legacy factors, so the u
+ group is the full cached group. The s group needs new coefficients only when
+ the excluded message is non-zero. A0 and B0 are the hard factors of the two
+ groups with the cavity message already excluded: pass the exact values of
+ _Pr_S and _Pr_U, or prod_V_plus and prod_V_minus for the field star.*/
 ThermoStar Vertex::cavity_star(bool b, const double *exclude, double A0, double B0, double T, double gamma) {
-    const vector<double *> &_s_ptr=(b)?_surveys_cl_to_i_plus:_surveys_cl_to_i_minus;
-    const vector<double *> &_u_ptr=(b)?_surveys_cl_to_i_minus:_surveys_cl_to_i_plus;
-    const vector<double> &_s_val=(b)?snap_plus:snap_minus;
-    const vector<double> &_u_val=(b)?snap_minus:snap_plus;
-    static thread_local vector<double> _es, _eu;
-    _es.clear();
-    _eu.clear();
-    _es.reserve(_s_ptr.size());
-    _eu.reserve(_u_ptr.size());
-    for (unsigned long i=0; i<_s_ptr.size(); ++i)
-        if(_s_ptr[i]!=exclude)_es.push_back(_s_val[i]);
-    for (unsigned long i=0; i<_u_ptr.size(); ++i)
-        if(_u_ptr[i]!=exclude)_eu.push_back(_u_val[i]);
-    return thermo_star(_es.data(),_es.size(),_eu.data(),_eu.size(),A0,B0,T,gamma);
+    if(T<=0.) return thermo_star_coef(NULL,0,NULL,0,A0,B0,T,gamma);/*the tropical limit reads A0 and B0 only*/
+    const vector<double> &_s_nz=(b)?nz_plus:nz_minus;
+    const vector<double *> &_s_nzp=(b)?nzp_plus:nzp_minus;
+    const vector<double> &_s_coef=(b)?coef_plus:coef_minus;
+    const vector<double> &_u_nz=(b)?nz_minus:nz_plus;
+    const vector<double> &_u_coef=(b)?coef_minus:coef_plus;
+    unsigned long skip=_s_nzp.size();
+    for (unsigned long i=0; i<_s_nzp.size(); ++i)
+        if(_s_nzp[i]==exclude) { skip=i; break; }
+    if(skip==_s_nzp.size())
+        return thermo_star_coef(_s_coef.data(),_s_nz.size(),_u_coef.data(),_u_nz.size(),A0,B0,T,gamma);
+    const unsigned long kStack=64;
+    double _es_stack[kStack], _coef_stack[kStack+1];
+    vector<double> _es_heap, _coef_heap;
+    double *_es=_es_stack, *_coef=_coef_stack;
+    if(_s_nz.size()>kStack) {
+        _es_heap.resize(_s_nz.size());
+        _coef_heap.resize(_s_nz.size()+1);
+        _es=_es_heap.data();
+        _coef=_coef_heap.data();
+    }
+    unsigned long ns=0;
+    for (unsigned long i=0; i<_s_nz.size(); ++i)
+        if(i!=skip) _es[ns++]=_s_nz[i];
+    thermo_coefficients(_es,ns,_coef);
+    return thermo_star_coef(_coef,ns,_u_coef.data(),_u_nz.size(),A0,B0,T,gamma);
 }
 
 

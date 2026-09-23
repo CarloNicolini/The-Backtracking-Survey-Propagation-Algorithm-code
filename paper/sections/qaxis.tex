@@ -1,0 +1,195 @@
+\section{Deformazioni sui pesi dei cluster: Rényi, Tsallis e il tilt $\gamma$}
+\label{sec:qaxis}
+
+La Sezione~\ref{sec:spy} mostra che la somma di Shannon agisce a due livelli.
+Qui deformiamo il livello dei cluster.
+Le entropie di Rényi e di Tsallis danno due deformazioni diverse, con conseguenze diverse vicino alla soglia $\alpha_s$.
+
+\subsection{L'ordine di Rényi è il parametro di Parisi}
+
+Nella fase SAT diamo a ogni cluster il peso $p_C=|C|/\mathcal Z$, dove $\mathcal Z=\sum_C|C|$ è il numero di soluzioni.
+Questo è il peso del cluster nella misura uniforme sulle soluzioni.
+
+\begin{proposizione}
+\label{prop:renyi-m}
+L'entropia di Rényi di ordine $m$ dei pesi $\{p_C\}$ è
+\begin{equation}
+H_m=\frac{1}{1-m}\log\sum_Cp_C^{\,m}=\frac{\log\Xi(m)-m\log\Xi(1)}{1-m},\qquad \Xi(m)=\sum_C|C|^m.
+\label{eq:renyi-clusters}
+\end{equation}
+Per $N\to\infty$ la sua densità è
+\begin{equation}
+h_m=\lim_{N\to\infty}\frac{H_m}{N}=\frac{\varphi(m)-m\,\varphi(1)}{1-m}.
+\label{eq:hm}
+\end{equation}
+\end{proposizione}
+
+\begin{proof}
+Si ha $\sum_Cp_C^m=\mathcal Z^{-m}\sum_C|C|^m=\Xi(m)/\Xi(1)^m$.
+Si prende il logaritmo, si divide per $1-m$ e si usa la~\eqref{eq:phi-m}.
+\end{proof}
+
+L'ordine della famiglia di Rényi coincide quindi con il parametro di Parisi del limite entropico.
+I casi particolari sono i seguenti.
+Per $m\to0$ si ha $h_0=\varphi(0)$, l'entropia di Hartley, cioè il logaritmo del numero di cluster: questo è il conteggio di SP.
+Per $m\to1$ la regola di de l'Hôpital e la~\eqref{eq:legendre-m} danno $h_1=\varphi(1)-\varphi'(1)=\Sig_s(s^*(1))$, l'entropia di Shannon dei pesi, cioè la complessità dei cluster che dominano la misura uniforme.
+Per $m\to\infty$ si ha la min-entropia, $h_\infty=\varphi(1)-s_{\max}$, dove $s_{\max}$ è la massima entropia interna con $\Sig_s\ge0$: essa misura il cluster più grande.
+
+\paragraph{Lettura multifrattale.}
+Scriviamo $p_C=e^{-Na}$, con $a=\varphi(1)-s_C\ge0$.
+Il numero di cluster con esponente $a$ è $e^{Nf(a)}$ con $f(a)=\Sig_s(\varphi(1)-a)$.
+Poniamo $\tau(m)=-\lim N^{-1}\log\sum_Cp_C^m=m\varphi(1)-\varphi(m)$.
+Dalla~\eqref{eq:phi-m} si ottiene
+\begin{equation}
+\tau(m)=\inf_{a}\bigl[m\,a-f(a)\bigr],\qquad h_m=\frac{\tau(m)}{m-1}.
+\label{eq:multifractal}
+\end{equation}
+Questo è il formalismo multifrattale di Halsey e coautori~\citep{halsey1986fractal}, con risoluzione $e^{-N}$.
+La funzione $f(a)$ è lo spettro delle singolarità, $\tau(m)$ è la sua trasformata di Legendre, e $h_m$ è la dimensione generalizzata di ordine $m$.
+La coppia $(\varphi(m),\Sig_s(s))$ della 1RSB entropica è quindi la stessa coppia di Legendre $(\tau(q),f(\alpha))$ della teoria dei multifrattali.
+Il calcolo di $\Sig_s(s)$ tramite $\varphi(m)$ è il metodo di~\citep{mezard2005landscape,krzakala2007clusters}.
+MT citano l'uso dell'entropia di Rényi nei multifrattali, ma non collegano l'ordine al parametro di Parisi.
+
+\paragraph{Condensazione e soglia.}
+Sia $m^*$ il valore in cui $\Sig_s(s^*(m^*))=0$.
+Se $m^*<1$ la misura è condensata, e questo accade per $\alpha_c<\alpha<\alpha_s$~\citep{krzakala2007clusters}.
+Per $m\ge m^*$ il supremo in~\eqref{eq:phi-m} è sul bordo $\Sig_s=0$, quindi $\varphi(m)=m\,s_{\max}$ e $\varphi(1)=s_{\max}$.
+Sostituendo nella~\eqref{eq:hm} si ottiene
+\begin{equation}
+h_m=0\qquad\text{per ogni }m\ge m^*,\ m\ne1,
+\label{eq:hm-zero}
+\end{equation}
+e anche $h_1=0$ per continuità.
+Nella fase condensata tutte le entropie di Rényi di ordine $m\ge m^*$ sono sotto-estensive: la misura sta su un numero sotto-esponenziale di cluster.
+Solo gli ordini $m<m^*$ vedono ancora un numero esponenziale di cluster.
+Per $\alpha\to\alpha_s$ la complessità totale tende a zero e $m^*\to0$~\citep{krzakala2007clusters}.
+Vicino alla soglia, quindi, lo spettro multifrattale utile si restringe all'intervallo $0\le m<m^*$, che tende al punto di SP.
+
+Questa è la risposta precisa alla domanda sulla statistica multifrattale vicino alla soglia SAT--UNSAT.
+Una deformazione con $m>0$ fisso smette di vedere informazione estensiva prima di $\alpha_s$.
+Il numero $m^*(\alpha)$ è esso stesso una misura della distanza dalla soglia.
+C'è anche un costo pratico.
+Con $m>0$ le equazioni di cavità non si chiudono sulle survey: ogni lato porta una distribuzione dei messaggi di BP, e la dimensione del cluster pesa i messaggi~\citep{mezard2005landscape,krzakala2007clusters,mezard2009information}.
+Una variante di SP con $m>0$ richiede quindi una popolazione di messaggi per ogni lato.
+
+\subsection{Tsallis sui pesi dei cluster}
+
+Sostituiamo il peso di Boltzmann degli stati con l'esponenziale deformato, come nella Proposizione~\ref{prop:tsallis}:
+\begin{equation}
+\mathcal Z_q(y)=\sum_\alpha\eq(-yE_\alpha).
+\label{eq:Zq}
+\end{equation}
+
+\begin{proposizione}[Tre regimi]
+\label{prop:tsallis-regimes}
+Supponiamo che il numero di stati con energia $E=Ne$ sia $e^{N\Sig_e(e)+o(N)}$, con $\Sig_e$ continua.
+\begin{enumerate}
+\item Se $q>1$ è fisso, allora $N^{-1}\log\mathcal Z_q(y)\to\sup_e\Sig_e(e)$.
+\item Se $q<1$ è fisso, allora $N^{-1}\log\mathcal Z_q(y)\to\Sig_e(0)$, cioè al conteggio degli stati di energia nulla.
+\item Se $q-1=\kappa/N$ con $\kappa$ fisso, allora
+\begin{equation}
+\frac1N\log\mathcal Z_q(y)\to\sup_{e}\Bigl[\Sig_e(e)-g_\kappa(e)\Bigr],\qquad g_\kappa(e)=\frac1\kappa\log(1+\kappa ye),
+\label{eq:gen-canonical}
+\end{equation}
+con il vincolo $e<1/(|\kappa|y)$ se $\kappa<0$.
+\end{enumerate}
+\end{proposizione}
+
+\begin{proof}
+Per $q>1$ si ha $\log\eq(-yNe)=-(q-1)^{-1}\log(1+(q-1)yNe)=O(\log N)$.
+Il peso è sotto-esponenziale, e tutte le energie contano allo stesso modo sulla scala $e^{N}$.
+Per $q<1$ il peso è zero se $E>1/((1-q)y)$, che è un numero finito.
+Contano solo gli stati con $E=O(1)$, cioè $e=0$ sulla scala di $N$.
+Per $q-1=\kappa/N$ con $\kappa>0$ si ha $\eq(-yNe)=(1+\kappa ye)^{-N/\kappa}=e^{-Ng_\kappa(e)}$.
+Per $\kappa<0$ si ha $\eq(-yNe)=(1-|\kappa|ye)_+^{N/|\kappa|}$, che dà la stessa formula con il taglio.
+Il metodo di Laplace conclude.
+\end{proof}
+
+I regimi 1 e 2 non danno nulla di nuovo.
+Il regime 1 dà $\sup_e\Sig_e(e)=G(0)$, cioè il limite $y\to0$ del potenziale~\eqref{eq:Phi-y}, che le equazioni SP-$y$ non descrivono in modo affidabile (Sezione~\ref{sec:spy}).
+Il regime 2 dà il limite $y\to\infty$.
+Una deformazione di Tsallis con $q$ fisso sui pesi dei cluster degenera quindi nei due estremi dell'asse $y$.
+Il regime 3 è un ensemble canonico generalizzato nel senso di Costeniuc, Ellis, Touchette e Turkington~\citep{costeniuc2005generalized,costeniuc2006generalized}.
+In quei lavori il peso di Boltzmann $e^{-\beta H}$ viene moltiplicato per $e^{-g(H)}$ con $g$ continua.
+
+\begin{corollario}[SP-$y$ con un $y$ efficace]
+\label{cor:yeff}
+Nel regime 3, l'aggiunta di un nodo con spostamento di energia $\Delta E=O(1)$ moltiplica il peso di uno stato per $e^{-y_{\mathrm{eff}}\Delta E}\,(1+O(1/N))$, con
+\begin{equation}
+y_{\mathrm{eff}}=g_\kappa'(e^*)=\frac{y}{1+\kappa y e^*}.
+\label{eq:yeff}
+\end{equation}
+Le equazioni di messaggio sono quindi le equazioni SP-$y$~\eqref{eq:sectors-explicit}--\eqref{eq:spy-clause} con $y=y_{\mathrm{eff}}$.
+L'energia $e^*$ è data dal punto di sella di~\eqref{eq:gen-canonical}, cioè $\Sig_e'(e^*)=y_{\mathrm{eff}}$.
+\end{corollario}
+
+\begin{proof}
+Si ha $Ng_\kappa((E+\Delta E)/N)-Ng_\kappa(E/N)=g_\kappa'(E/N)\,\Delta E+O(1/N)$, e la misura si concentra su $E/N=e^*$.
+Il resto è la derivazione della Sezione~\ref{sec:spy} con $y$ sostituito da $y_{\mathrm{eff}}$.
+\end{proof}
+
+Il corollario ha due conseguenze.
+Primo, se $\Sig_e$ è concava, il regime 3 non raggiunge punti nuovi.
+Ogni punto $e^*$ con $\Sig_e'(e^*)=y_{\mathrm{eff}}$ si raggiunge anche con SP-$y$ al valore $y_{\mathrm{eff}}$, quindi la deformazione è solo una riparametrizzazione dell'asse $y$.
+Secondo, il punto $e^*$ è un massimo di $\Sig_e-g_\kappa$ se $\Sig_e''(e^*)<g_\kappa''(e^*)=-\kappa y_{\mathrm{eff}}^2$.
+Per $\kappa>0$, cioè $q>1$, la funzione $g_\kappa$ è concava, e il vincolo è più forte di quello di SP-$y$.
+Per $\kappa<0$, cioè $q<1$, la funzione $g_\kappa$ è convessa, e il regime 3 raggiunge anche punti in cui $\Sig_e$ è localmente convessa, con $0\le\Sig_e''(e^*)<|\kappa|y_{\mathrm{eff}}^2$.
+Questi punti non si raggiungono con nessun valore di $y$.
+Questo è il meccanismo dell'ensemble gaussiano di~\citep{costeniuc2006generalized}, con una funzione $g$ diversa.
+
+\paragraph{Uso vicino alla soglia.}
+La deformazione con $q<1$ in scala $1/N$ ha anche un taglio di energia $e<1/(|\kappa|y)$.
+Essa quindi seleziona una finestra di energie e penalizza di più le energie vicine al taglio.
+In un algoritmo la deformazione si realizza con un ciclo esterno su $y_{\mathrm{eff}}$: si risolve SP-$y$ al valore corrente, si calcola $e^*=-G'(y_{\mathrm{eff}})$ dal funzionale~\eqref{eq:bethe-y}, e si aggiorna $y_{\mathrm{eff}}\leftarrow y/(1+\kappa ye^*)$.
+Il ciclo è simile all'aggiornamento dinamico di $y$ proposto da Battaglia, Kolář e Zecchina.
+Non sappiamo se la complessità energetica $\Sig_e(e)$ del $K$-SAT casuale abbia tratti non concavi vicino ad $\alpha_s$.
+Solo in quel caso la deformazione di Tsallis in scala $1/N$ darebbe stati nuovi.
+Il nostro codice non contiene ancora questo parametro.
+
+\begin{osservazione}[Tsallis a livello locale]
+Si possono sostituire i pesi $e^{-y\min(p,q)}$ nelle~\eqref{eq:sectors-explicit} con $\eq(-y\min(p,q))$ a $q$ fisso.
+Il Corollario~\ref{cor:yeff} mostra che questa sostituzione non segue da nessun potenziale sui cluster della forma~\eqref{eq:Zq}.
+Sulla scala esponenziale il reweighting di cavità è sempre esponenziale nello spostamento di energia.
+Questa variante è quindi un'euristica e non un'equazione 1RSB.
+\end{osservazione}
+
+\subsection{Il tilt verso gli stati $*$ nel modello di MMW}
+
+Gli autori di BSP suggeriscono che una misura concentrata sui cluster non congelati potrebbe ridurre il backtracking~\citep{marino2016bsp}.
+Il modello~\eqref{eq:mmw} offre un modo esatto per scrivere una misura di questo tipo.
+Si prende $\omega_o=0$ e $\omega_*=e^{\gamma}$.
+Allora il peso di un assegnamento parziale senza variabili libere è $e^{\gamma n_*}$, e per $\gamma>0$ la misura preferisce gli assegnamenti con molte variabili $*$, cioè con poche variabili congelate.
+
+\begin{proposizione}
+\label{prop:gamma}
+Sia $\omega_o=0$.
+La riduzione di BP sul modello~\eqref{eq:mmw} a una sola survey per lato vale per messaggi generici se e solo se $\omega_*=1$.
+\end{proposizione}
+
+\begin{proof}
+Usiamo le equazioni di BP sul modello esteso nella Sezione~3 di MMW~\citep{maneva2007survey}.
+I messaggi da clausola a variabile hanno le componenti $M^s$, $M^u$ e $M^*$, e i messaggi da variabile a clausola hanno le componenti $R^s$, $R^u$ e $R^*$.
+Le componenti $R^s$ e $R^*$ del messaggio da $i$ ad $a$ valgono
+\begin{align*}
+R^s_{i\to a}&=\prod_{b\in\uu}M^u_{b\to i}\prod_{b\in\us}\bigl(M^s_{b\to i}+M^*_{b\to i}\bigr),\\
+R^*_{i\to a}&=\prod_{b\in\uu}M^u_{b\to i}\Bigl[\prod_{b\in\us}\bigl(M^s_{b\to i}+M^*_{b\to i}\bigr)-(1-\omega_o)\prod_{b\in\us}M^*_{b\to i}\Bigr]+\omega_*\prod_{b\in\partial i\setminus a}M^*_{b\to i}.
+\end{align*}
+Supponiamo che i messaggi in ingresso soddisfino $M^u=M^*$.
+Allora
+\begin{equation*}
+R^s_{i\to a}-R^*_{i\to a}=(1-\omega_o-\omega_*)\prod_{b\in\partial i\setminus a}M^*_{b\to i}.
+\end{equation*}
+Le equazioni di clausola di MMW danno
+\begin{equation*}
+M^u_{a\to i}-M^*_{a\to i}=\sum_{k\in\partial a\setminus i}\bigl(R^s_{k\to a}-R^*_{k\to a}\bigr)\prod_{j\in\partial a\setminus\{i,k\}}R^u_{j\to a}.
+\end{equation*}
+Quindi l'invariante $M^u=M^*$ si conserva se $\omega_o+\omega_*=1$, e per messaggi generici si rompe altrimenti.
+Questa è la condizione~(a) del Teorema~3 di MMW.
+Con $\omega_o=0$ la condizione diventa $\omega_*=1$.
+\end{proof}
+
+Con $\gamma\ne0$ servono quindi i messaggi completi di MMW, con due numeri liberi per lato invece di uno.
+Il calcolo è BP su un modello grafico esplicito, quindi è ben definito.
+Una chiusura su un solo numero, che moltiplica soltanto il peso $\Pi^0$ per $e^{\gamma}$, è un'approssimazione e non coincide con BP sul modello di MMW.
+Il nostro codice usa questa chiusura approssimata.
+Il valore algoritmico del tilt $\gamma$ è una domanda aperta.

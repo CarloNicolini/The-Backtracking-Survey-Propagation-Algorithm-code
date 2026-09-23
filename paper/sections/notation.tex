@@ -1,0 +1,124 @@
+\section{Problema e notazione}
+\label{sec:notation}
+
+\subsection{Il $K$-SAT casuale e il factor graph}
+
+Una formula ha $N$ variabili $x_i\in\{-1,+1\}$, con $i=1,\dots,N$, e $M=\alpha N$ clausole.
+Il valore $+1$ indica ``vero''.
+Ogni clausola $a$ contiene un insieme $\partial a$ di $K$ variabili distinte.
+Per ogni variabile $i\in\partial a$ il numero $s_{a,i}\in\{-1,+1\}$ indica il valore che soddisfa il letterale: il letterale è $x_i$ se $s_{a,i}=+1$ ed è $\neg x_i$ se $s_{a,i}=-1$.
+La clausola $a$ è violata se e solo se $x_i=-s_{a,i}$ per ogni $i\in\partial a$.
+Nell'ensemble casuale ogni clausola sceglie $K$ variabili a caso in modo uniforme e segni $s_{a,i}$ indipendenti ed equiprobabili.
+
+L'energia è il numero di clausole violate,
+\begin{equation}
+E(x)=\sum_{a=1}^{M}\ \prod_{i\in\partial a}\frac{1-s_{a,i}x_i}{2}.
+\label{eq:energy}
+\end{equation}
+Le soluzioni sono le configurazioni con $E(x)=0$.
+Il factor graph è il grafo bipartito con un nodo per ogni variabile, un nodo per ogni clausola e un lato $(i,a)$ quando $i\in\partial a$.
+Indichiamo con $\partial i$ l'insieme delle clausole che contengono $i$, e con
+\begin{equation}
+\partial i^{\pm}=\{a\in\partial i:\ s_{a,i}=\pm1\}
+\end{equation}
+le clausole soddisfatte da $x_i=\pm1$.
+Per un lato $(i,a)$ servono due insiemi di clausole vicine di $i$ diverse da $a$:
+\begin{equation}
+\us=\{b\in\partial i\setminus a:\ s_{b,i}=s_{a,i}\},\qquad
+\uu=\{b\in\partial i\setminus a:\ s_{b,i}=-s_{a,i}\}.
+\label{eq:su-sets}
+\end{equation}
+Le clausole in $\us$ sono soddisfatte dallo stesso valore che soddisfa $a$.
+Le clausole in $\uu$ sono soddisfatte dal valore opposto.
+Nel limite $N\to\infty$ a $\alpha$ fisso il factor graph è localmente un albero: un intorno di raggio finito di un nodo non contiene cicli con probabilità che tende a uno~\citep{mezard2009information}.
+
+\subsection{Soglie e cluster}
+
+Per $K=3$ la teoria 1RSB prevede le seguenti soglie~\citep{krzakala2007clusters,mertens2006threshold}.
+Oltre $\alpha_d\simeq3{,}86$ le soluzioni si dividono in un numero esponenziale di cluster.
+Per $K=3$ la soglia di condensazione coincide con $\alpha_d$, mentre per $K\ge4$ vale $\alpha_d<\alpha_c$.
+Oltre $\alpha_c$ un numero sotto-esponenziale di cluster porta quasi tutta la misura uniforme sulle soluzioni.
+Oltre $\alpha_s\simeq4{,}2667$ non esistono più soluzioni.
+Per $K=4$ i valori sono $\alpha_d\simeq9{,}38$, $\alpha_c\simeq9{,}547$ e $\alpha_s\simeq9{,}931$.
+
+Un cluster è, in modo informale, un insieme di soluzioni collegate da cammini di soluzioni in cui ogni passo cambia $o(N)$ variabili, separato dagli altri cluster.
+La definizione precisa usa gli stati puri della misura di Gibbs~\citep{krzakala2007clusters,mezard2009information}.
+Una variabile è congelata in un cluster se assume lo stesso valore in tutte le soluzioni del cluster.
+Indichiamo i cluster con $C$ e la loro entropia interna per variabile con $s_C=N^{-1}\log|C|$.
+Il numero di cluster con entropia interna vicina a $s$ cresce come $e^{N\Sig_s(s)}$.
+La funzione $\Sig_s(s)$ è la complessità entropica.
+
+Nella fase UNSAT e nello studio del paesaggio di energia si usano gli stati, cioè gruppi di configurazioni di energia minima locale separati da barriere~\citep{mezard2002random,mezard2003cavity}.
+Indichiamo gli stati con $\alpha$ e la loro energia con $E_\alpha$.
+Il numero di stati con energia vicina a $Ne$ cresce come $e^{N\Sig_e(e)}$.
+La funzione $\Sig_e(e)$ è la complessità energetica.
+Nella fase SAT gli stati di energia nulla sono i cluster di soluzioni.
+
+\subsection{Il potenziale 1RSB e i suoi due limiti}
+
+Sia $Z_\alpha(\beta)=\sum_{x\in\alpha}e^{-\beta E(x)}$ la funzione di partizione ristretta allo stato $\alpha$, a temperatura inversa $\beta$.
+Il potenziale 1RSB è
+\begin{equation}
+\Xi(\beta,m)=\sum_\alpha Z_\alpha(\beta)^{m},
+\label{eq:xi}
+\end{equation}
+dove $m$ è il parametro di Parisi~\citep{parisi1980sequence,mezard2001bethe,monasson1995structural}.
+Il valore $m=1$ dà la funzione di partizione ordinaria.
+Il valore $m=0$ conta gli stati senza pesarli.
+Due limiti di~\eqref{eq:xi} sono importanti.
+
+\paragraph{Limite entropico.}
+Si restringe la somma ai cluster di soluzioni, cioè si prende $\beta\to\infty$ con $m$ fisso nella fase SAT.
+Allora $Z_C=|C|=e^{Ns_C}$, e il metodo di Laplace dà
+\begin{equation}
+\varphi(m)=\lim_{N\to\infty}\frac1N\log\sum_C|C|^{m}=\sup_{s:\ \Sig_s(s)\ge0}\bigl[\Sig_s(s)+ms\bigr].
+\label{eq:phi-m}
+\end{equation}
+Il vincolo $\Sig_s(s)\ge0$ esprime il fatto che una famiglia con meno di un cluster in media non contribuisce.
+Se il supremo è interno, il punto di massimo $s^*(m)$ soddisfa $\Sig_s'(s^*)=-m$, e valgono
+\begin{equation}
+s^*(m)=\varphi'(m),\qquad \Sig_s\bigl(s^*(m)\bigr)=\varphi(m)-m\varphi'(m).
+\label{eq:legendre-m}
+\end{equation}
+Questo limite è studiato in~\citep{mezard2005landscape,krzakala2007clusters,montanari2008clusters}.
+
+\paragraph{Limite energetico.}
+Si prende $\beta\to\infty$ e $m\to0$ con $y=\beta m$ fisso~\citep{mezard2002random,mezard2003cavity}.
+Scriviamo $Z_\alpha(\beta)^{m}=\exp[-\beta m F_\alpha(\beta)]$ con $F_\alpha=E_\alpha-\beta^{-1}S_\alpha$, dove $S_\alpha$ è l'entropia interna dello stato.
+Allora $\beta mF_\alpha=yE_\alpha-mS_\alpha$.
+Il termine $mS_\alpha$ vale $(y/\beta)\,O(N)$ e, diviso per $N$, tende a zero.
+Resta il peso $e^{-yE_\alpha}$, e si definisce
+\begin{equation}
+-y\,\Phi(y)=\lim_{N\to\infty}\frac1N\log\sum_\alpha e^{-yE_\alpha}=\sup_{e}\bigl[\Sig_e(e)-ye\bigr].
+\label{eq:Phi-y}
+\end{equation}
+La funzione $\Phi(y)$ ha il ruolo di un'energia libera a ``temperatura'' $1/y$.
+Poniamo $G(y)=-y\Phi(y)$.
+Il teorema dell'inviluppo dà $G'(y)=-e^*(y)$, quindi
+\begin{equation}
+e^*(y)=\frac{\partial\,(y\Phi)}{\partial y},\qquad
+\Sig_e\bigl(e^*(y)\bigr)=G(y)+y\,e^*(y)=y^2\,\frac{\partial\Phi}{\partial y}.
+\label{eq:legendre-y}
+\end{equation}
+Poiché $\Phi(y)=y^{-1}\inf_e[ye-\Sig_e(e)]$, per ogni $y>0$ vale $\Phi(y)\le e_{\mathrm{gs}}$, dove $e_{\mathrm{gs}}$ è l'energia per variabile degli stati fondamentali, che hanno $\Sig_e(e_{\mathrm{gs}})=0$.
+L'uguaglianza vale nel punto $y^*$ in cui $\partial\Phi/\partial y=0$, cioè in cui $\Sig_e(e^*)=0$.
+Nella fase UNSAT la stima dell'energia fondamentale è quindi $e_{\mathrm{gs}}=\max_y\Phi(y)$~\citep{mezard2002random}.
+
+\paragraph{Il vertice comune.}
+Nella fase SAT si ha $e_{\mathrm{gs}}=0$.
+Per $y\to\infty$ la~\eqref{eq:Phi-y} dà $G(y)\to\Sig_e(0)$, il logaritmo del numero di stati di energia nulla, cioè di cluster di soluzioni.
+Per $m\to0$ la~\eqref{eq:phi-m} dà $\varphi(0)=\sup_s\Sig_s(s)$, cioè il logaritmo del numero totale di cluster.
+I due limiti portano allo stesso oggetto per strade diverse.
+Al livello delle equazioni di cavità la corrispondenza è la seguente: il limite $m\to0$ delle equazioni entropiche, ristretto ai messaggi di BP con valori in $\{0,1\}$, dà le equazioni SP~\citep{krzakala2007clusters,montanari2008clusters,mezard2009information}.
+I cluster senza variabili congelate non producono warning e sono invisibili a SP.
+Per questo motivo la soglia in cui SP ha una soluzione non banale non coincide in generale con $\alpha_d$~\citep{krzakala2007clusters}.
+
+\subsection{Dequantizzazione di Maslov}
+
+Le formule~\eqref{eq:phi-m} e~\eqref{eq:Phi-y} sono entrambe esempi dello stesso limite.
+Per $h>0$ si definisce $a\oplus_h b=h\log(e^{a/h}+e^{b/h})$.
+Per $h\to0$ si ha $a\oplus_h b\to\max(a,b)$, e il semianello $(\R\cup\{-\infty\},\oplus_h,+)$ tende al semianello tropicale $(\max,+)$.
+Questo limite si chiama dequantizzazione di Maslov~\citep{litvinov2007maslov}.
+Una somma di $e^{Ng(e)}$ su una famiglia di stati è una somma $\oplus_h$ con $h=1/N$, a meno del fattore di scala.
+Il metodo di Laplace, che porta alle trasformate di Legendre~\eqref{eq:phi-m} e~\eqref{eq:Phi-y}, è quindi una dequantizzazione di Maslov con parametro $1/N$.
+Nel seguito incontreremo un secondo parametro di dequantizzazione, la temperatura $T=1/y$, e i due limiti non vanno confusi.

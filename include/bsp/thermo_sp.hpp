@@ -65,4 +65,16 @@ ThermoStar thermo_star(const double *eta_s, std::size_t ns, const double *eta_u,
                        std::size_t nu, double A0, double B0, double T,
                        double gamma = 0.);
 
+/*Coefficients of the polynomial product over one warning group:
+ prod_b (1 - eta_b + eta_b z) = sum_p c_p z^p. coef must hold n+1 values, and
+ c_p is the prior probability of p active warnings in the group.*/
+void thermo_coefficients(const double *eta, std::size_t n, double *coef);
+
+/*The same sums as thermo_star, from the coefficients A (ns+1 values) and B
+ (nu+1 values) of the two groups. Only the coefficients with p >= 1 are read,
+ because A0 and B0 carry the exact hard factors.*/
+ThermoStar thermo_star_coef(const double *A, std::size_t ns, const double *B,
+                            std::size_t nu, double A0, double B0, double T,
+                            double gamma = 0.);
+
 #endif /* THERMO_SP_HPP */

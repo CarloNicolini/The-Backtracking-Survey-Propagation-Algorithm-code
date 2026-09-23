@@ -1,0 +1,76 @@
+\section{Discussione e problemi aperti}
+\label{sec:discussion}
+
+\subsection{Cosa è noto e cosa aggiungiamo}
+
+La Tabella~\ref{tab:known} separa i risultati noti dalle osservazioni di questo lavoro.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{@{}p{0.55\linewidth}p{0.38\linewidth}@{}}
+\toprule
+Enunciato & Fonte \\
+\midrule
+Potenziale 1RSB $\Xi(\beta,m)$, limiti entropico ed energetico & \citep{monasson1995structural,mezard2003cavity,mezard2002random} \\
+SP, SP-$y$ e funzionale di complessità & \citep{mezard2002analytic,mezard2002random,braunstein2005survey} \\
+SP come BP su uno spazio esteso, famiglia SP$(\rho)$ & \citep{braunstein2004surveybp,maneva2007survey} \\
+Bias $b_i$ come fattore sul numero di cluster; BSP & \citep{marino2016bsp} \\
+SP-$y$ con backtracking e indice con segno & \citep{battaglia2004minimizing} \\
+Semianelli termodinamici, Shannon, Rényi, Tsallis, KL & \citep{marcolli2014thermodynamic} \\
+Ensemble canonici generalizzati & \citep{costeniuc2005generalized,costeniuc2006generalized} \\
+\midrule
+Stazionarietà del funzionale completo, non della forma compatta (Lemma~\ref{lem:stationary}) & dimostrazione diretta nostra di un fatto generale~\citep{yedidia2005constructing} \\
+Due livelli della somma di Shannon; $y$ locale uguale a $y$ dei cluster & nostro \\
+Settori di SP-$y$ come somme con entropia relativa & nostro \\
+Ordine di Rényi uguale a $m$; spettro multifrattale; $h_m=0$ per $m\ge m^*$ & nostro \\
+Forma chiusa e limite $T\to0$ della somma di Tsallis deformata & nostro, con~\citep{curado1991generalized} \\
+Tsallis sui cluster: tre regimi, $y_{\mathrm{eff}}$ & nostro \\
+Tilt $\gamma$: rottura dell'invariante di MMW & nostro, da~\citep{maneva2007survey} \\
+Identità locale con segno e resto di secondo ordine & nostro; il caso del valore più probabile è in~\citep{marino2016bsp} \\
+Equazioni di Bellman soft e politica di Gibbs & \citep{haarnoja2018soft} \\
+Look-ahead soft a due passi, valore a campi congelati, ricompensa di Tsallis (Sezione~\ref{sec:softq}) & nostro; verificato in Lean~4 \\
+\bottomrule
+\end{tabular}
+\caption{Risultati noti (sopra) e osservazioni di questo lavoro (sotto).}
+\label{tab:known}
+\end{table}
+
+Il quadro dei semianelli non produce da solo un algoritmo nuovo.
+A $T$ fisso il semianello di Shannon è isomorfo al semianello di BP, quindi ogni equazione di cavità si può scrivere in esso.
+Il valore del quadro sta nei limiti e nelle deformazioni.
+Esso dice quali deformazioni restano associative, quali degenerano, e a quale livello della teoria agisce ogni parametro.
+
+\subsection{Problemi aperti}
+
+\paragraph{Non concavità di $\Sig_e$.}
+La deformazione di Tsallis in scala $1/N$ con $q<1$ dà stati nuovi solo se $\Sig_e(e)$ ha tratti non concavi.
+Per saperlo si può calcolare $\Sig_e(e)$ con la dinamica di popolazione vicino ad $\alpha_s$, per $K=3$ e $K=4$.
+
+\paragraph{Il ciclo su $y_{\mathrm{eff}}$.}
+Il Corollario~\ref{cor:yeff} suggerisce un ciclo esterno che aggiorna $y_{\mathrm{eff}}$ con l'energia del funzionale di Bethe.
+Resta da capire se il ciclo converge e se, con backtracking, cambia la soglia algoritmica.
+
+\paragraph{Il tilt $\gamma$.}
+BP sul modello di MMW con $\omega_o=0$ e $\omega_*=e^\gamma$ è ben definita, ma non si chiude su una survey.
+Resta da confrontare questa misura con la chiusura approssimata del nostro codice.
+Resta anche da capire se la misura aiuta la ricerca di cluster non congelati, come suggerito in~\citep{marino2016bsp}.
+
+\paragraph{Il resto $R_{k,s}$ su grafi con cicli.}
+La Proposizione~\ref{prop:remainder} dà l'ordine del resto ma non la sua grandezza.
+Una stima tramite la suscettività di SP e la lunghezza dei cicli renderebbe quantitativo il confronto fra $I_k$, $b_k$ e $b_{\mathrm{back}}$.
+Ricci-Tersenghi e Semerjian~\citep{ricci2009cavity} studiano la decimazione con il metodo della cavità, e il loro approccio è un punto di partenza.
+
+\paragraph{Esperimenti.}
+Le prove numeriche fatte finora sono troppo piccole.
+Un confronto utile deve fissare il budget di calcolo, usare molte istanze per ogni $(K,\alpha,N)$, e riportare la frazione di istanze risolte con il suo errore.
+Le regole di rilascio da confrontare sono $b_k$, $b_{\mathrm{back}}$ e $I_k$, a parità di $r$ e $f$.
+
+\section{Conclusioni}
+
+Abbiamo scritto le deformazioni note di SP nella lingua dei semianelli termodinamici e abbiamo derivato ogni passo.
+La somma di Shannon agisce su due livelli, e il livello dei cluster fissa il reweighting locale.
+L'ordine di Rényi dei pesi dei cluster è il parametro di Parisi, e vicino alla soglia la parte utile dello spettro multifrattale si riduce a SP.
+La deformazione di Tsallis con $q$ fisso degenera, mentre la deformazione in scala $1/N$ è un ensemble canonico generalizzato che si riduce a SP-$y$ con un $y$ efficace.
+L'identità locale della complessità giustifica il bias di BSP per il fissaggio e dà una regola con segno per il rilascio, con un resto di secondo ordine.
+I diagrammi dei limiti raccolgono questi fatti e mostrano quali varianti sono nuove e quali sono riparametrizzazioni di algoritmi noti.

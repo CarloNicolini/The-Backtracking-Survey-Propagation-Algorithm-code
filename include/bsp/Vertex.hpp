@@ -92,6 +92,9 @@ public:
 
     ThermoStar cavity_star(bool b, const double *exclude, double A0, double B0, double T, double gamma = 0.); /*deformed cavity star sums*/
 
+    void cache_group(const vector<double *> &slots, vector<double> &nz,
+                     vector<double *> &nzp, vector<double> &coef); /*ThermoSP cache of one group*/
+
     void compute_s(); /*compute surveys for each variable node*/
 
     void fix_var_i(); /*fix variable i to true or false*/
@@ -156,8 +159,11 @@ public:
     double _Ik; /*I(k) = fraction of clusters compatible with the assignment*/
     double prod_V_plus; /*product (1-message) in V_plus*/
     double prod_V_minus; /*product (1-message) in V_minus*/
-    vector<double> snap_plus; /*message values of V_plus at the last make_products call*/
-    vector<double> snap_minus; /*message values of V_minus at the last make_products call*/
+    /*ThermoSP cache of the last make_products call: the non-zero messages of
+     V_plus and V_minus, their slots, and the coefficients of each full group*/
+    vector<double> nz_plus, nz_minus;
+    vector<double *> nzp_plus, nzp_minus;
+    vector<double> coef_plus, coef_minus;
     double complexity_variable;/*variable node complexity*/
     double energy_variable;/*mean conflict energy of the field star (ThermoSP only)*/
     unsigned int _vertex; /*vertex label*/

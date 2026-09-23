@@ -1,0 +1,13 @@
+{
+  "bsp": "build/bsp",
+  "K": 3,
+  "N": 30,
+  "alphas": [3.0, 3.5],
+  "seeds": {"start": 1, "stop": 2},
+  "timeout_s": 60,
+  "jobs": 1,
+  "extra_flags": ["-q"],
+  "configs": [
+    {"name": "cert", "flags": ["--scorer=cert", "--r=0.9"]}
+  ]
+}

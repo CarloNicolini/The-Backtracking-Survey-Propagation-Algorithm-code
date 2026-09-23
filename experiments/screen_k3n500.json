@@ -1,0 +1,14 @@
+{
+  "bsp": "build/bsp",
+  "K": 3,
+  "N": 500,
+  "alphas": [3.8, 4.0, 4.1, 4.15, 4.2, 4.22, 4.25],
+  "seeds": {"start": 1, "stop": 50},
+  "timeout_s": 300,
+  "jobs": 4,
+  "extra_flags": ["-q"],
+  "configs": [
+    {"name": "cert", "flags": ["--scorer=cert", "--r=0.9", "--seed=0", "--w"]},
+    {"name": "dynI", "flags": ["--scorer=cert", "--r=0.9", "--dynamic-i-backtrack"]}
+  ]
+}

@@ -1,0 +1,378 @@
+\documentclass{article}
+\usepackage{iclr2027_conference,times}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{microtype}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\title{Propagazione di survey termodinamica\\
+\large Deformazione di semianello e controllo della complessit\`a nel $K$-SAT casuale}
+
+\author{Carlo Nicolini\\
+Raffaele Marino\\
+\texttt{c.nicolini@ipazia.com}}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Sig}{\Sigma}
+\newcommand{\Tc}{T_{\mathrm{cav}}}
+\newcommand{\Ta}{T_{\mathrm{act}}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Nel $K$-SAT casuale, vicino alla soglia di soddisfacibilit\`a, lo spazio delle soluzioni si frammenta in un numero esponenziale di cluster.
+La survey propagation (SP) stima la complessit\`a $\Sig$, logaritmo del numero di cluster, e guida la decimazione.
+Il backtracking survey propagation (BSP) corregge scelte precedenti per mantenere $\Sig$ positiva.
+In questo lavoro proponiamo una lettura termodinamica di SP: l'aggregazione ``dura'' delle configurazioni di warning viene sostituita dall'operazione di free energy dei semianelli termodinamici di Marcolli e Thorngren, con temperatura cavitarie $\Tc$.
+Nel limite $\Tc\to 0$ si recupera SP; a $\Tc>0$ la costruzione coincide con la famiglia SP a energia finita, reinterpretata come deformazione di semianello.
+Sullo stesso asse costruiamo una politica di decisione basata su risposte locali della free entropy, di cui un membro a vincolo duro \`e lo stimatore $I(k)$ della frazione di cluster compatibili con un'assegnazione gi\`a fissata.
+Su istanze $3$-SAT e $4$-SAT, la politica $I(k)$ predice la variazione reale di $\Sig$ al rilascio con correlazione $r\simeq 0{,}997$ e migliora la dinamica della complessit\`a rispetto ai criteri di certainty e polarizzazione.
+Restano aperti lo spostamento della soglia algoritmica $\alpha_a$ e la costruzione operativa del bias verso cluster non congelati.
+\end{abstract}
+
+\section{Introduzione}
+\label{sec:intro}
+
+Il problema di soddisfacibilit\`a booleana casuale ($K$-SAT) \`e un banco di prova per la meccanica statistica dei sistemi disordinati e per gli algoritmi di ottimizzazione discreta~\cite{mezard2009information}.
+Una formula con $N$ variabili e $M=\alpha N$ clausole di lunghezza $K$ definisce un paesaggio di energia $E(\sigma)$ uguale al numero di clausole violate.
+A temperatura zero le configurazioni di energia nulla sono le soluzioni.
+Al crescere di $\alpha$ lo spazio delle soluzioni cambia di natura: oltre una densit\`a dinamica $\alpha_d$ si spezza in un numero esponenziale di cluster, e oltre una densit\`a di condensazione $\alpha_c$ un numero sotto-esponenziale di cluster porta quasi tutta la misura~\cite{krzakala2007clusters,montanari2008clusters}.
+La soglia di soddisfacibilit\`a $\alpha_s$ segna la scomparsa delle soluzioni~\cite{mezard2002analytic,achlioptas2005rigidity}.
+
+La teoria della rottura di simmetria di replica a un passo (one-step replica symmetry breaking, 1RSB) descrive questa geometria~\cite{parisi1980sequence,mezard2001bethe}.
+I cluster sono stati puri della misura di Gibbs; due soluzioni dello stesso cluster hanno overlap alto, due soluzioni di cluster diversi overlap basso.
+Il parametro di Parisi $m$ pesa i cluster secondo la loro entropia interna.
+Survey propagation corrisponde al conteggio uniforme dei cluster, cio\`e al limite $m\to 0$ della 1RSB a temperatura fisica zero~\cite{mezard2002analytic,braunstein2005survey}.
+Le equazioni SP possono anche essere rilette come belief propagation su uno spazio esteso in cui ogni variabile ammette lo stato ``*''~\cite{braunstein2004surveybp}.
+
+Gli algoritmi basati su SP fissano progressivamente le variabili pi\`u polarizzate (decimazione) e aggiornano i messaggi sulla formula residua.
+Il BSP di Marino, Parisi e Ricci-Tersenghi~\cite{marino2016bsp} aggiunge mosse di backtracking: variabili gi\`a fissate possono essere liberate, con frequenza regolata da un rapporto $r$ fra backtracking e decimazione.
+L'obiettivo dichiarato \`e mantenere la complessit\`a $\Sig$ positiva il pi\`u a lungo possibile, perch\'e una $\Sig$ che crolla segnala la perdita di troppi cluster e spesso precede il fallimento della ricerca.
+Gli autori stessi osservano che una misura concentrata sui cluster non congelati (unfrozen) potrebbe ridurre il backtracking necessario, ma non forniscono un criterio locale operativo per seguirla.
+
+Due lacune restano aperte.
+La prima riguarda la metrica di decisione: BSP ordina decimazione e backtracking con bias locali (polarizzazione, certainty) calcolati al momento della scelta.
+Per le variabili fissate, i bias non vengono aggiornati con i messaggi correnti, e il confronto fra scelte di et\`a diverse mescola quantit\`a definite su formule residue diverse.
+La seconda riguarda la struttura dell'aggregazione cavitarie: SP esclude in modo duro ogni configurazione di warning con conflitti.
+Esiste gi\`a una letteratura di SP a energia finita, ma manca una lettura che colleghi in modo esplicito quella deformazione ai semianelli termodinamici~\cite{marcolli2014thermodynamic}, costruiti sulla teoria di Connes e Consani in caratteristica uno~\cite{connes2010characteristic,connes2014witt}, e a una politica di controllo del processo di ricerca~\cite{kappen2005path}.
+
+In questo lavoro sviluppiamo entrambe le linee.
+Nella Sezione~\ref{sec:theory} richiamiamo 1RSB, SP e BSP.
+Nella Sezione~\ref{sec:thermo} definiamo la survey propagation termodinamica (ThermoSP): la somma sulle configurazioni di warning viene sostituita dall'operazione di free energy di Shannon a temperatura $\Tc$, e dimostriamo il recupero di SP per $\Tc\to 0$.
+Nella Sezione~\ref{sec:policy} introduciamo politiche basate su risposte della free entropy, incluso lo stimatore $I(k)$ delle survey virtuali.
+Nella Sezione~\ref{sec:methods} descriviamo l'implementazione e i protocolli numerici.
+Nella Sezione~\ref{sec:results} riportiamo i risultati preliminari.
+Nella Sezione~\ref{sec:discussion} discutiamo limiti e prospettive, e nella Sezione~\ref{sec:conclusions} concludiamo.
+
+\section{Quadro teorico}
+\label{sec:theory}
+
+\subsection{Complessit\`a e misura 1RSB}
+
+Sia $\mathcal{C}$ l'insieme dei cluster di soluzioni di una formula fissata.
+Indichiamo con $s_C=N^{-1}\log|C|$ l'entropia interna del cluster $C$ e con $\Sig(f)$ la densit\`a di complessit\`a, cio\`e $N^{-1}$ volte il logaritmo del numero di cluster con densit\`a di energia libera $f$.
+La somma pesata
+\begin{equation}
+  \Xi(m)=\sum_{C\in\mathcal{C}}|C|^m
+  \simeq\int\mathrm{d}f\,\exp\bigl(N[\Sig(f)-\beta m f]\bigr)
+\end{equation}
+seleziona, al variare di $m$, diverse sezioni della curva $\Sig$.
+A $m\to 0$ i cluster sono contati uno a uno; a $m=1$ si recupera l'equilibrio, in cui i cluster pesano secondo il numero di soluzioni che contengono.
+Nel codice e negli esperimenti di questo lavoro la quantit\`a chiamata complessit\`a \`e il logaritmo estensivo del numero di cluster; la densit\`a \`e quindi $\Sig/N$.
+
+\subsection{Equazioni di survey propagation}
+
+Sul factor graph della formula, i messaggi di SP sono survey $\eta_{a\to i}\in[0,1]$: probabilit\`a che la clausola $a$ invii un warning alla variabile $i$ in un cluster tipico.
+Per un arco variabile--clausola $j\to a$, i warning entranti dagli altri vicini di $j$ producono un campo cavitarie $h$.
+Le configurazioni con conflitti (warning opposti) sono escluse.
+Le quantit\`a $\Pi^u_{j\to a}$, $\Pi^s_{j\to a}$ e $\Pi^0_{j\to a}$ raccolgono le probabilit\`a delle configurazioni che spingono $j$ a non soddisfare $a$, a soddisfarla, o a lasciarla libera.
+L'aggiornamento di clausola \`e
+\begin{equation}
+  \eta_{a\to i}
+  =\prod_{j\in\partial a\setminus i}
+  \frac{\Pi^u_{j\to a}}{\Pi^u_{j\to a}+\Pi^s_{j\to a}+\Pi^0_{j\to a}}.
+  \label{eq:sp-eta}
+\end{equation}
+Dai messaggi convergenti si ottengono i bias di variabile $w_i^+$, $w_i^-$ e la complessit\`a $\Sig$ come somma di contributi di clausole e di variabili~\cite{braunstein2005survey,marino2016bsp}.
+
+\subsection{Backtracking survey propagation}
+
+BSP alterna aggiornamenti SP, mosse di decimazione e mosse di backtracking.
+Nella decimazione si fissa la variabile con bias pi\`u alto nella direzione suggerita.
+Nel backtracking si libera una variabile gi\`a fissata secondo un criterio locale (nel BSP originale: polarizzazione o certainty calcolate al momento del fissaggio).
+Il parametro $r$ \`e il rapporto fra numero di backtracking e numero di decimazioni; per $r=0$ si recupera la decimazione pura guidata da SP.
+Il tempo di calcolo scala come $N/(1-r)$~\cite{marino2016bsp}.
+
+\section{Survey propagation termodinamica}
+\label{sec:thermo}
+
+\subsection{Semianelli termodinamici}
+
+Nel semianello tropicale min-plus l'addizione \`e $x\oplus y=\min(x,y)$: sopravvive soltanto l'alternativa migliore.
+Marcolli e Thorngren~\cite{marcolli2014thermodynamic} deformano questa operazione con un'entropia $S$ e una temperatura $T$:
+\begin{equation}
+  x\oplus_{S,T}y
+  =\min_{p\in[0,1]}
+  \bigl[p\,x+(1-p)\,y-T\,S(p)\bigr].
+\end{equation}
+Per l'entropia di Shannon si ottiene
+\begin{equation}
+  x\oplus_{\mathrm{Sh},T}y
+  =-T\log\bigl(e^{-x/T}+e^{-y/T}\bigr),
+\end{equation}
+cio\`e una free energy a due stati.
+Per $T\to 0$ si recupera $\min(x,y)$.
+La stessa costruzione ammette una forma $n$-aria sul simplesso delle probabilit\`a, interpretabile come mescolamento termodinamico di $n$ alternative~\cite{marcolli2014thermodynamic}.
+Questa \`e la struttura algebrica che usiamo per aggregare le configurazioni di warning.
+
+\subsection{Deformazione delle somme cavitarie}
+
+Fissiamo un arco $j\to a$ e una configurazione $\omega$ dei warning entranti in $j$ dagli altri vicini.
+Siano $p(\omega)$ e $q(\omega)$ i numeri di warning che spingono $j$ a soddisfare $a$ e a non soddisfarla.
+L'energia di conflitto \`e
+\begin{equation}
+  \Delta E(\omega)=\min\bigl(p(\omega),q(\omega)\bigr).
+\end{equation}
+Se $P_0(\omega)$ \`e la misura a priori indotta dalle survey entranti, definiamo la free energy del settore di campo $h$ come
+\begin{equation}
+  F^{(T)}_{j\to a}(h)
+  =-T\log\sum_{\omega:\,h(\omega)=h}
+  P_0(\omega)\,e^{-\Delta E(\omega)/T}.
+  \label{eq:F-thermo}
+\end{equation}
+In forma di semianello,
+\begin{equation}
+  F^{(T)}_{j\to a}(h)
+  =\bigoplus_{\omega:\,h(\omega)=h}^{\mathrm{Sh},T}
+  \bigl[\Delta E(\omega)-T\log P_0(\omega)\bigr].
+\end{equation}
+La forma variazionale equivalente \`e
+\begin{equation}
+  F^{(T)}_{j\to a}(h)
+  =\min_{\rho}
+  \Bigl[
+  \E_{\rho}[\Delta E]+T\,D_{\mathrm{KL}}(\rho\Vert P_0)
+  \Bigr],
+\end{equation}
+dove il minimo corre sulle misure $\rho$ supportate sulle configurazioni con campo $h$.
+La soluzione ``dura'' minimizza soltanto l'energia; la soluzione termodinamica bilancia energia e distanza informazionale dalla misura cavitaria di riferimento.
+
+Le probabilit\`a termiche dei settori $u$, $s$ e $0$ sono
+\begin{align}
+  \widetilde{\Pi}^{u}_{j\to a}(T)
+  &\propto\sum_{q>p}C_{pq}\,e^{-\min(p,q)/T},\\
+  \widetilde{\Pi}^{s}_{j\to a}(T)
+  &\propto\sum_{p>q}C_{pq}\,e^{-\min(p,q)/T},\\
+  \widetilde{\Pi}^{0}_{j\to a}(T)
+  &\propto\sum_{p=q}C_{pq}\,e^{-p/T},
+\end{align}
+dove $C_{pq}$ \`e la probabilit\`a a priori di $p$ warning soddisfacenti e $q$ insoddisfacenti, ottenuta dal prodotto polinomiale sulle survey entranti.
+L'equazione di clausola diventa
+\begin{equation}
+  \eta^{(T)}_{a\to i}
+  =\prod_{j\in\partial a\setminus i}
+  \frac{\widetilde{\Pi}^{u}_{j\to a}(T)}
+  {\widetilde{\Pi}^{u}_{j\to a}(T)
+  +\widetilde{\Pi}^{s}_{j\to a}(T)
+  +\widetilde{\Pi}^{0}_{j\to a}(T)}.
+  \label{eq:thermo-eta}
+\end{equation}
+
+\subsection{Limiti e identificazioni}
+
+Per $T\to 0$,
+\begin{equation}
+  e^{-\min(p,q)/T}
+  \to
+  \begin{cases}
+  1 & \text{se }\min(p,q)=0,\\
+  0 & \text{se }\min(p,q)>0.
+  \end{cases}
+\end{equation}
+Le somme $\widetilde{\Pi}$ riducono alle $\Pi$ di SP, e quindi
+\begin{equation}
+  \lim_{T\to 0}\mathrm{ThermoSP}(T)=\mathrm{SP}.
+\end{equation}
+A $T>0$ il peso $e^{-\Delta E/T}$ \`e il fattore di Boltzmann delle configurazioni con conflitti.
+Identificando $T=1/y$ si recupera la survey propagation a energia finita gi\`a presente in letteratura~\cite{braunstein2004surveybp,wemmenhove2007finite}.
+La novit\`a che rivendichiamo non \`e quindi la sola deformazione dei messaggi, ma la sua lettura come operazione di semianello termodinamico e, soprattutto, l'uso delle free energy risultanti come segnali di controllo del BSP (Sezione~\ref{sec:policy}).
+
+Due temperature devono restare distinte.
+La temperatura cavitarie $\Tc$ deforma l'aggregazione dei warning dentro le equazioni di messaggio.
+La temperatura di azione $\Ta$ deforma la politica di scelta fra azioni (decimare, backtrackare, scegliere il segno).
+Sono parametri indipendenti: $\Tc$ ha un interpretazione fisica nel sistema esteso di~\cite{braunstein2004surveybp}; $\Ta$ \`e un parametro di esplorazione del solver.
+
+\section{Politiche basate sulla free entropy}
+\label{sec:policy}
+
+\subsection{Dal bias al costo di free energy}
+
+Nel BSP standard i bias $w_i^\pm$ sono marginali locali.
+Noi consideriamo invece risposte della free entropy a un vincolo locale.
+Siano $\Phi_i^+(T)$ e $\Phi_i^-(T)$ le free energy cavitarie associate ai due valori di $x_i$.
+Il bias termodinamico \`e
+\begin{equation}
+  B_i^{\mathrm{th}}(T)=\Phi_i^-(T)-\Phi_i^+(T),
+\end{equation}
+e una politica di Gibbs a temperatura $\Ta$ sceglie
+\begin{equation}
+  \pi_{\Ta}(x_i=\sigma)
+  \propto\exp\bigl(-\Phi_i^\sigma/\Ta\bigr).
+\end{equation}
+Per il backtracking, il costo relativo dell'assegnazione corrente \`e
+\begin{equation}
+  \Delta\Phi_i
+  =\Phi_i^{\mathrm{assigned}}-\min_{\sigma}\Phi_i^\sigma.
+\end{equation}
+
+\subsection{Survey virtuali e quantit\`a $I(k)$}
+
+Un membro particolarmente semplice di questa famiglia si ottiene a vincolo duro ($\Tc=0$) senza liberare realmente la variabile.
+Ricostruiamo le survey ``virtuali'' di ogni variabile fissata $k$ usando i messaggi correnti dei suoi vicini.
+Se $k$ \`e fissata a vero, poniamo
+\begin{equation}
+  I(k)=1-s_F(k);
+\end{equation}
+se \`e fissata a falso,
+\begin{equation}
+  I(k)=1-s_T(k).
+\end{equation}
+Qui $s_T$ e $s_F$ sono le probabilit\`a survey di essere forzati a vero o a falso nella popolazione corrente dei cluster.
+$I(k)$ \`e quindi la frazione di cluster attuali compatibili con il valore gi\`a assegnato a $k$.
+
+Se i cluster della formula con $k$ fissata sono la frazione $I(k)$ dei cluster della formula in cui $k$ \`e libera, il guadagno di complessit\`a al rilascio vale
+\begin{equation}
+  \Delta\Sig_{\mathrm{release}}\simeq -\log I(k)
+  \label{eq:delta-sigma-I}
+\end{equation}
+(logaritmo estensivo; nella convenzione densitaria il fattore $1/N$ compare esplicitamente).
+Il backtracking dinamico-$I$ libera la variabile con il pi\`u piccolo $I(k)$ corrente.
+Decimazione, direzione e frequenza $r$ restano quelle del BSP.
+
+La relazione~\eqref{eq:delta-sigma-I} collega direttamente la teoria 1RSB al criterio operativo: liberare l'assegnazione compatibile con la frazione pi\`u piccola di cluster massimizza, a un passo, il recupero di $\Sig$.
+Nella espansione a bassa temperatura $F_T=E_{\min}-T\log W_{\min}$, la differenza di free energy fratto $T$ riduce a un logaritmo di rapporti di probabilit\`a; $I(k)$ e $\Delta\Phi$ sono quindi due punti dello stesso funzionale, presi a temperature e a normalizzazioni diverse.
+
+\subsection{Asse dei cluster non congelati}
+
+Marino, Parisi e Ricci-Tersenghi~\cite{marino2016bsp} suggeriscono di concentrare la misura sui cluster unfrozen.
+Una famiglia naturale \`e
+\begin{equation}
+  \mu_{m,\gamma}(C)
+  \propto\exp\bigl[N(m\,s_C+\gamma\,q_C)\bigr],
+\end{equation}
+dove $q_C$ \`e la frazione di variabili non congelate del cluster.
+Il parametro $m$ premia i cluster internamente ricchi; $\gamma$ premia i cluster in cui la variabile cavitarie non riceve warning.
+Operativamente, nella stella a temperatura zero il settore unfrozen $A_0 B_0$ pesa $e^{\gamma}$ e i settori frozen restano invariati prima della rinormalizzazione.
+I conflitti bilanciati a $\Tc>0$ ($p=q>0$) non ricevono $e^{\gamma}$.
+Il messaggio resta $\eta=\pi^u/z^{(\gamma)}$.
+Con $\gamma\neq 0$ la $\Sig$ stampata \`e la free entropy di questa misura biasata, non la complexity uniforme a $m=0$, $\gamma=0$.
+L'opzione \`e \texttt{--rsb-gamma}. Non va confusa con lo scorer \texttt{gamma:<g>}, che ordina soltanto la decimazione.
+
+\section{Metodi}
+\label{sec:methods}
+
+\subsection{Implementazione}
+
+Le equazioni~\eqref{eq:F-thermo}--\eqref{eq:thermo-eta} sono implementate come somma polinomiale sui coefficienti dei prodotti $\prod_b(1-\eta_b+\eta_b z)$.
+A $\Tc=0$ le correzioni di conflitto si annullano e i fattori riducono esattamente alle $\Pi$ del codice SP legacy.
+La politica di Gibbs sulla direzione usa
+\begin{equation}
+  P(x_i=\mathrm{vero})
+  =\bigl(1+e^{(\Phi_i^+-\Phi_i^-)/\Ta}\bigr)^{-1}
+\end{equation}
+e coincide con la regola dura per $\Ta\le 0$.
+Il backtracking dinamico-$I$ ricostruisce le survey virtuali senza rilanciare una SP completa sulla formula con $k$ liberata.
+
+\subsection{Validazione dello stimatore $I(k)$}
+
+Su istanze intermedie del BSP, per $120$ scelte di variabili fissate, confrontiamo $-\log I(k)$ con la variazione reale di $\Sig$ ottenuta liberando $k$, riconvergendo SP e misurando $\Delta\Sig$.
+Questa \`e la verifica meccanicistica centrale: lo stimatore locale deve predire il guadagno globale.
+
+\subsection{Protocolli di risoluzione}
+
+Confrontiamo tre criteri di backtracking a parit\`a di $r$ e di regola di decimazione:
+\begin{itemize}
+  \item certainty (BSP di riferimento);
+  \item polarizzazione;
+  \item dinamico-$I$.
+\end{itemize}
+I protocolli principali sono $K=3$, $N=10^4$, $\alpha=4{,}2$ (cinque seed) e $K=4$, $N=10^3$, $\alpha=9{,}5$ (dieci seed).
+Oltre al tasso di successo SAT misuriamo la traiettoria $\Sig(t)$, la roughness a parit\`a di variabili fissate, il massimo drop di $\Sig$ a profondit\`a fissata e il tempo di calcolo.
+Le soluzioni trovate sono verificate clausola per clausola sulla formula originale.
+
+\section{Risultati}
+\label{sec:results}
+
+\subsection{Accuratezza di $I(k)$ come predittore di $\Delta\Sig$}
+
+Nei $120$ esperimenti di liberazione reale, la correlazione fra guadagno previsto $-\log I(k)$ e guadagno misurato \`e $r=0{,}99684$.
+Il segno della variazione \`e corretto in $120$ casi su $120$.
+L'errore medio assoluto \`e $0{,}00056$.
+Lo stimatore locale ricostruito dalle survey virtuali misura quindi, entro l'errore numerico, il guadagno globale di complessit\`a dovuto al rilascio.
+Questo risultato supporta l'ipotesi che la risposta della free entropy al vincolo $x_k=$assegnato sia la quantit\`a rilevante per il backtracking, e non il bias congelato al momento del fissaggio.
+
+\subsection{Dinamica della complessit\`a e tasso di successo}
+
+Per $K=3$, $N=10^4$, $\alpha=4{,}2$, dinamico-$I$ risolve $5/5$ istanze, certainty $4/5$, polarizzazione $5/5$.
+Rispetto a certainty, dinamico-$I$ riduce la discesa media di $\Sig$ del $26{,}0\%$, la roughness a parit\`a di variabili fissate del $17{,}7\%$ e il massimo drop a profondit\`a fissata del $17{,}9\%$, con un aumento di tempo del $5{,}8\%$.
+
+Per $K=4$, $N=10^3$, $\alpha=9{,}5$, dinamico-$I$ risolve $6/10$ istanze, certainty $5/10$, polarizzazione $6/10$.
+Rispetto a certainty, $|\Delta\Sig|$ medio scende dell'$8{,}6\%$, la discesa media del $23{,}2\%$, il massimo drop a profondit\`a fissata del $39{,}8\%$; la roughness migliora del $4{,}8\%$, mentre il tempo cresce di un fattore $1{,}94$.
+Le undici soluzioni trovate da dinamico-$I$ sui due protocolli sono state verificate esaustivamente.
+
+\subsection{Limiti osservati}
+
+Una discesa pi\`u lenta di $\Sig$ non implica da sola lo spostamento della soglia algoritmica $\alpha_a$.
+Un lookahead che massimizzava direttamente $\Sig$ dopo la mossa \`e risultato costosissimo e quasi inutile.
+Alcuni criteri riducevano il massimo drop ma diminuivano il successo.
+A $K=4$, $\alpha=9{,}7$, dinamico-$I$ produce ancora la curva di complessit\`a pi\`u regolare, ma tutti i metodi falliscono ($0/5$).
+Conservare cluster disponibili \`e quindi una condizione favorevole, non sufficiente: contano anche la stabilit\`a del punto fisso SP e la scelta di assegnazioni che non conducano a futuri punti spinodali.
+
+\section{Discussione}
+\label{sec:discussion}
+
+Il contributo pi\`u solido \`e meccanicistico: $I(k)$ collega una quantit\`a 1RSB locale alla variazione globale di $\Sig$, con accuratezza quasi esatta.
+Questo risolve, nella pratica, il problema dei bias stantii nel backtracking del BSP.
+La lettura in termini di free energy colloca $I(k)$ in una famiglia pi\`u ampia $(\Tc,\Ta,m,\gamma)$, di cui soltanto l'angolo duro della politica di rilascio \`e stato misurato in modo sistematico.
+
+La deformazione ThermoSP a $\Tc>0$ coincide con SP a energia finita.
+Il formalismo dei semianelli termodinamici fornisce linguaggio, forma variazionale e la domanda sulla conservazione della struttura di message passing sotto deformazioni di R\'enyi o Tsallis~\cite{marcolli2017entropy}.
+Non fornisce da solo un nuovo algoritmo: senza un principio di selezione dei parametri, la famiglia rischia di diventare uno spazio di ricerca euristico.
+
+Sull'asse $m>0$ siamo cauti.
+I risultati con $I(k)$ stanno nel conteggio uniforme dei cluster ($m=0$).
+Premiare i cluster a maggiore entropia interna allontana la misura dal punto sperimentalmente favorevole.
+L'asse $\gamma$ verso cluster unfrozen resta, a nostro avviso, la direzione teorica pi\`u promettente e la meno sviluppata.
+
+Il controllo soft globale basato su una ricorrenza di partition function sull'albero di ricerca~\cite{kappen2005path} richiede un troncamento.
+Nei nostri test, i lookahead su $\Sig$ non hanno migliorato il successo a costo accettabile.
+Preferiamo quindi politiche a un passo basate su risposte locali, come $I(k)$ e $\Delta\Phi$, rispetto a stime di valore a profondit\`a maggiore.
+
+Per una rivendicazione sulla soglia algoritmica servono ancora una griglia di $\alpha$ vicino a $\alpha_s$, decine di seed per punto, stime di $\alpha_a$ con intervalli di confidenza, test a pi\`u $N$ e un insieme di formule tenute fuori dallo sviluppo.
+
+\section{Conclusioni}
+\label{sec:conclusions}
+
+Abbiamo formulato la survey propagation termodinamica come deformazione di semianello dell'aggregazione cavitarie, con limite duro uguale a SP, e abbiamo collegato la politica di backtracking del BSP a risposte locali della free entropy.
+Lo stimatore $I(k)$, ricostruito dalle survey virtuali, predice la variazione di complessit\`a al rilascio con correlazione prossima a uno e migliora la dinamica di $\Sig$ su istanze $3$-SAT e $4$-SAT di grandezza algoritmica rilevante.
+
+Il passo successivo \`e derivare le equazioni SP con campo sorgente sulle variabili congelate (asse $\gamma$) e confrontare $\Delta\Phi$ a temperatura finita con $I(k)$ come predittore di $\Delta\Sig$ su formule non usate nello sviluppo.
+Solo dopo quel confronto, e dopo una campagna statistica sulla soglia, sar\`a possibile decidere se la famiglia termodinamica sposta $\alpha_a$ oppure se il contributo pubblicabile resta la ricostruzione operativa delle survey virtuali.
+
+\section*{Ringraziamenti}
+Lavoro in corso.
+Ringraziamo i colleghi e i collaboratori che hanno discusso le idee qui presentate.
+
+\bibliography{thermosp}
+\bibliographystyle{iclr2027_conference}
+
+\end{document}

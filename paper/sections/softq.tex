@@ -1,0 +1,251 @@
+\section{Un look-ahead soft a due passi}
+\label{sec:softq}
+
+Questa sezione propone una variante di BSP.
+È la sola parte algoritmica del lavoro.
+La variante usa le equazioni di Bellman soft del Soft Actor-Critic (SAC) di Haarnoja e coautori~\citep{haarnoja2018soft} e le combina con l'identità locale della Proposizione~\ref{prop:local}.
+Il ponte con il resto del lavoro è la somma termodinamica di Shannon: SAC la applica alle azioni della ricerca, come SP la applica ai warning e il potenziale 1RSB agli stati.
+Gli enunciati algebrici di questa sezione sono verificati in Lean~4 con Mathlib, nel file \texttt{lean/SoftQ.lean} del codice.
+Fra parentesi quadre diamo il nome del teorema Lean corrispondente.
+
+\subsection{Il problema di controllo}
+
+Lo stato è la formula residua $F$, con il suo punto fisso di SP.
+Un'azione è una coppia $(k,s)$: si fissa la variabile libera $k$ al valore $s$.
+La transizione è deterministica e porta nella formula ridotta $F^{(k,s)}=F|_{x_k=s}$, dopo la propagazione unitaria.
+La ricompensa $r(F,(k,s))$ sarà definita nella~\eqref{eq:tsallis-reward}.
+Una politica $\pi(\cdot\mid F)$ è una distribuzione sulle azioni.
+SAC massimizza la somma delle ricompense più l'entropia della politica, pesata con una temperatura $\alpha>0$.
+Con transizioni deterministiche le equazioni di Bellman soft sono
+\begin{equation}
+Q_\alpha(F,a)=r(F,a)+V_\alpha(F^{a}),\qquad
+V_\alpha(F)=\alpha\log\sum_a e^{Q_\alpha(F,a)/\alpha},\qquad
+\pi_\alpha(a\mid F)=e^{[Q_\alpha(F,a)-V_\alpha(F)]/\alpha}.
+\label{eq:soft-bellman}
+\end{equation}
+La politica di SAC è quindi la distribuzione di Gibbs dei valori $Q_\alpha$, e vale l'identità $Q_\alpha-V_\alpha=\alpha\log\pi_\alpha$.
+
+\begin{proposizione}[Il valore soft è una somma termodinamica]
+\label{prop:sac-shannon}
+Sia $Q_a$ un numero reale per ogni azione $a$ di un insieme finito, e sia $\alpha>0$.
+Per ogni distribuzione $p$ sulle azioni vale
+\begin{equation}
+\sum_ap_aQ_a+\alpha H(p)\le\alpha\log\sum_ae^{Q_a/\alpha},
+\label{eq:sac-bound}
+\end{equation}
+e l'uguaglianza vale per $p_a\propto e^{Q_a/\alpha}$.
+[\texttt{sac\_objective\_le\_soft}, \texttt{sac\_objective\_gibbs}]
+\end{proposizione}
+
+\begin{proof}
+È la Proposizione~\ref{prop:shannon} con $x_a=-Q_a$ e $T=\alpha$, letta con il segno opposto.
+\end{proof}
+
+Il valore $V_\alpha$ è quindi la somma di Maslov $\oplus_\alpha$ della Sezione~\ref{sec:notation} applicata ai valori delle azioni, cioè $V_\alpha=-\bigoplus_{\Sh,\alpha}\{-Q_a\}_a$.
+Per $\alpha\to0$ esso tende a $\max_aQ_a$, e la politica diventa la scelta deterministica della migliore azione.
+Nel lavoro la somma di Shannon compare quindi su tre livelli.
+Il primo è l'aggregazione dei warning (Sezione~\ref{sec:spy}).
+Il secondo è il potenziale dei cluster, dove la temperatura è $1/y$.
+Il terzo è la scelta delle mosse della ricerca, dove la temperatura è $\alpha$.
+Per l'Osservazione~\ref{oss:no-free-T} i primi due livelli hanno la stessa temperatura.
+Il terzo livello non ha questo vincolo: $\alpha$ è la temperatura di azione $\Tact$ della Sezione~\ref{sec:response}, e non corrisponde a nessun potenziale 1RSB.
+
+\subsection{Tre ostacoli a una traduzione letterale}
+
+\begin{proposizione}[La complessità telescopa]
+\label{prop:telescoping}
+Sia $F_0,F_1,\dots,F_n$ una traiettoria della decimazione e sia $r_t=\Sig(F_{t+1})-\Sig(F_t)$.
+Allora $\sum_{t<n}r_t=\Sig(F_n)-\Sig(F_0)$.
+Due traiettorie con gli stessi estremi hanno la stessa somma.
+[\texttt{telescoping}, \texttt{same\_return}]
+\end{proposizione}
+
+Una ricompensa di questa forma è una differenza di potenziali.
+Ng, Harada e Russell~\citep{ng1999policy} mostrano che una ricompensa di questo tipo non cambia la politica ottima.
+La richiesta di una discesa lenta della complessità è quindi una richiesta sulla forma della traiettoria, e non sulla perdita totale.
+
+\begin{osservazione}[Il look-ahead a un passo]
+\label{oss:one-step}
+Si fissi $x_k=s$ e si riconverga SP.
+Per le Proposizioni~\ref{prop:local} e~\ref{prop:remainder} la variazione misurata della complessità è $\log(1-w_k^{-s})+R_{k,s}$, con $R_{k,s}$ di secondo ordine.
+Un look-ahead a un passo sulla complessità ricalcola quindi il bias $b_k$, a meno di un termine di secondo ordine, al prezzo di una riconvergenza completa.
+\end{osservazione}
+
+Il secondo passo letterale di SAC è $V_\alpha(F^{(k,s)})=\alpha\log\sum_{l,t}e^{r_l^t/\alpha}$, dove la somma corre sulle mosse $(l,t)$ disponibili dopo la prima.
+La proposizione seguente mostra che anche questo valore porta poca informazione.
+
+\begin{proposizione}[Il secondo passo letterale degenera]
+\label{prop:degenerate}
+\begin{enumerate}
+\item Siano $b_l\in[0,1]$ per ogni $l$ di un insieme finito, e sia $b_{l_0}=1$ per un $l_0$. Allora $\max_l\log b_l=0$. [\texttt{hard\_two\_step\_degenerate}]
+\item Siano $Z>0$, $Z+\delta>0$ e $\alpha\ge0$. Allora
+\begin{equation}
+\frac{\alpha\delta}{Z+\delta}\le\alpha\log(Z+\delta)-\alpha\log Z\le\frac{\alpha\delta}{Z}.
+\label{eq:dilution}
+\end{equation}
+[\texttt{dilution}]
+\end{enumerate}
+\end{proposizione}
+
+\begin{proof}
+Il primo punto segue da $\log b_l\le0$ e $\log b_{l_0}=0$.
+Il secondo segue da $1-1/x\le\log x\le x-1$ con $x=(Z+\delta)/Z$.
+\end{proof}
+
+Nel limite $\alpha\to0$ il secondo passo vale $\max_{l}\log b_l$.
+Durante quasi tutta la decimazione esiste una variabile con $b_l=1$, congelata o libera in tutti i cluster, e il primo punto dà zero per ogni prima mossa.
+Per $\alpha>0$ la somma $Z=\sum_{l,t}e^{r_l^t/\alpha}$ ha $2N_t$ termini.
+La prima mossa cambia solo i termini delle variabili vicine a $k$, quindi $\delta=O(1)$.
+Se una frazione finita dei termini è di ordine uno, allora $Z=\Theta(N_t)$, e la~\eqref{eq:dilution} dà una differenza di ordine $1/N_t$ fra due prime mosse.
+
+\subsection{La ricompensa di Tsallis}
+
+Sia $\lnq x=(x^{1-q}-1)/(1-q)$ il logaritmo di Tsallis della Proposizione~\ref{prop:tsallis}.
+Definiamo la ricompensa della mossa $(k,s)$ come
+\begin{equation}
+r_k^s=\lnq\bigl(1-w_k^{-s}\bigr).
+\label{eq:tsallis-reward}
+\end{equation}
+Per $q=1$ essa è la variazione della complessità data dall'identità locale~\eqref{eq:local-identity}.
+
+\begin{proposizione}[Proprietà della ricompensa]
+\label{prop:tsallis-reward}
+Siano $x,y>0$ e $q\ne1$.
+\begin{enumerate}
+\item $\lnq(xy)=\lnq x+\lnq y+(1-q)\lnq x\,\lnq y$. [\texttt{lnq\_mul}]
+\item Se $q>1$ e $x,y<1$, allora $\lnq(xy)<\lnq x+\lnq y$. [\texttt{lnq\_split}]
+\item Se $q>1$, la funzione $\lnq$ è strettamente crescente. [\texttt{lnq\_strictMono}]
+\item Per $q\to1$ si ha $\lnq x\to\log x$. [\texttt{lnq\_tendsto\_log}]
+\end{enumerate}
+\end{proposizione}
+
+\begin{proof}
+Il primo punto segue da $(xy)^{1-q}=x^{1-q}y^{1-q}$.
+Per il secondo, con $q>1$ e $x<1$ si ha $x^{1-q}>1$ e quindi $\lnq x<0$; lo stesso vale per $y$, e il termine $(1-q)\lnq x\,\lnq y$ è negativo.
+Il terzo segue da $x^{1-q}$ decrescente e da $1-q<0$.
+Il quarto è la derivata di $t\mapsto x^t$ in $t=0$, con $t=1-q$.
+\end{proof}
+
+Il primo punto dice che per $q\ne1$ la somma delle ricompense non telescopa.
+Il secondo dice che per $q>1$ una caduta di un fattore $xy$ in un solo passo costa più di due cadute di fattori $x$ e $y$.
+La ricompensa premia quindi una discesa lenta e regolare.
+Il terzo dice che, su un solo passo, la ricompensa ordina le mosse come il bias $b_k$.
+La deformazione di Tsallis agisce qui sulla ricompensa della ricerca.
+Nella Sezione~\ref{sec:qaxis} essa agiva invece sui pesi dei cluster, e le due deformazioni non vanno confuse.
+
+\subsection{Il valore a campi congelati}
+
+Dopo la prima mossa approssimiamo il futuro con i campi congelati.
+Questo significa che la ricompensa di una mossa futura $(l,t)$ è $r_l^t$ calcolata con le grandezze $w_l^\pm$ di $F^{(k,s)}$, e non dipende dalle mosse fatte prima di essa.
+
+\begin{proposizione}[Fattorizzazione]
+\label{prop:frozen}
+Sia $L$ un insieme finito di variabili, e siano $r_l^\pm$ numeri reali.
+\begin{enumerate}
+\item Il guadagno di un assegnamento completo $t\in\{\pm1\}^L$ è $\sum_lr_l^{t_l}$, per ogni ordine in cui le variabili vengono fissate. [\texttt{frozen\_order\_free}]
+\item Per ogni $\alpha>0$ vale
+\begin{equation}
+\alpha\log\sum_{t\in\{\pm1\}^L}\exp\Bigl(\frac1\alpha\sum_{l\in L}r_l^{t_l}\Bigr)=\sum_{l\in L}v_\alpha(l),\qquad
+v_\alpha(l)=\alpha\log\bigl(e^{r_l^+/\alpha}+e^{r_l^-/\alpha}\bigr).
+\label{eq:frozen-value}
+\end{equation}
+[\texttt{frozen\_soft\_value}]
+\end{enumerate}
+\end{proposizione}
+
+\begin{proof}
+Il primo punto è l'invarianza di una somma finita per permutazione.
+Il secondo segue da $\sum_t\prod_le^{r_l^{t_l}/\alpha}=\prod_l\sum_{t_l}e^{r_l^{t_l}/\alpha}$ e dal logaritmo di un prodotto.
+\end{proof}
+
+Il valore del futuro a campi congelati è quindi
+\begin{equation}
+V_\alpha(F)=\sum_{l\ \text{libera in}\ F}v_\alpha(l).
+\label{eq:frozen-V}
+\end{equation}
+Abbiamo tolto il fattore $N_t!$ degli ordinamenti, perché ordini diversi portano allo stesso assegnamento.
+Il valore~\eqref{eq:frozen-V} è estensivo, a differenza del secondo passo letterale.
+
+\begin{proposizione}[Limite duro del valore di sito]
+\label{prop:site-limit}
+Per $\alpha>0$ vale $\max(r_l^+,r_l^-)\le v_\alpha(l)\le\max(r_l^+,r_l^-)+\alpha\log2$.
+Quindi $v_\alpha(l)\to\max(r_l^+,r_l^-)=\lnq b_l$ per $\alpha\to0^+$, se $q\ge1$.
+[\texttt{soft2\_ge\_max}, \texttt{soft2\_le\_max\_add}, \texttt{soft2\_tendsto\_max}]
+\end{proposizione}
+
+\begin{proof}
+La somma $e^{r_l^+/\alpha}+e^{r_l^-/\alpha}$ sta fra $e^{m/\alpha}$ e $2e^{m/\alpha}$, con $m=\max(r_l^+,r_l^-)$.
+L'uguaglianza $m=\lnq b_l$ segue dalla monotonia di $\lnq$ e da $b_l=1-\min(w_l^+,w_l^-)$.
+\end{proof}
+
+\subsection{Il punteggio}
+
+Il valore soft della mossa $(k,s)$ è $Q_\alpha(F,(k,s))=r_k^s+V_\alpha(F^{(k,s)})$.
+Siano $L$ e $L'$ gli insiemi delle variabili libere in $F$ e in $F^{(k,s)}$.
+L'insieme $L'$ non contiene $k$ e le variabili fissate dalla propagazione unitaria.
+
+\begin{proposizione}[Decomposizione del punteggio]
+\label{prop:score}
+Vale
+\begin{equation}
+Q_\alpha(F,(k,s))-V_\alpha(F)=\alpha\log\pi_\alpha(s\mid k)+D_\alpha(k,s),
+\label{eq:score}
+\end{equation}
+con
+\begin{equation}
+\pi_\alpha(s\mid k)=\frac{e^{r_k^s/\alpha}}{e^{r_k^+/\alpha}+e^{r_k^-/\alpha}},\qquad
+D_\alpha(k,s)=\sum_{l\in L'}v_\alpha\bigl(l;F^{(k,s)}\bigr)-\sum_{l\in L\setminus k}v_\alpha(l;F).
+\label{eq:D}
+\end{equation}
+[\texttt{score\_decomposition}, \texttt{sac\_identity}]
+\end{proposizione}
+
+\begin{proof}
+Si separa il termine di $k$ in $V_\alpha(F)$, e si usa $\alpha\log\pi_\alpha(s\mid k)=r_k^s-v_\alpha(k)$.
+\end{proof}
+
+Il primo termine è l'identità di SAC applicata alla scelta del segno di $k$.
+Il secondo termine è il vero look-ahead: misura quanto la mossa cambia il valore soft delle altre variabili.
+
+\begin{corollario}[Variabili congelate e variabili libere]
+\label{cor:frozen-free}
+Se $k$ non è congelata in nessun cluster, cioè $w_k^+=w_k^-=0$, allora $v_\alpha(k)=\alpha\log2$ e $\alpha\log\pi_\alpha(s\mid k)=-\alpha\log2$.
+Se $w_k^{-s}=0$, allora $r_k^s=0$ e $0\le v_\alpha(k)\le\alpha e^{r_k^{-s}/\alpha}$.
+Se inoltre $w_k^s\to1$, cioè $k$ è congelata al valore $s$ in quasi tutti i cluster, allora $r_k^{-s}\to-\infty$ e $\alpha\log\pi_\alpha(s\mid k)\to0$.
+[\texttt{soft2\_unfrozen}, \texttt{soft2\_frozen}]
+\end{corollario}
+
+Le due variabili del corollario hanno entrambe $b_k=1$, e la Sezione~\ref{sec:response} ha mostrato che il criterio della complessità non le distingue.
+Il punteggio soft le distingue: per $\alpha>0$ esso fissa prima le variabili congelate e lascia libere le variabili libere in tutti i cluster.
+Questo è lo stesso ordine del secondo criterio di BSP, la polarizzazione $|w_k^+-w_k^-|$.
+
+\begin{osservazione}[Il termine a un passo si cancella]
+\label{oss:cancel}
+Per $\alpha\to0$ e $s$ il valore più probabile si ha $\alpha\log\pi_\alpha(s\mid k)\to0$, e la~\eqref{eq:score} si riduce a $D_0(k,s)$.
+Con campi congelati il costo $\lnq b_k$ si paga comunque, prima o dopo, e il punteggio dipende solo dall'effetto della mossa sulle altre variabili.
+Per questo motivo teniamo il bias di BSP come filtro dei candidati.
+\end{osservazione}
+
+La somma in~\eqref{eq:D} corre su tutte le variabili libere, ma riceve contributi soprattutto dalle variabili vicine a $k$.
+Il Corollario~\ref{cor:tree} e la Proposizione~\ref{prop:remainder} suggeriscono questa località, ma essa è un'ipotesi da misurare.
+Se la località vale, $D_\alpha$ è di ordine uno e non si diluisce come il secondo passo letterale.
+
+\subsection{L'algoritmo SQ$(M,\alpha,q)$}
+
+La variante cambia solo la scelta delle variabili da fissare in un passo di decimazione.
+Sia $B=\max(1,\lfloor fN_t\rfloor)$ la dimensione del batch di BSP.
+\begin{enumerate}
+\item Si prendono come candidati le prime $M$ variabili libere nell'ordine di BSP. Se $M\le B$ l'algoritmo è BSP.
+\item Per ogni candidato $k$ con il valore più probabile $s$ si esegue una sonda: si fissa $x_k=s$, si applica la propagazione unitaria e si riconverge SP su una copia della formula. Se la sonda trova una contraddizione o non converge, il punteggio vale $-\infty$. Altrimenti si calcola $V_\alpha(F^{(k,s)})$.
+\item Il punteggio è il membro destro della~\eqref{eq:score}.
+\item Per $\alpha=0$ si fissano i $B$ candidati con il punteggio più alto. Per $\alpha>0$ si estraggono $B$ candidati senza reinserimento con probabilità proporzionali a $e^{\text{punteggio}/\alpha}$, con il metodo Gumbel-top-$k$~\citep{kool2019stochastic}.
+\item I passi di backtracking restano quelli di BSP.
+\end{enumerate}
+Per $M\le B$ si ritrova BSP.
+Nel codice abbiamo verificato che questo limite, e il caso in cui le sonde vengono eseguite ma l'ordine di BSP viene mantenuto, riproducono BSP passo per passo.
+Il costo è di $M$ riconvergenze di SP per ogni passo di decimazione.
+Il look-ahead a un passo dell'Osservazione~\ref{oss:one-step} è il caso in cui il punteggio è la complessità dopo la sonda.
+
+SAC stima $Q_\alpha$ con una rete e con l'apprendimento.
+Qui il modello della dinamica è noto, perché è SP stessa, e $Q_\alpha$ si calcola con una sonda.
+La famiglia di algoritmi più vicina è quindi la pianificazione a massima entropia~\citep{xiao2019maximum}, più che l'actor-critic.
