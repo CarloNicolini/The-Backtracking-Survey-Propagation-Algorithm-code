@@ -26,6 +26,7 @@ RUNS_COLS = [
     "sigma_last_over_N",
     "sigma_res",
     "sigma_res_over_N",
+    "sp_sweeps",
 ]
 
 STEPS_COLS = [

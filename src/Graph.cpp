@@ -27,8 +27,10 @@
 
 #include <bsp/Graph.hpp>
 #include <bsp/thermo_sp.hpp>
+#include <bsp/softq.hpp>
 #ifndef _WIN32
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <csignal>
@@ -62,6 +64,10 @@ double g_frac = frac;
 static const double k_slope_frac = 0.05;
 static const unsigned k_eta_cut = 128;
 static const double k_r_boost = 0.09;
+/*Score of a failed probe. -inf is unsafe under -ffast-math.*/
+static const double k_softq_fail = -1e300;
+/*Wall-clock limit of one rollout child.*/
+static const unsigned k_rollout_timeout_s = 1800;
 
 /***********************************************************************************/
 /***********************************************************************************/
@@ -304,26 +310,42 @@ static void promote_unfixed(vector<Vertex*>& p, unsigned nfixed, const vector<Ve
     for (unsigned j=0; j<rest.size(); ++j) p[nfixed+win.size()+j]=rest[j];
 }
 
+/*Sum of the soft site values v_alpha over the free variables p[from..],
+ one sum for each (q, alpha) pair.*/
+static vector<double> free_site_value_sums(const vector<Vertex*>& p, unsigned from,
+                                           const vector<pair<double, double> >& qa) {
+    vector<double> s(qa.size(), 0.);
+    for (unsigned i=from; i<p.size(); ++i)
+        for (unsigned g=0; g<qa.size(); ++g)
+            s[g]+=softq_site_value(p[i]->_sT, p[i]->_sF, qa[g].first, qa[g].second);
+    return s;
+}
+
 /*Fork a child that fixes vars in the SP direction and reconverges.
  The parent graph is unchanged. Returns 1 if that child found a fixed point.
  sigma is the complexity after reconvergence. sweeps counts the iterations
  spent, and is added to the run total so a lookahead can be compared with
  plain BSP at equal SP work. A contradiction or a non-convergence returns 0
- and charges t_max sweeps.*/
-int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) {
+ and charges t_max sweeps. If vsum is given, it receives, for each (q, alpha)
+ pair of qa, the sum of the soft site values over the free variables after
+ reconvergence.*/
+int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps,
+                       const vector<pair<double, double> >& qa, vector<double>* vsum) {
     sigma=0.;
     sweeps=0;
+    if (vsum) vsum->assign(qa.size(), 0.);
     if (vars.empty()) return 0;
 #ifdef _WIN32
     return 0;
 #else
-    double* tout=(double*)mmap(NULL, 3*sizeof(double), PROT_READ|PROT_WRITE,
+    const size_t nout=3+qa.size();
+    double* tout=(double*)mmap(NULL, nout*sizeof(double), PROT_READ|PROT_WRITE,
                                MAP_SHARED|MAP_ANONYMOUS, -1, 0);
     if (tout==MAP_FAILED) {
         BSP_ERROR<<"mmap failed for complexity probe"<<endl;
         exit(-1);
     }
-    tout[0]=0.; tout[1]=0.; tout[2]=0.;
+    fill(tout, tout+nout, 0.);
     _diag_step_out<<flush;
     _diag_var_out<<flush;
     _diag_move_out<<flush;
@@ -355,6 +377,8 @@ int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) 
         tout[0]=1.;
         tout[1]=complexity;
         tout[2]=(double)_time_conv_print;
+        vector<double> s=free_site_value_sums(ptrV, (unsigned)_list_fixed_element.size(), qa);
+        copy(s.begin(), s.end(), tout+3);
         _exit(0);
     }
     int status=0;
@@ -363,12 +387,129 @@ int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) 
     if (conv) {
         sigma=tout[1];
         sweeps=(int)tout[2]+1;
+        if (vsum) copy(tout+3, tout+nout, vsum->begin());
     } else {
         sweeps=t_max;
     }
     _sp_sweeps+=(unsigned long)sweeps;
-    munmap(tout, 3*sizeof(double));
+    munmap(tout, nout*sizeof(double));
     return conv;
+#endif
+}
+/*Soft two-step look-ahead (paper, Section softq). The candidates are the
+ top-M free variables in the BSP order. Each is probed: fixed in the SP
+ direction, SP reconverged in a forked child. Its score is
+ alpha log pi(s|k) + D(k,s), with D = V(after) - V(before) + v_k.
+ A probe that hits a contradiction or does not converge scores -inf.
+ The best batch moves to the front of the free region; alpha>0 samples it
+ with the Gumbel top-k trick, i.e. without replacement from e^{score/alpha}.
+ At a rollout checkpoint every candidate also runs plain BSP to the end in a
+ child of its own. Returns true only in such a child, which must fix exactly
+ the candidate now at the front.*/
+bool Graph::softq_step(unsigned nfixed, unsigned batch) {
+    vector<Vertex*> cand;
+    for (unsigned i=nfixed; i<_N && cand.size()<g_softq_m; ++i)
+        if (bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) cand.push_back(ptrV[i]);
+    bool rollout=_softq_next_rollout<g_softq_rollout_at.size() &&
+                 nfixed>=g_softq_rollout_at[_softq_next_rollout]*_N;
+    if (cand.size()<=batch && !rollout) return false;
+    /*qa[0] is the active (q, alpha); a rollout also logs the scores of the grid*/
+    vector<pair<double, double> > qa(1, make_pair(g_softq_q, g_softq_alpha));
+    if (rollout) qa.insert(qa.end(), g_softq_score_grid.begin(), g_softq_score_grid.end());
+    vector<double> v0=free_site_value_sums(ptrV, nfixed, qa), v1;
+    vector<vector<double> > score(qa.size(), vector<double>(cand.size(), k_softq_fail));
+    vector<double> sig(cand.size(), 0.);
+    unsigned nfail=0, swsum=0;
+    for (unsigned j=0; j<cand.size(); ++j) {
+        Vertex* v=cand[j];
+        int sw=0;
+        bool ok=probe_fixes(vector<Vertex*>(1, v), sig[j], sw, qa, &v1);
+        swsum+=sw;
+        if (!ok) { ++nfail; continue; }
+        for (unsigned g=0; g<qa.size(); ++g) {
+            double q=qa[g].first, a=qa[g].second;
+            score[g][j]=softq_log_policy(v->_sT, v->_sF, v->_sT>v->_sF, q, a)
+                        +v1[g]-v0[g]+softq_site_value(v->_sT, v->_sF, q, a);
+        }
+    }
+    BSP_DEBUG<<"softq probes="<<cand.size()<<" failed="<<nfail<<" sweeps="<<swsum<<endl;
+    if (rollout) {
+        ofstream out("softq_rollouts.csv", ios::app);
+        for (unsigned j=0; j<cand.size(); ++j) {
+            out<<setprecision(12)<<g_softq_rollout_at[_softq_next_rollout]<<","<<nfixed<<","<<j<<","
+               <<cand[j]->_vertex<<","<<cand[j]->_sC<<","<<sig[j]<<","<<complexity;
+            for (unsigned g=0; g<qa.size(); ++g) out<<","<<score[g][j];
+            out<<"\n";
+        }
+        out.close();
+        if (softq_rollout(cand, _softq_next_rollout)) return true;
+        ++_softq_next_rollout;
+    }
+    if (g_softq_observe || cand.size()<=batch) return false;
+    vector<double> key(score[0]);
+    if (g_softq_alpha>0.) {
+        for (unsigned j=0; j<key.size(); ++j) {
+            double u=(random()+0.5)/(RAND_MAX+1.0);
+            key[j]+=-g_softq_alpha*log(-log(u));
+        }
+    }
+    vector<unsigned> order(cand.size());
+    for (unsigned j=0; j<order.size(); ++j) order[j]=j;
+    stable_sort(order.begin(), order.end(), [&key](unsigned a, unsigned b) { return key[a]>key[b]; });
+    vector<Vertex*> win;
+    for (unsigned j=0; j<batch; ++j) win.push_back(cand[order[j]]);
+    promote_unfixed(ptrV, nfixed, win);
+    BSP_DEBUG<<"softq chose rank "<<order[0]<<" of "<<cand.size()<<" sp_sweeps="<<_sp_sweeps<<endl;
+    return false;
+}
+
+/*Forks one child per candidate at rollout checkpoint idx. Each child writes
+ into rollout_f<f>_c<j>/, fixes its candidate alone and continues with plain
+ BSP. The parent waits for all children and returns false. A child returns
+ true with its candidate at the front of the free region.*/
+bool Graph::softq_rollout(const vector<Vertex*>& cand, unsigned idx) {
+#ifdef _WIN32
+    return false;
+#else
+    _diag_step_out<<flush;
+    _diag_var_out<<flush;
+    _diag_move_out<<flush;
+    cout<<flush;
+    cerr<<flush;
+    fflush(NULL);
+    unsigned nfixed=(unsigned)_list_fixed_element.size();
+    vector<pid_t> kids;
+    for (unsigned j=0; j<cand.size(); ++j) {
+        pid_t pid=fork();
+        if (pid<0) {
+            BSP_ERROR<<"fork failed for softq rollout"<<endl;
+            exit(-1);
+        }
+        if (pid>0) {
+            kids.push_back(pid);
+            continue;
+        }
+        ostringstream dir;
+        dir<<"rollout_f"<<g_softq_rollout_at[idx]<<"_c"<<j;
+        mkdir(dir.str().c_str(), 0755);
+        if (chdir(dir.str().c_str())!=0) _exit(1);
+        if (!freopen("log.txt", "w", stdout) || !freopen("log.txt", "a", stderr)) _exit(1);
+        bsp::set_log_level(bsp::LogLevel::Info);
+        alarm(k_rollout_timeout_s);
+        _diag_step_out.close();
+        _diag_var_out.close();
+        _diag_move_out.close();
+        _diag_header_done=false;
+        g_softq_m=0;
+        g_softq_rollout_at.clear();
+        promote_unfixed(ptrV, nfixed, vector<Vertex*>(1, cand[j]));
+        return true;
+    }
+    for (unsigned j=0; j<kids.size(); ++j) {
+        int status=0;
+        while (waitpid(kids[j], &status, 0)<0 && errno==EINTR) { /*retry*/ }
+    }
+    return false;
 #endif
 }
 
@@ -388,7 +529,9 @@ void Graph::choose_var_to_fix_and_clean() {
     /*Variant 2 needs a real batch. Below that width it is the same as the
      2016 ranking, so the single-variable lookahead (variant 1) runs instead.
      Both leave the SP direction alone and only reorder which variables are fixed.*/
-    if (g_corr_batch && _batch>=2) {
+    if (g_softq_m>0) {
+        if (softq_step(_size_init, _batch)) _batch=1;/*rollout child: its candidate alone*/
+    } else if (g_corr_batch && _batch>=2) {
         vector<Vertex*> legacy, diverse;
         for (unsigned i=_size_init; i<_N && legacy.size()<_batch; ++i) {
             if (!bsp_pass_margin(ptrV[i]->_sT, ptrV[i]->_sF)) continue;

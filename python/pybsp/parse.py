@@ -72,6 +72,7 @@ def read_diag_steps(path: Path) -> list[dict]:
                     "Sigma_over_N": float(r["Sigma_per_N"]),
                     "alpha_res": float("nan"),
                     "eta": float(r["eta"]) if "eta" in r else float("nan"),
+                    "sp_sweeps": float(r.get("sp_sweeps") or "nan"),
                     "move": r.get("move", ""),
                 }
             )
@@ -122,6 +123,7 @@ def summarize_run(
         "sigma_last_over_N": sigma_last_over_N,
         "sigma_res": sigma_res,
         "sigma_res_over_N": sigma_res_over_N,
+        "sp_sweeps": steps[-1].get("sp_sweeps", float("nan")) if n_steps else float("nan"),
     }
     return summary, steps
 

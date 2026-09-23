@@ -1,0 +1,14 @@
+{
+  "bsp": "build/bsp",
+  "K": 3,
+  "N": 2000,
+  "alphas": [4.2],
+  "seeds": {"start": 1, "stop": 32},
+  "timeout_s": 3600,
+  "jobs": 2,
+  "extra_flags": ["-q"],
+  "note": "Predictivity test. The parent runs plain BSP; at 15% and 25% fixed variables each of the top-8 candidates is fixed alone and continued with plain BSP. Analyse with tools/softq_rollout_stats.py.",
+  "configs": [
+    {"name": "roll_q1", "flags": ["--scorer=cert", "--r=0.9", "--softq-m=8", "--softq-observe", "--softq-rollout-at=0.15,0.25"]}
+  ]
+}

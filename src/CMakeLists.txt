@@ -3,6 +3,7 @@ add_library(bsp_core STATIC
   Vertex.cpp
   thermo_sp.cpp
   thermo_policy.cpp
+  softq.cpp
   walksat.cpp
 )
 
