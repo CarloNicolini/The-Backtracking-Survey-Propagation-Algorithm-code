@@ -1,0 +1,30 @@
+{
+  "description": "Smoke load grid on RandSATBench test-final N=64. Two configs, few ids. Use to verify bsp -l wiring before the full N=256 screen.",
+  "bsp": "build/release/bsp",
+  "dataset": "../RandSATBench/datasets/3SAT/test-final",
+  "labels": "../RandSATBench/datasets/3SAT/test_labels.csv",
+  "K": 3,
+  "N": 64,
+  "alphas": [4.0, 4.2],
+  "alpha_tol": 0.06,
+  "ids": {"start": 1, "stop": 5},
+  "timeout_s": 60,
+  "jobs": 2,
+  "extra_flags": ["-q"],
+  "configs": [
+    {
+      "name": "cert",
+      "axis": "baseline",
+      "flags": ["--scorer=cert", "--r=0.9"]
+    },
+    {
+      "name": "dynI",
+      "axis": "release_I",
+      "flags": ["--scorer=cert", "--r=0.9", "--dynamic-i-backtrack"]
+    }
+  ],
+  "howto": {
+    "run": "source .venv/bin/activate && bsp-grid experiments/smoke_randsat_n64.json -o experiments/smoke_randsat_n64 -j 2",
+    "plot": "source .venv/bin/activate && bsp-plot experiments/smoke_randsat_n64 -o experiments/smoke_randsat_n64/figures"
+  }
+}

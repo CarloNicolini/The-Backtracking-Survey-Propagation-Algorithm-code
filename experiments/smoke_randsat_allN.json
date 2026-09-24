@@ -1,0 +1,25 @@
+{
+  "description": "Smoke: N=null loads every size in test-final; tiny id/alpha slice.",
+  "bsp": "build/release/bsp",
+  "dataset": "../RandSATBench/datasets/3SAT/test-final",
+  "labels": "../RandSATBench/datasets/3SAT/test_labels.csv",
+  "K": 3,
+  "N": null,
+  "alphas": [4.0],
+  "alpha_tol": 0.06,
+  "ids": {"start": 1, "stop": 2},
+  "timeout_s": 60,
+  "jobs": 2,
+  "extra_flags": ["-q"],
+  "configs": [
+    {
+      "name": "cert",
+      "axis": "baseline",
+      "flags": ["--scorer=cert", "--r=0.9"]
+    }
+  ],
+  "howto": {
+    "run": "source .venv/bin/activate && bsp-grid experiments/smoke_randsat_allN.json -o experiments/smoke_randsat_allN -j 2",
+    "plot": "source .venv/bin/activate && bsp-plot experiments/smoke_randsat_allN -o experiments/smoke_randsat_allN/figures"
+  }
+}
