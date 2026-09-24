@@ -1,0 +1,86 @@
+{
+  "description": "RandSATBench test_ood, N=512 and 1024, alpha 4.0-4.3, ids 1-80 (paired across configs). Tests the promising directions of axes_randsat at sizes where the cavity quantities are informative: small MMW m with the cert scorer, the corrected release_I, fe_bt with bt_cost in the new units, real SP-y at T=0.25, and a WalkSAT proxy. The labels are NOT proven: sat=1 means solved by the best RandSATBench solver (3SAT-best_per_sample.csv), sat=0 means unsolved by all of them. On muletto, test_ood_known_sat.csv was made from that file for N in {512, 1024}.",
+  "bsp": "build/release/bsp",
+  "dataset": "../RandSATBench/datasets/3SAT/test_ood",
+  "labels": "../RandSATBench/datasets/3SAT/test_ood_known_sat.csv",
+  "K": 3,
+  "N": [512, 1024],
+  "alphas": [4.0, 4.1, 4.2, 4.3],
+  "alpha_tol": 0.01,
+  "ids": {"start": 1, "stop": 80},
+  "timeout_s": 600,
+  "jobs": 16,
+  "extra_flags": ["-q"],
+  "configs": [
+    {
+      "name": "cert",
+      "axis": "baseline",
+      "role": "BSP 2016 reference: hard SP, certainty scorer, fixed r.",
+      "flags": ["--scorer=cert", "--r=0.9"]
+    },
+    {
+      "name": "dynI",
+      "axis": "release_I",
+      "role": "Corrected release_I (toward and against groups). Small significant gain at N<=64 in axes_randsat; does it survive at N>=512?",
+      "flags": ["--scorer=cert", "--r=0.9", "--dynamic-i-backtrack"]
+    },
+    {
+      "name": "rsbm_0.02",
+      "axis": "m",
+      "role": "MMW closure gamma_eff = m ln2 with the cert scorer. Calibration N=512 a=4.2: 1/8 solved vs 0/8 for cert.",
+      "flags": ["--scorer=cert", "--r=0.9", "--rsb-m=0.02"]
+    },
+    {
+      "name": "rsbm_0.05",
+      "axis": "m",
+      "role": "Calibration: 2/8 solved.",
+      "flags": ["--scorer=cert", "--r=0.9", "--rsb-m=0.05"]
+    },
+    {
+      "name": "rsbm_0.10",
+      "axis": "m",
+      "role": "Calibration: 3/8 solved through the BSP path, not a collapse to WalkSAT.",
+      "flags": ["--scorer=cert", "--r=0.9", "--rsb-m=0.10"]
+    },
+    {
+      "name": "rsbm_0.20",
+      "axis": "m",
+      "role": "Upper end of the dose curve, below the m>=0.3 collapse seen in axes_randsat.",
+      "flags": ["--scorer=cert", "--r=0.9", "--rsb-m=0.20"]
+    },
+    {
+      "name": "dynI_rsbm_0.10",
+      "axis": "release_I_x_m",
+      "role": "Interaction of the two positive signals.",
+      "flags": ["--scorer=cert", "--r=0.9", "--rsb-m=0.10", "--dynamic-i-backtrack"]
+    },
+    {
+      "name": "febt_0.005",
+      "axis": "release_DeltaPhi",
+      "role": "Gibbs back/dec split in the new units. Calibration: release frequency about 0.45 (cert 0.47).",
+      "flags": ["--scorer=cert", "--cav-temp=0.05", "--act-temp=0.02", "--fe-backtrack", "--bt-cost=0.005"]
+    },
+    {
+      "name": "febt_0.01",
+      "axis": "release_DeltaPhi",
+      "role": "Calibration: release frequency about 0.40.",
+      "flags": ["--scorer=cert", "--cav-temp=0.05", "--act-temp=0.02", "--fe-backtrack", "--bt-cost=0.01"]
+    },
+    {
+      "name": "cav_0.25",
+      "axis": "T_cav",
+      "role": "Real SP-y at y=4, outside the tropical regime of T<=0.1.",
+      "flags": ["--scorer=cert", "--r=0.9", "--cav-temp=0.25"]
+    },
+    {
+      "name": "ws_proxy",
+      "axis": "baseline_walksat",
+      "role": "Same flags as rsb_0.50 of axes_randsat. SP collapses to the trivial point and WalkSAT gets the full formula; check numclause in log.txt.",
+      "flags": ["--scorer=rsb", "--r=0.9", "--rsb-m=0.50"]
+    }
+  ],
+  "howto": {
+    "run": "source .venv/bin/activate && bsp-grid experiments/ood_k3.json -o experiments/ood_k3 -j 16",
+    "plot": "source .venv/bin/activate && bsp-plot experiments/ood_k3 -o experiments/ood_k3/figures --alpha 4.2"
+  }
+}
