@@ -277,6 +277,7 @@ public:
     _have_sigma_prev =
         false;         /*slope is defined only after the first fixed point*/
     _sp_sweeps = 0;    /*cumulative SP iterations, including discarded probes*/
+    _softq_next_rollout = 0;
     _counter_conv = 0; /*counter convergence surveys set to 0*/
     complexity_clauses = 0.;    /*clause complexity set to 0*/
     complexity_variables = 0.;  /*variable complexity set to 0*/
@@ -451,6 +452,7 @@ private:
   double _sigma_prev;            /*complexity at the previous fixed point*/
   bool _have_sigma_prev;         /*true after the first surveys() call*/
   unsigned long _sp_sweeps;      /*SP iterations spent, probes included*/
+  unsigned _softq_next_rollout;  /*index of the next softq rollout checkpoint*/
   int _argc;                     /*copy of argc*/
   unsigned long s;
   double _new;
@@ -497,8 +499,15 @@ private:
 
   bool _conv(double &a, double &b);
 
-  int probe_fixes(const vector<Vertex *> &vars, double &sigma,
-                  int &sweeps); /*forked tentative fix*/
+  int probe_fixes(const vector<Vertex *> &vars, double &sigma, int &sweeps,
+                  const vector<pair<double, double> > &qa =
+                      vector<pair<double, double> >(),
+                  vector<double> *vsum = NULL); /*forked tentative fix*/
+
+  bool softq_step(unsigned nfixed, unsigned batch); /*soft two-step look-ahead*/
+
+  bool softq_rollout(const vector<Vertex *> &cand,
+                     unsigned idx); /*plain BSP rollout of each candidate*/
 
   double _Pr_U(Vertex *V, bool b);
 

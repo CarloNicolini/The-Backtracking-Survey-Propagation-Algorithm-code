@@ -40,6 +40,7 @@
 #include <bsp/Graph.hpp>
 #include <bsp/thermo_sp.hpp>
 #include <bsp/thermo_policy.hpp>
+#include <bsp/softq.hpp>
 #include <bsp/outdir.hpp>
 #include <cxxopts.hpp>
 #define UNIX 1
@@ -135,6 +136,16 @@ int main(int argc, char* argv[]) {
             cxxopts::value<double>())
         ("frac", "Decimation batch fraction in (0, 1]",
             cxxopts::value<double>())
+        ("softq-m", "Soft two-step look-ahead: probe the top-M candidates (0=off)",
+            cxxopts::value<unsigned>())
+        ("softq-alpha", "Soft look-ahead policy temperature alpha >= 0 (default 0)",
+            cxxopts::value<double>())
+        ("softq-q", "Tsallis index q > 0 of the look-ahead reward (default 1)",
+            cxxopts::value<double>())
+        ("softq-observe", "Score the candidates but keep the BSP order")
+        ("softq-rollout-at", "Fractions of fixed variables where each candidate "
+                             "is rolled out with plain BSP, e.g. 0.2,0.4",
+            cxxopts::value<string>())
         ("outdir", "Directory for all file outputs (default: bsp_runs/<slug>)",
             cxxopts::value<string>())
         ("q,quiet", "Warnings and errors only")
@@ -305,6 +316,30 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    if (result.count("softq-m"))
+        g_softq_m = result["softq-m"].as<unsigned>();
+    if (result.count("softq-alpha")) {
+        g_softq_alpha = result["softq-alpha"].as<double>();
+        if (!(g_softq_alpha >= 0.0)) {
+            BSP_ERROR << "softq-alpha must be >= 0, got " << g_softq_alpha << endl;
+            return 1;
+        }
+    }
+    if (result.count("softq-q")) {
+        g_softq_q = result["softq-q"].as<double>();
+        if (!(g_softq_q > 0.0)) {
+            BSP_ERROR << "softq-q must be > 0, got " << g_softq_q << endl;
+            return 1;
+        }
+    }
+    if (result.count("softq-observe"))
+        g_softq_observe = true;
+    if (result.count("softq-rollout-at") &&
+        !softq_parse_rollout(result["softq-rollout-at"].as<string>())) {
+        BSP_ERROR << "softq-rollout-at expects fractions in (0, 1), e.g. 0.2,0.4" << endl;
+        return 1;
+    }
+
     const bool do_write = result.count("write") > 0;
     const bool do_load = result.count("load") > 0;
     const vector<string> unmatched = result.unmatched();
@@ -471,6 +506,10 @@ int main(int argc, char* argv[]) {
                 <<" adaptive_r="<<(g_adaptive_r?1:0)
                 <<" frac="<<g_frac
                 <<" dynamic_i="<<(g_dynamic_i?1:0)<<endl;
+    if (g_softq_m>0)
+        BSP_INFO<<"soft two-step look-ahead: M="<<g_softq_m<<" alpha="<<g_softq_alpha
+                <<" q="<<g_softq_q<<" observe="<<(g_softq_observe?1:0)
+                <<" rollouts="<<g_softq_rollout_at.size()<<endl;
     /*Check if we have to use unit propagation*/
     G.unit_propagation();
 

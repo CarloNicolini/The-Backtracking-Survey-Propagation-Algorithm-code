@@ -17,3 +17,9 @@ outfile
 *.o
 *.d
 example_delta.nn
+
+# Lean build output
+lean/.lake/
+lean/lake-manifest.json
+__pycache__/
+.cache/

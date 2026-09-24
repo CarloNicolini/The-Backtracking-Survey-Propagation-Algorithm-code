@@ -1,0 +1,15 @@
+{
+  "bsp": "build/bsp",
+  "K": 3,
+  "N": 5000,
+  "alphas": [4.2, 4.22],
+  "seeds": {"start": 1, "stop": 50},
+  "timeout_s": 7200,
+  "jobs": 8,
+  "extra_flags": ["-q"],
+  "note": "Main test near alpha_s = 4.267. At alpha=4.24 plain BSP fails at the first SP fixed point on 30/30 formulas (negative complexity or no convergence), so that point carries no information. Same seeds give the same formulas in both configs, so the comparison is paired. sq8q2 probes 8 candidates per decimation step with the Tsallis reward q=2 at alpha=0.",
+  "configs": [
+    {"name": "cert", "flags": ["--scorer=cert", "--r=0.9"]},
+    {"name": "sq8q2", "flags": ["--scorer=cert", "--r=0.9", "--softq-m=8", "--softq-q=2"]}
+  ]
+}

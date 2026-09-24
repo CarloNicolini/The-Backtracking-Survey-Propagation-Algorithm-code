@@ -7,6 +7,7 @@
 #include <bsp/Header.hpp>
 #include <bsp/thermo_policy.hpp>
 #include <bsp/thermo_sp.hpp>
+#include <bsp/softq.hpp>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -105,6 +106,8 @@ string bsp_make_run_slug(unsigned K, double alpha, unsigned N) {
   if (g_lookahead_k > 0) o << "_la" << g_lookahead_k;
   if (g_adaptive_r) o << "_ar";
   if (g_corr_batch) o << "_cb";
+  if (g_softq_m > 0)
+    o << "_sq" << g_softq_m << "a" << float_token(g_softq_alpha) << "q" << float_token(g_softq_q);
   return o.str();
 }
 

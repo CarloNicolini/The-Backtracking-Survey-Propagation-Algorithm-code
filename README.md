@@ -155,6 +155,42 @@ site has z = e^gamma under the tilt.
 ./build/release/bsp --rsb-gamma=0.5 -w 3 4.0 50
 ```
 
+## Soft two-step look-ahead
+
+The option `--softq-m=M` changes only the choice of the variables that a
+decimation step fixes. The candidates are the first M free variables in the
+BSP order. For each candidate the solver forks a probe: it fixes the variable
+in the SP direction and reconverges SP. The score of the candidate is
+alpha log pi(s|k) + D(k,s), where D is the change of the soft site values
+v_alpha of the other free variables. A probe with a contradiction or without
+convergence gets the lowest score. The step then fixes the best candidates.
+The derivation is in `paper/sections/softq.tex`, and `lean/SoftQ.lean` proves
+its algebraic statements.
+
+- `--softq-alpha=A` is the policy temperature. At A = 0 the step takes the best
+  scores. At A > 0 it samples the batch with probabilities e^(score/A).
+- `--softq-q=Q` is the Tsallis index of the reward ln_q(1-w). Q = 1 is the
+  logarithm, and Q > 1 penalizes large drops of the complexity more.
+- `--softq-observe` computes and logs the scores, but keeps the BSP order.
+- `--softq-rollout-at=F1,F2` runs, at each fraction F of fixed variables, one
+  plain-BSP continuation of every candidate in `rollout_f<F>_c<j>/`. The scores
+  go to `softq_rollouts.csv`. `tools/softq_rollout_stats.py` measures whether
+  the scores rank the continuations.
+
+If M is not larger than the batch size, the solver is BSP. Each probed step
+costs M SP reconvergences and M forks. `tools/softq_smoke.sh` checks that the
+BSP limits give the same trajectory as a reference binary.
+
+```bash
+./build/release/bsp --softq-m=8 --softq-q=2 -w 3 4.2 2000
+```
+
+To check the Lean file, use a Mathlib workspace at the same version:
+
+```bash
+cd lean && lake exe cache get && lake env lean SoftQ.lean
+```
+
 ## Memory checking with Valgrind
 
 Valgrind runs on **Linux** only (not available as a native macOS/Homebrew bottle).
