@@ -33,6 +33,7 @@
  the legacy compiled-in __H macro behavior exactly.*/
 int g_scorer_id = -1;
 double g_scorer_gamma = 1.0;
+double g_scorer_beta = 1.0;
 
 /*Score a variable for (de)selection from its surveys: a=sT, b=sF, c=sI,
  b_th=free-energy bias Phi_minus-Phi_plus.*/
@@ -46,6 +47,7 @@ double bsp_score(double a, double b, double c, double b_th) {
         case 3: return c; /*I_C*/
         case 4: return std::fabs(b_th); /*FTH, the free-energy bias*/
         case 5: return std::fabs(a - b); /*RSB, b_i(m) of the 1RSB measure*/
+        case 6: return SOFT_CERT(a, b, g_scorer_beta);
         default: return __H(a, b, c); /*legacy compiled-in macro*/
     }
 }
@@ -67,6 +69,16 @@ bool bsp_parse_scorer(const string& spec) {
         g_scorer_id = 2;
         return true;
     }
+    if (spec.compare(0, 10, "soft_cert:") == 0) {
+        try {
+            g_scorer_beta = std::stod(spec.substr(10));
+        } catch (...) {
+            return false;
+        }
+        if (!(g_scorer_beta > 0.0)) return false;
+        g_scorer_id = 6;
+        return true;
+    }
     return false;
 }
 
@@ -81,6 +93,11 @@ string bsp_scorer_name() {
         case 2: {
             ostringstream o;
             o << "gamma:" << g_scorer_gamma;
+            return o.str();
+        }
+        case 6: {
+            ostringstream o;
+            o << "soft_cert:" << g_scorer_beta;
             return o.str();
         }
         default: return "macro-default";

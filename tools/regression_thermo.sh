@@ -137,4 +137,16 @@ if ! numdiff "$WORK/t0.trace" "$WORK/tlow.trace" >"$WORK/numdiff.msg"; then
     status=1
 fi
 
+# A vanishing Tsallis kappa runs the outer loop but keeps y_eff = y, so the
+# trace must equal plain SP-y at the same cavity temperature.
+mkdir -p "$WORK/spy" "$WORK/k0"
+(cd "$WORK/spy" && "$BIN" --outdir=. --cav-temp=0.5 -w 3 4.0 100 --seed=5 >stdout.log 2>stderr.log)
+(cd "$WORK/k0" && "$BIN" --outdir=. --cav-temp=0.5 --tsallis-kappa=1e-12 -w 3 4.0 100 --seed=5 >stdout.log 2>stderr.log)
+trace_sigma "$WORK/spy/stdout.log" > "$WORK/spy.trace"
+trace_sigma "$WORK/k0/stdout.log" > "$WORK/k0.trace"
+if ! numdiff "$WORK/spy.trace" "$WORK/k0.trace" >"$WORK/numdiff.msg"; then
+    echo "regression_thermo: --tsallis-kappa=1e-12 differs from SP-y ($(cat "$WORK/numdiff.msg"))" >&2
+    status=1
+fi
+
 exit "$status"

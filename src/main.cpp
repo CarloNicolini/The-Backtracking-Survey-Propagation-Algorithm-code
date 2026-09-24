@@ -40,6 +40,7 @@
 #include <bsp/Graph.hpp>
 #include <bsp/thermo_sp.hpp>
 #include <bsp/thermo_policy.hpp>
+#include <bsp/tsallis.hpp>
 #include <bsp/outdir.hpp>
 #include <cxxopts.hpp>
 #define UNIX 1
@@ -91,7 +92,7 @@ int main(int argc, char* argv[]) {
         ("l,load", "Load a CNF formula from file and solve it",
             cxxopts::value<string>())
         ("h,help", "Show this help message")
-        ("scorer", "Decimation scorer: cert|pol|i_c|fth|gamma:<g>",
+        ("scorer", "Decimation scorer: cert|pol|i_c|fth|gamma:<g>|soft_cert:<beta>",
             cxxopts::value<string>())
         ("diag", "Write PREFIX_steps.csv / PREFIX_vars.csv diagnostics",
             cxxopts::value<string>())
@@ -117,6 +118,9 @@ int main(int argc, char* argv[]) {
                   "adds m*ln2 to the unfrozen tilt gamma",
             cxxopts::value<double>())
         ("rsb-gamma", "1RSB unfrozen-cluster bias (default 0; not scorer gamma)",
+            cxxopts::value<double>())
+        ("tsallis-kappa", "Tsallis kappa=N(q-1): SP-y at y_eff=y/(1+kappa*y*e) "
+                          "(default 0; needs --cav-temp>0)",
             cxxopts::value<double>())
         ("minisat", "Minisat binary (default minisat)",
             cxxopts::value<string>())
@@ -200,7 +204,7 @@ int main(int argc, char* argv[]) {
         if (!bsp_parse_scorer(result["scorer"].as<string>())) {
             BSP_ERROR << "Unknown scorer "
                       << result["scorer"].as<string>()
-                      << " (expected cert|pol|i_c|fth|gamma:<g>)" << endl;
+                      << " (expected cert|pol|i_c|fth|gamma:<g>|soft_cert:<beta>)" << endl;
             print_cli_help(options, prog);
             return 1;
         }
@@ -276,6 +280,8 @@ int main(int argc, char* argv[]) {
     if (result.count("rsb-gamma"))
         g_rsb_gamma = result["rsb-gamma"].as<double>();
     g_gamma_eff = g_rsb_gamma + g_rsb_m * M_LN2;
+    if (result.count("tsallis-kappa"))
+        g_tsallis_kappa = result["tsallis-kappa"].as<double>();
     if (result.count("minisat"))
         g_minisat_path = result["minisat"].as<string>();
     if (result.count("oracle-timeout"))
@@ -332,6 +338,12 @@ int main(int argc, char* argv[]) {
                   << " (the free energies come from the deformed messages)" << endl;
         return 1;
     }
+    if (g_tsallis_kappa != 0. && g_T_cav <= 0.) {
+        BSP_ERROR << "--tsallis-kappa needs --cav-temp>0 (the base y is 1/cav-temp)" << endl;
+        return 1;
+    }
+    if (g_T_cav > 0.)
+        g_tsallis_y = 1. / g_T_cav;
     if (g_fe_backtrack && g_T_cav <= 0.) {
         BSP_ERROR << "--fe-backtrack needs --cav-temp>0"
                   << " (the release order runs on the free energies)" << endl;
@@ -376,6 +388,7 @@ int main(int argc, char* argv[]) {
     man.act_temp = g_T_act;
     man.rsb_m = g_rsb_m;
     man.rsb_gamma = g_rsb_gamma;
+    man.tsallis_kappa = g_tsallis_kappa;
     man.dynamic_i = g_dynamic_i;
     man.fe_backtrack = g_fe_backtrack;
     man.bt_cost = g_bt_cost;
@@ -464,6 +477,8 @@ int main(int argc, char* argv[]) {
     if (g_rsb_m!=0.)BSP_INFO<<"1RSB cluster reweighting: m="<<g_rsb_m
                             <<" (MMW closure, effective gamma="<<g_gamma_eff<<")"<<endl;
     if (g_rsb_gamma!=0.)BSP_INFO<<"1RSB unfrozen bias: gamma="<<g_rsb_gamma<<endl;
+    if (g_tsallis_kappa!=0.)BSP_INFO<<"Tsallis outer loop: kappa="<<g_tsallis_kappa
+                                    <<" base y="<<g_tsallis_y<<endl;
     if (g_fe_backtrack)BSP_INFO<<"Free-energy backtracking on, bt-cost="<<g_bt_cost<<endl;
     if (g_lookahead_k>1 || g_corr_batch || g_adaptive_r || g_frac!=frac || g_dynamic_i)
         BSP_INFO<<"profile controls: lookahead="<<g_lookahead_k
@@ -522,6 +537,8 @@ SP:
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
+    if (g_tsallis_kappa!=0.)
+        tsallis_update(G.energy, G.N_t());/*y_eff for the next SP solve*/
 
     /*The backtracking survey propagation (BSP) algorithm proceeds similarly to survey inspired decimation (SID), by alternating decimation or backtracking steps on a fraction f of variables, in order to keep the algorithm efficient. The choice between a decimation or a backtracking step is taken accordingly to a stochastic rule, where the parameter r ∈ [0,1) represents the ratio between backtracking steps to decimation steps [1]. When r=0 one obtains survey inspired decimation (SID), while when r!=0 one works with backtracking survey propagation. In this code r=_R_BSP into Header.h file.
      */

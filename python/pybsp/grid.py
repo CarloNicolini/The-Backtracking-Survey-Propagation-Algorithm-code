@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import product
 from pathlib import Path
@@ -40,6 +41,8 @@ STEPS_COLS = [
     "Sigma",
     "Sigma_over_N",
     "alpha_res",
+    "y",
+    "E_per_Nt",
 ]
 
 
@@ -56,13 +59,20 @@ def load_grid(path: Path) -> dict:
         return json.load(f)
 
 
-def trial_tag(cfg: str, alpha: float, seed: int) -> str:
-    return f"{cfg}_a{alpha}_s{seed}"
+def trial_tag(cfg: str, alpha: float, seed: int, N: int | None = None) -> str:
+    if N is None:
+        return f"{cfg}_a{alpha}_s{seed}"
+    return f"{cfg}_N{N}_a{alpha}_s{seed}"
 
 
 def done_keys(runs: pd.DataFrame) -> set[tuple]:
     if runs.empty:
         return set()
+    if "N" in runs.columns:
+        return {
+            (str(c), int(n), float(a), int(s))
+            for c, n, a, s in zip(runs["cfg"], runs["N"], runs["alpha"], runs["seed"])
+        }
     return {
         (str(c), float(a), int(s))
         for c, a, s in zip(runs["cfg"], runs["alpha"], runs["seed"])
@@ -71,6 +81,7 @@ def done_keys(runs: pd.DataFrame) -> set[tuple]:
 
 def _one_trial(payload: dict) -> tuple[dict, list[dict]]:
     rundir = Path(payload["rundir"])
+    cnf = Path(payload["cnf"]) if payload.get("cnf") else None
     text, rc, wall_s, timed_out = run_trial(
         Path(payload["bsp"]),
         K=payload["K"],
@@ -80,6 +91,7 @@ def _one_trial(payload: dict) -> tuple[dict, list[dict]]:
         flags=payload["flags"],
         rundir=rundir,
         timeout_s=payload["timeout_s"],
+        cnf=cnf,
     )
     summary, steps = summarize_run(
         text,
@@ -109,6 +121,8 @@ def _one_trial(payload: dict) -> tuple[dict, list[dict]]:
             "Sigma": s["Sigma"],
             "Sigma_over_N": s["Sigma_over_N"],
             "alpha_res": s.get("alpha_res", float("nan")),
+            "y": s.get("y", float("nan")),
+            "E_per_Nt": s.get("E_per_Nt", float("nan")),
         }
         for s in steps
     ]
@@ -125,8 +139,22 @@ def append_csv_gz(path: Path, df: pd.DataFrame, columns: list[str]) -> None:
         df.to_csv(path, index=False, compression="gzip")
 
 
+def git_state(repo: Path) -> dict:
+    """Commit and dirty flag of the repository that holds the bsp binary."""
+    git = ["git", "-C", str(repo)]
+    commit = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True)
+    status = subprocess.run([*git, "status", "--porcelain", "--untracked-files=no"],
+                            capture_output=True, text=True)
+    return {"commit": commit.stdout.strip() or None, "dirty": bool(status.stdout.strip())}
+
+
 def run_grid(grid_path: Path, outdir: Path, jobs: int | None = None) -> None:
     spec = load_grid(grid_path)
+    if "dataset" in spec:
+        from pybsp.load_grid import run_load_grid
+
+        run_load_grid(grid_path, outdir, jobs=jobs)
+        return
     outdir.mkdir(parents=True, exist_ok=True)
     runs_path = outdir / "runs.csv.gz"
     steps_path = outdir / "steps.csv.gz"
@@ -149,6 +177,7 @@ def run_grid(grid_path: Path, outdir: Path, jobs: int | None = None) -> None:
         "grid_path": str(grid_path.resolve()),
         "outdir": str(outdir.resolve()),
         "bsp": str(bsp.resolve()),
+        "git": git_state(bsp.resolve().parent),
         "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "grid": spec,
     }
@@ -169,7 +198,7 @@ def run_grid(grid_path: Path, outdir: Path, jobs: int | None = None) -> None:
     payloads = []
     for cfg, alpha, seed in product(configs, alphas, seeds):
         name = cfg["name"]
-        key = (name, float(alpha), int(seed))
+        key = (name, N, float(alpha), int(seed))
         if key in skip:
             continue
         flags = list(extra) + list(cfg.get("flags", []))
@@ -183,7 +212,7 @@ def run_grid(grid_path: Path, outdir: Path, jobs: int | None = None) -> None:
                 "seed": seed,
                 "flags": flags,
                 "timeout_s": timeout_s,
-                "rundir": str(runs_dir / trial_tag(name, alpha, seed)),
+                "rundir": str(runs_dir / trial_tag(name, alpha, seed, N=N)),
             }
         )
 

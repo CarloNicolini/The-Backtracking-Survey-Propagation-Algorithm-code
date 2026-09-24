@@ -6,11 +6,13 @@
 //  1. the sums match a brute-force enumeration of the warning configurations;
 //  2. the T=0 and tiny-T sums equal the hard SP factors exactly;
 //  3. the partition sum z equals pi_u+pi_s+pi_0;
-//  4. the Gibbs sampler frequencies match the weights e^(-Phi/T_act).
+//  4. the Gibbs sampler frequencies match the weights e^(-Phi/T_act);
+//  5. the Tsallis T_eff has the kappa=0, e=0 and energy-cut limits.
 //
 
 #include <bsp/thermo_sp.hpp>
 #include <bsp/thermo_policy.hpp>
+#include <bsp/tsallis.hpp>
 
 #include <cmath>
 #include <cstdio>
@@ -219,8 +221,20 @@ static void test_rsb_gamma() {
     }
 }
 
+/*T_eff = (1 + kappa y e)/y: kappa=0 and e=0 give 1/y, kappa<0 beyond the
+ energy cut gives 0 (y_eff infinite), and the saddle slope matches Cor. yeff.*/
+static void test_tsallis_T_eff() {
+    expect_close("kappa=0", tsallis_T_eff(2., 0., 0.3), 0.5, 0.);
+    expect_close("e=0", tsallis_T_eff(2., -7., 0.), 0.5, 0.);
+    expect_close("kappa>0", tsallis_T_eff(2., 5., 0.01), 1.1 / 2., 1e-15);
+    expect_close("kappa<0", tsallis_T_eff(2., -5., 0.01), 0.9 / 2., 1e-15);
+    expect_close("cut", tsallis_T_eff(2., -5., 0.1), 0., 0.);
+    expect_close("beyond cut", tsallis_T_eff(2., -5., 0.2), 0., 0.);
+}
+
 int main() {
     mt19937 rng(20260922u);
+    test_tsallis_T_eff();
     test_matches_brute_force(rng);
     test_zero_temperature_limit(rng);
     test_partition_sum(rng);

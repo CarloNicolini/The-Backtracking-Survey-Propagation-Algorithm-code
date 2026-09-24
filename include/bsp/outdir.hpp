@@ -34,6 +34,7 @@ struct BspRunManifest {
   double act_temp;
   double rsb_m;
   double rsb_gamma;
+  double tsallis_kappa;
   bool dynamic_i;
   bool fe_backtrack;
   double bt_cost;

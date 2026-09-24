@@ -281,6 +281,9 @@ public:
     complexity_clauses = 0.;    /*clause complexity set to 0*/
     complexity_variables = 0.;  /*variable complexity set to 0*/
     complexity = 0.;            /*total complexity set to 0*/
+    energy_clauses = 0.;
+    energy_variables = 0.;
+    energy = 0.;
     _unit_prop = 0;             /*unit propagation counter set to 0*/
     WellRandomInitialization(); /*Initialization seed random number generator*/
   };
@@ -292,6 +295,8 @@ public:
   unsigned int N() { return _N; /*public values of N*/ }
 
   unsigned int M() { return _M; /*public values of M*/ }
+
+  unsigned int N_t() { return _N_t; /*number of free variables*/ }
 
   double alpha() { return _alpha; /*public values of alpha*/ }
 
@@ -349,7 +354,7 @@ public:
 
   void sort_V_Back_move(); /*sort ptrV for backtracking move*/
 
-  double release_I(Vertex *k); /*I(k) of a fixed variable from the current fixed point*/
+  double release_I(Vertex *k, bool toward = true); /*I(k) of a fixed variable from the current fixed point*/
 
   void choose_var_to_fix_and_clean(); /*choose a variable to fix and clean the
                                          graph*/
@@ -410,6 +415,9 @@ public:
   double complexity_clauses;                   /*clauses complexity*/
   double complexity_variables;                 /*variable nodes complexity*/
   double complexity;                           /*graph total complexity*/
+  double energy_clauses;   /*clause and edge part of the SP-y Bethe energy*/
+  double energy_variables; /*site part of the SP-y Bethe energy*/
+  double energy;           /*SP-y Bethe energy E, 0 at T_cav=0*/
   double _comp_init;
   double _last_certitude;             /*min value of certutude fixed at time t*/
   double _numb_of_dec_moves;          /*number of decimation moves*/

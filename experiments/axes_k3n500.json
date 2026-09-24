@@ -1,5 +1,5 @@
 {
-  "description": "One-factor screen of the four ThermoBSP axes on K=3, N=128. Seeds 101-180 are disjoint from screen_k3n500 (seeds 1-50). Axis map: T_cav=--cav-temp, T_act=--act-temp, m=--rsb-m, release=I(k)|DeltaPhi. The CLI --scorer=gamma:<g> is NOT the unfrozen-cluster gamma (unimplemented).",
+  "description": "One-factor screen of the four ThermoBSP axes on K=3, N=500. Seeds 101-180 are disjoint from screen_k3n500 (seeds 1-50). Axis map: T_cav=--cav-temp, T_act=--act-temp, m=--rsb-m, release=I(k)|DeltaPhi. The CLI --scorer=gamma:<g> is NOT the unfrozen-cluster gamma (unimplemented).",
   "bsp": "build/bsp",
   "K": 3,
   "N": 500,

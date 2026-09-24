@@ -34,8 +34,8 @@ La survey propagation (SP) stima la complessit\`a $\Sig$, logaritmo del numero d
 Il backtracking survey propagation (BSP) corregge scelte precedenti per mantenere $\Sig$ positiva.
 In questo lavoro proponiamo una lettura termodinamica di SP: l'aggregazione ``dura'' delle configurazioni di warning viene sostituita dall'operazione di free energy dei semianelli termodinamici di Marcolli e Thorngren, con temperatura cavitarie $\Tc$.
 Nel limite $\Tc\to 0$ si recupera SP; a $\Tc>0$ la costruzione coincide con la famiglia SP a energia finita, reinterpretata come deformazione di semianello.
-Sullo stesso asse costruiamo una politica di decisione basata su risposte locali della free entropy, di cui un membro a vincolo duro \`e lo stimatore $I(k)$ della frazione di cluster compatibili con un'assegnazione gi\`a fissata.
-Su istanze $3$-SAT e $4$-SAT, la politica $I(k)$ predice la variazione reale di $\Sig$ al rilascio con correlazione $r\simeq 0{,}997$ e migliora la dinamica della complessit\`a rispetto ai criteri di certainty e polarizzazione.
+Sullo stesso asse costruiamo una policy di decisione basata su risposte locali della free entropy, di cui un membro a vincolo duro \`e lo stimatore $I(k)$ della frazione di cluster compatibili con un'assegnazione gi\`a fissata.
+Su istanze $3$-SAT e $4$-SAT, la policy $I(k)$ predice la variazione reale di $\Sig$ al rilascio con correlazione $r\simeq 0{,}997$ e migliora la dinamica della complessit\`a rispetto ai criteri di certainty e polarizzazione.
 Restano aperti lo spostamento della soglia algoritmica $\alpha_a$ e la costruzione operativa del bias verso cluster non congelati.
 \end{abstract}
 
@@ -63,7 +63,7 @@ Due lacune restano aperte.
 La prima riguarda la metrica di decisione: BSP ordina decimazione e backtracking con bias locali (polarizzazione, certainty) calcolati al momento della scelta.
 Per le variabili fissate, i bias non vengono aggiornati con i messaggi correnti, e il confronto fra scelte di et\`a diverse mescola quantit\`a definite su formule residue diverse.
 La seconda riguarda la struttura dell'aggregazione cavitarie: SP esclude in modo duro ogni configurazione di warning con conflitti.
-Esiste gi\`a una letteratura di SP a energia finita, ma manca una lettura che colleghi in modo esplicito quella deformazione ai semianelli termodinamici~\cite{marcolli2014thermodynamic}, costruiti sulla teoria di Connes e Consani in caratteristica uno~\cite{connes2010characteristic,connes2014witt}, e a una politica di controllo del processo di ricerca~\cite{kappen2005path}.
+Esiste gi\`a una letteratura di SP a energia finita, ma manca una lettura che colleghi in modo esplicito quella deformazione ai semianelli termodinamici~\cite{marcolli2014thermodynamic}, costruiti sulla teoria di Connes e Consani in caratteristica uno~\cite{connes2010characteristic,connes2014witt}, e a una policy di controllo del processo di ricerca~\cite{kappen2005path}.
 
 In questo lavoro sviluppiamo entrambe le linee.
 Nella Sezione~\ref{sec:theory} richiamiamo 1RSB, SP e BSP.
@@ -208,7 +208,7 @@ La novit\`a che rivendichiamo non \`e quindi la sola deformazione dei messaggi, 
 
 Due temperature devono restare distinte.
 La temperatura cavitarie $\Tc$ deforma l'aggregazione dei warning dentro le equazioni di messaggio.
-La temperatura di azione $\Ta$ deforma la politica di scelta fra azioni (decimare, backtrackare, scegliere il segno).
+La temperatura di azione $\Ta$ deforma la policy di scelta fra azioni (decimare, backtrackare, scegliere il segno).
 Sono parametri indipendenti: $\Tc$ ha un interpretazione fisica nel sistema esteso di~\cite{braunstein2004surveybp}; $\Ta$ \`e un parametro di esplorazione del solver.
 
 \section{Politiche basate sulla free entropy}
@@ -223,7 +223,7 @@ Il bias termodinamico \`e
 \begin{equation}
   B_i^{\mathrm{th}}(T)=\Phi_i^-(T)-\Phi_i^+(T),
 \end{equation}
-e una politica di Gibbs a temperatura $\Ta$ sceglie
+e una policy di Gibbs a temperatura $\Ta$ sceglie
 \begin{equation}
   \pi_{\Ta}(x_i=\sigma)
   \propto\exp\bigl(-\Phi_i^\sigma/\Ta\bigr).
@@ -284,7 +284,7 @@ L'opzione \`e \texttt{--rsb-gamma}. Non va confusa con lo scorer \texttt{gamma:<
 
 Le equazioni~\eqref{eq:F-thermo}--\eqref{eq:thermo-eta} sono implementate come somma polinomiale sui coefficienti dei prodotti $\prod_b(1-\eta_b+\eta_b z)$.
 A $\Tc=0$ le correzioni di conflitto si annullano e i fattori riducono esattamente alle $\Pi$ del codice SP legacy.
-La politica di Gibbs sulla direzione usa
+La policy di Gibbs sulla direzione usa
 \begin{equation}
   P(x_i=\mathrm{vero})
   =\bigl(1+e^{(\Phi_i^+-\Phi_i^-)/\Ta}\bigr)^{-1}
@@ -342,7 +342,7 @@ Conservare cluster disponibili \`e quindi una condizione favorevole, non suffici
 
 Il contributo pi\`u solido \`e meccanicistico: $I(k)$ collega una quantit\`a 1RSB locale alla variazione globale di $\Sig$, con accuratezza quasi esatta.
 Questo risolve, nella pratica, il problema dei bias stantii nel backtracking del BSP.
-La lettura in termini di free energy colloca $I(k)$ in una famiglia pi\`u ampia $(\Tc,\Ta,m,\gamma)$, di cui soltanto l'angolo duro della politica di rilascio \`e stato misurato in modo sistematico.
+La lettura in termini di free energy colloca $I(k)$ in una famiglia pi\`u ampia $(\Tc,\Ta,m,\gamma)$, di cui soltanto l'angolo duro della policy di rilascio \`e stato misurato in modo sistematico.
 
 La deformazione ThermoSP a $\Tc>0$ coincide con SP a energia finita.
 Il formalismo dei semianelli termodinamici fornisce linguaggio, forma variazionale e la domanda sulla conservazione della struttura di message passing sotto deformazioni di R\'enyi o Tsallis~\cite{marcolli2017entropy}.
@@ -362,7 +362,7 @@ Per una rivendicazione sulla soglia algoritmica servono ancora una griglia di $\
 \section{Conclusioni}
 \label{sec:conclusions}
 
-Abbiamo formulato la survey propagation termodinamica come deformazione di semianello dell'aggregazione cavitarie, con limite duro uguale a SP, e abbiamo collegato la politica di backtracking del BSP a risposte locali della free entropy.
+Abbiamo formulato la survey propagation termodinamica come deformazione di semianello dell'aggregazione cavitarie, con limite duro uguale a SP, e abbiamo collegato la policy di backtracking del BSP a risposte locali della free entropy.
 Lo stimatore $I(k)$, ricostruito dalle survey virtuali, predice la variazione di complessit\`a al rilascio con correlazione prossima a uno e migliora la dinamica di $\Sig$ su istanze $3$-SAT e $4$-SAT di grandezza algoritmica rilevante.
 
 Il passo successivo \`e derivare le equazioni SP con campo sorgente sulle variabili congelate (asse $\gamma$) e confrontare $\Delta\Phi$ a temperatura finita con $I(k)$ come predittore di $\Delta\Sig$ su formule non usate nello sviluppo.

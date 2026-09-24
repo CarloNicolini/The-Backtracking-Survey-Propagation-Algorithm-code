@@ -23,6 +23,7 @@ def write_trial_manifest(
     returncode: int,
     wall_s: float,
     timed_out: bool,
+    cnf: Path | None = None,
 ) -> None:
     payload = {
         "kind": "trial",
@@ -37,6 +38,7 @@ def write_trial_manifest(
         "returncode": returncode,
         "wall_s": wall_s,
         "timed_out": timed_out,
+        "cnf": None if cnf is None else str(cnf.resolve()),
         "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -52,11 +54,12 @@ def run_trial(
     flags: list[str],
     rundir: Path,
     timeout_s: float,
+    cnf: Path | None = None,
 ) -> tuple[str, int, float, bool]:
     """Return (log_text, returncode, wall_s, timed_out).
 
-    All bsp file outputs go into rundir: the process cwd is rundir and
-    --outdir=. keeps Formula_CNF / residuals / whitening / manifest.json there.
+    With cnf=None the binary builds a random instance (-w). With a CNF path it
+    loads that file (-l). Outputs land in rundir via cwd and --outdir=.
     """
     rundir.mkdir(parents=True, exist_ok=True)
     log_path = rundir / "log.txt"
@@ -67,11 +70,11 @@ def run_trial(
         "--outdir=.",
         "--diag=t",
         "--diag-every=1000000",
-        "-w",
-        str(K),
-        str(alpha),
-        str(N),
     ]
+    if cnf is None:
+        cmd.extend(["-w", str(K), str(alpha), str(N)])
+    else:
+        cmd.extend(["-l", str(cnf.resolve())])
     t0 = time.perf_counter()
     timed_out = False
     try:
@@ -105,5 +108,6 @@ def run_trial(
         returncode=rc,
         wall_s=wall_s,
         timed_out=timed_out,
+        cnf=cnf,
     )
     return text, rc, wall_s, timed_out

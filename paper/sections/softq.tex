@@ -14,8 +14,8 @@ Lo stato è la formula residua $F$, con il suo punto fisso di SP.
 Un'azione è una coppia $(k,s)$: si fissa la variabile libera $k$ al valore $s$.
 La transizione è deterministica e porta nella formula ridotta $F^{(k,s)}=F|_{x_k=s}$, dopo la propagazione unitaria.
 La ricompensa $r(F,(k,s))$ sarà definita nella~\eqref{eq:tsallis-reward}.
-Una politica $\pi(\cdot\mid F)$ è una distribuzione sulle azioni.
-SAC massimizza la somma delle ricompense più l'entropia della politica, pesata con una temperatura $\alpha>0$.
+Una policy $\pi(\cdot\mid F)$ è una distribuzione sulle azioni.
+SAC massimizza la somma delle ricompense più l'entropia della policy, pesata con una temperatura $\alpha>0$.
 Con transizioni deterministiche le equazioni di Bellman soft sono
 \begin{equation}
 Q_\alpha(F,a)=r(F,a)+V_\alpha(F^{a}),\qquad
@@ -23,7 +23,7 @@ V_\alpha(F)=\alpha\log\sum_a e^{Q_\alpha(F,a)/\alpha},\qquad
 \pi_\alpha(a\mid F)=e^{[Q_\alpha(F,a)-V_\alpha(F)]/\alpha}.
 \label{eq:soft-bellman}
 \end{equation}
-La politica di SAC è quindi la distribuzione di Gibbs dei valori $Q_\alpha$, e vale l'identità $Q_\alpha-V_\alpha=\alpha\log\pi_\alpha$.
+La policy di SAC è quindi la distribuzione di Gibbs dei valori $Q_\alpha$, e vale l'identità $Q_\alpha-V_\alpha=\alpha\log\pi_\alpha$.
 
 \begin{proposizione}[Il valore soft è una somma termodinamica]
 \label{prop:sac-shannon}
@@ -42,7 +42,7 @@ e l'uguaglianza vale per $p_a\propto e^{Q_a/\alpha}$.
 \end{proof}
 
 Il valore $V_\alpha$ è quindi la somma di Maslov $\oplus_\alpha$ della Sezione~\ref{sec:notation} applicata ai valori delle azioni, cioè $V_\alpha=-\bigoplus_{\Sh,\alpha}\{-Q_a\}_a$.
-Per $\alpha\to0$ esso tende a $\max_aQ_a$, e la politica diventa la scelta deterministica della migliore azione.
+Per $\alpha\to0$ esso tende a $\max_aQ_a$, e la policy diventa la scelta deterministica della migliore azione.
 Nel lavoro la somma di Shannon compare quindi su tre livelli.
 Il primo è l'aggregazione dei warning (Sezione~\ref{sec:spy}).
 Il secondo è il potenziale dei cluster, dove la temperatura è $1/y$.
@@ -61,7 +61,7 @@ Due traiettorie con gli stessi estremi hanno la stessa somma.
 \end{proposizione}
 
 Una ricompensa di questa forma è una differenza di potenziali.
-Ng, Harada e Russell~\citep{ng1999policy} mostrano che una ricompensa di questo tipo non cambia la politica ottima.
+Ng, Harada e Russell~\citep{ng1999policy} mostrano che una ricompensa di questo tipo non cambia la policy ottima.
 La richiesta di una discesa lenta della complessità è quindi una richiesta sulla forma della traiettoria, e non sulla perdita totale.
 
 \begin{osservazione}[Il look-ahead a un passo]

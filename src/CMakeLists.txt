@@ -1,8 +1,10 @@
 add_library(bsp_core STATIC
   Graph.cpp
+  release_score.cpp
   Vertex.cpp
   thermo_sp.cpp
   thermo_policy.cpp
+  tsallis.cpp
   walksat.cpp
 )
 

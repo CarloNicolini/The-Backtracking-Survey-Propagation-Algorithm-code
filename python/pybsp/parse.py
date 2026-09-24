@@ -73,6 +73,8 @@ def read_diag_steps(path: Path) -> list[dict]:
                     "alpha_res": float("nan"),
                     "eta": float(r["eta"]) if "eta" in r else float("nan"),
                     "move": r.get("move", ""),
+                    "y": float(r.get("y", "nan")),
+                    "E_per_Nt": float(r.get("E_per_Nt", "nan")),
                 }
             )
         except (KeyError, ValueError):

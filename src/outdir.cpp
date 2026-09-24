@@ -7,6 +7,7 @@
 #include <bsp/Header.hpp>
 #include <bsp/thermo_policy.hpp>
 #include <bsp/thermo_sp.hpp>
+#include <bsp/tsallis.hpp>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -98,6 +99,7 @@ string bsp_make_run_slug(unsigned K, double alpha, unsigned N) {
   if (g_T_act > 0.) o << "_Ta" << float_token(g_T_act);
   if (g_rsb_m != 0.) o << "_m" << float_token(g_rsb_m);
   if (g_rsb_gamma != 0.) o << "_g" << float_token(g_rsb_gamma);
+  if (g_tsallis_kappa != 0.) o << "_kq" << float_token(g_tsallis_kappa);
   if (g_dynamic_i) o << "_dynI";
   if (g_fe_backtrack) o << "_feBT";
   if (g_fe_backtrack) o << "_btc" << float_token(g_bt_cost);
@@ -131,6 +133,7 @@ void bsp_write_manifest(const string& path, const BspRunManifest& m) {
   out << "  \"act_temp\": " << m.act_temp << ",\n";
   out << "  \"rsb_m\": " << m.rsb_m << ",\n";
   out << "  \"rsb_gamma\": " << m.rsb_gamma << ",\n";
+  out << "  \"tsallis_kappa\": " << m.tsallis_kappa << ",\n";
   out << "  \"dynamic_i\": " << (m.dynamic_i ? "true" : "false") << ",\n";
   out << "  \"fe_backtrack\": " << (m.fe_backtrack ? "true" : "false") << ",\n";
   out << "  \"bt_cost\": " << m.bt_cost << ",\n";

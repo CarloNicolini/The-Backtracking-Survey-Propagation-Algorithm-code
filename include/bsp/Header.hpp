@@ -62,6 +62,9 @@
 #define CERT
 //#define P_M
 //#define I_C
+/*soft-certitude: 1+(1/beta)*log(e^{-beta*a}+e^{-beta*b}), natural log;
+ recovers CERT (1-min(a,b)) as beta->inf*/
+#define SOFT_CERT(a,b,beta) (1.+(1./(beta))*log(exp(-(beta)*(a))+exp(-(beta)*(b))))
 
 
 #define INITLEN 32
@@ -93,10 +96,12 @@ int WalkSat(vector <vector<bool> > & sol,int argc, char * argv[]); // WalkSat fu
  (legacy behavior, CERT by default); 0=CERT, 1=POL, 2=GAMMA, 3=I_C, 4=FTH,
  5=RSB. GAMMA scores b*|sT-sF|^g_scorer_gamma, interpolating certainty (g=0)
  and polarization-like rankings. FTH ranks by the absolute free-energy bias and
- needs --cav-temp>0. RSB is b_i(m), the bias of the 1RSB measure. Set via
+ needs --cav-temp>0. RSB is b_i(m), the bias of the 1RSB measure.
+ 6=SOFT_CERT scores SOFT_CERT(sT,sF,g_scorer_beta). Set via
  --scorer=... (see main.cpp).*/
 extern int g_scorer_id;
 extern double g_scorer_gamma;
+extern double g_scorer_beta;
 double bsp_score(double a, double b, double c, double b_th); /*a=sT,b=sF,c=sI,b_th=Phi_minus-Phi_plus*/
 bool bsp_parse_scorer(const string& spec); /*"cert","pol","i_c","gamma:<g>"*/
 string bsp_scorer_name(); /*short name of the active scorer, for logging*/
