@@ -270,10 +270,13 @@ def make_figures(data_dir: Path, fig_dir: Path, *, alpha: float | None = None) -
             alpha = float(alphas[len(alphas) // 2])
         for n in ns:
             suffix = f"_N{n}" if n is not None and len(ns) > 1 else ""
+            # alphas are snapped to M/N per size, so match the nearest one of this N
+            sub = steps if n is None else steps.loc[steps["N"] == n]
+            alpha_n = float(min(sub["alpha"].unique(), key=lambda a: abs(a - alpha)))
             plot_sigma_vs_depth(
                 steps,
                 runs,
                 fig_dir / f"sigma_vs_depth{suffix}.png",
-                alpha=alpha,
+                alpha=alpha_n,
                 N=n,
             )

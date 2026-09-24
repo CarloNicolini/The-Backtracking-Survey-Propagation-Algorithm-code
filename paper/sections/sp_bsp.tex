@@ -167,6 +167,7 @@ Con una regola stocastica governata dal rapporto $r\in[0,1)$ fra passi di backtr
 Per $r=0$ si ritrova SID.
 Ogni variabile viene assegnata in media $1/(1-r)$ volte, e il costo cresce dello stesso fattore.
 BSP usa $f=10^{-3}$.
+L'Appendice~\ref{app:bsp} scrive lo pseudocodice della versione eseguita dal programma, nello stile di~\citep{cormen2009introduction}.
 
 Battaglia, Kolář e Zecchina~\citep{battaglia2004minimizing} avevano già proposto un backtracking per SP-$y$ (algoritmo SP-Y).
 Essi fissano la variabile al valore suggerito da $b_{\mathrm{fix}}(j)=|W_j^+-W_j^-|$, dove $W_j^{\pm}$ sono le probabilità che il campo locale sia positivo o negativo.
