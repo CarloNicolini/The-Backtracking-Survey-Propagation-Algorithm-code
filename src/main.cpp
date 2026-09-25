@@ -42,6 +42,7 @@
 #include <bsp/thermo_policy.hpp>
 #include <bsp/tsallis.hpp>
 #include <bsp/outdir.hpp>
+#include <bsp/rsb2.hpp>
 #include <cxxopts.hpp>
 #define UNIX 1
 #if UNIX
@@ -139,6 +140,13 @@ int main(int argc, char* argv[]) {
             cxxopts::value<double>())
         ("frac", "Decimation batch fraction in (0, 1]",
             cxxopts::value<double>())
+        ("rsb2-stab", "2RSB linear stability test: lambda in PREFIX_rsb2.csv")
+        ("rsb2-x", "2RSB population solver at x=mu1/mu2 in (0, 1] (default off)",
+            cxxopts::value<double>())
+        ("rsb2-pop", "2RSB population size per edge (default 64)",
+            cxxopts::value<unsigned>())
+        ("rsb2-every", "Run the 2RSB tools every K SP fixed points (default 1)",
+            cxxopts::value<unsigned>())
         ("outdir", "Directory for all file outputs (default: bsp_runs/<slug>)",
             cxxopts::value<string>())
         ("q,quiet", "Warnings and errors only")
@@ -310,6 +318,28 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     }
+    if (result.count("rsb2-stab"))
+        g_rsb2_stab = true;
+    if (result.count("rsb2-x")) {
+        g_rsb2_x = result["rsb2-x"].as<double>();
+        if (!(g_rsb2_x > 0.0 && g_rsb2_x <= 1.0)) {
+            BSP_ERROR << "rsb2-x must be in (0, 1], got " << g_rsb2_x << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("rsb2-pop")) {
+        g_rsb2_pop = result["rsb2-pop"].as<unsigned>();
+        if (g_rsb2_pop < 2) {
+            BSP_ERROR << "rsb2-pop must be >= 2, got " << g_rsb2_pop << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("rsb2-every")) {
+        g_rsb2_every = result["rsb2-every"].as<unsigned>();
+        if (g_rsb2_every == 0) g_rsb2_every = 1;
+    }
 
     const bool do_write = result.count("write") > 0;
     const bool do_load = result.count("load") > 0;
@@ -347,6 +377,11 @@ int main(int argc, char* argv[]) {
     if (g_fe_backtrack && g_T_cav <= 0.) {
         BSP_ERROR << "--fe-backtrack needs --cav-temp>0"
                   << " (the release order runs on the free energies)" << endl;
+        return 1;
+    }
+    if ((g_rsb2_stab || g_rsb2_x > 0.) && (g_T_cav > 0. || g_gamma_eff != 0.)) {
+        BSP_ERROR << "--rsb2-stab and --rsb2-x need plain SP"
+                  << " (no --cav-temp, --rsb-m or --rsb-gamma)" << endl;
         return 1;
     }
     if (g_oracle_pick > 0) {
@@ -398,6 +433,10 @@ int main(int argc, char* argv[]) {
     man.theta = g_bsp_theta;
     man.diag = g_diag_prefix;
     man.diag_every = g_diag_every;
+    man.rsb2_stab = g_rsb2_stab;
+    man.rsb2_x = g_rsb2_x;
+    man.rsb2_pop = g_rsb2_pop;
+    man.rsb2_every = g_rsb2_every;
     man.timestamp_utc = bsp_utc_now();
     for (int i = 0; i < argc; ++i)
         man.argv.push_back(argv[i] ? argv[i] : "");
@@ -537,6 +576,8 @@ SP:
     G.convergence_messages();/*find messages convergence*/
     G.surveys();/*compute surveys for variable nodes*/
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
+    if (g_rsb2_stab || g_rsb2_x>0.)
+        rsb2_step(G);/*2RSB stability and populations at this fixed point*/
     if (g_tsallis_kappa!=0.)
         tsallis_update(G.energy, G.N_t());/*y_eff for the next SP solve*/
 

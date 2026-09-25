@@ -1,6 +1,11 @@
 add_library(bsp_core STATIC
   Graph.cpp
   release_score.cpp
+  rsb2.cpp
+  rsb2_draw.cpp
+  rsb2_graph.cpp
+  rsb2_obs.cpp
+  rsb2_pop.cpp
   Vertex.cpp
   thermo_sp.cpp
   thermo_policy.cpp

@@ -44,6 +44,10 @@ struct BspRunManifest {
   double theta;
   std::string diag;
   unsigned diag_every;
+  bool rsb2_stab;
+  double rsb2_x;
+  unsigned rsb2_pop;
+  unsigned rsb2_every;
   std::string timestamp_utc;
   std::vector<std::string> argv;
 };

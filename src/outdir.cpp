@@ -145,6 +145,10 @@ void bsp_write_manifest(const string& path, const BspRunManifest& m) {
       << (m.diag.empty() ? "null" : ("\"" + json_escape(m.diag) + "\""))
       << ",\n";
   out << "  \"diag_every\": " << m.diag_every << ",\n";
+  out << "  \"rsb2_stab\": " << (m.rsb2_stab ? "true" : "false") << ",\n";
+  out << "  \"rsb2_x\": " << m.rsb2_x << ",\n";
+  out << "  \"rsb2_pop\": " << m.rsb2_pop << ",\n";
+  out << "  \"rsb2_every\": " << m.rsb2_every << ",\n";
   out << "  \"timestamp_utc\": \"" << json_escape(m.timestamp_utc) << "\",\n";
   out << "  \"argv\": [";
   for (size_t i = 0; i < m.argv.size(); ++i) {
