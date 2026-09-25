@@ -1,0 +1,33 @@
+{
+  "description": "Generated K=3 formulas at N=5000, near the threshold, seeds 1-24 shared by every config. Compares cert, SP-y at y=4 and y=2, and a WalkSAT proxy that uses the same embedded WalkSAT (cutoff 1e8 flips, seed 1234567). A solve is a checked assignment. There are no SAT labels.",
+  "bsp": "build/release/bsp",
+  "K": 3,
+  "N": 5000,
+  "alphas": [4.2, 4.22, 4.24, 4.26],
+  "seeds": {"start": 1, "stop": 24},
+  "timeout_s": 3600,
+  "jobs": 12,
+  "extra_flags": ["-q"],
+  "configs": [
+    {
+      "name": "cert",
+      "flags": ["--scorer=cert", "--r=0.9"]
+    },
+    {
+      "name": "cav_0.25",
+      "flags": ["--scorer=cert", "--r=0.9", "--cav-temp=0.25"]
+    },
+    {
+      "name": "cav_0.50",
+      "flags": ["--scorer=cert", "--r=0.9", "--cav-temp=0.50"]
+    },
+    {
+      "name": "ws_proxy",
+      "flags": ["--scorer=rsb", "--r=0.9", "--rsb-m=0.50"]
+    }
+  ],
+  "howto": {
+    "run": "source .venv/bin/activate && bsp-grid experiments/large_k3.json -o experiments/large_k3 -j 12",
+    "plot": "source .venv/bin/activate && bsp-plot experiments/large_k3 -o experiments/large_k3/figures --alpha 4.24"
+  }
+}
