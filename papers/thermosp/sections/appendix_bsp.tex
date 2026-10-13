@@ -1,0 +1,472 @@
+\section{Pseudocodice di BSP}
+\label{app:bsp}
+
+Questa appendice scrive l'algoritmo BSP eseguito dal programma, nel formalismo di~\citep{cormen2009introduction}.
+Il bias è la certezza~\eqref{eq:bias}.
+Le deformazioni termodinamiche, gli altri punteggi, l'oracolo e il look-ahead non fanno parte di queste procedure.
+La notazione è quella della Sezione~\ref{sec:spbsp}.
+Il logaritmo è naturale.
+Un prodotto su un insieme vuoto vale~$1$.
+
+Il programma chiama $\proc{BSP}$ con $r=0{,}9$, $f=0{,}00125$, $\epsilon=0{,}01$, $t_{\max}=1024$, $\delta=10^{-10}$ e $\Sig_{\min}=-2$.
+I contatori $n_{\mathrm{dec}}$ e $n_{\mathrm{back}}$ partono da~$1$.
+Il primo confronto è quindi $1/1<r$.
+Per $r<1$ la prima mossa è una decimazione.
+Per $r=0$ ogni mossa è una decimazione, e si ritrova la decimazione guidata dalle survey.
+
+Una clausola $a$ conserva l'insieme originale $\partial a$ e un insieme $\attrib{a}{V}\subseteq\partial a$ di variabili ancora presenti.
+La clausola è residua quando $\attrib{a}{sat}$ è falso.
+L'assegnazione parziale è descritta, per ogni variabile $i$, dagli attributi $\attrib{i}{free}$, $\attrib{i}{value}\in\{-1,+1\}$, $\attrib{i}{forced}$ e $\attrib{i}{bias}$.
+Il valore $\attrib{i}{bias}$ è il bias calcolato al momento dell'assegnazione, e non viene ricalcolato finché $i$ resta assegnata.
+L'attributo $\attrib{i}{degree}$ è il numero di clausole residue che contengono $i$, ed è $0$ se $i$ è assegnata.
+Su ogni lato originale $(a,i)$ la procedura conserva la survey $\eta_{a\to i}$ e una copia $\eta^{\mathrm{s}}_{a\to i}$.
+La copia vale $\const{nil}$ quando il lato è residuo.
+Le procedure di cavità leggono solo i lati residui, cioè le coppie $(b,j)$ con $\attrib{b}{sat}$ falso e $j\in\attrib{b}{V}$.
+
+\begin{codebox}
+\Procname{$\proc{Initialize}(F)$}
+\li \For each variable $i$
+\li     \Do
+            $\attrib{i}{free} \gets \const{true}$
+\li         $\attrib{i}{forced} \gets \const{false}$
+\li         $\attrib{i}{degree} \gets |\partial i|$
+\li         $\attrib{i}{bias} \gets 0$
+        \End
+\li \For each clause $a$
+\li     \Do
+            $\attrib{a}{sat} \gets \const{false}$
+\li         $\attrib{a}{V} \gets \partial a$
+        \End
+\li \For each edge $(a,i)$
+\li     \Do
+            draw $\eta_{a \to i}$ uniformly from $[0,1)$
+\li         $\eta^{\mathrm{s}}_{a \to i} \gets \const{nil}$
+        \End
+\li $\attrib{F}{n-dec} \gets 1$
+\li $\attrib{F}{n-back} \gets 1$
+\li $\attrib{F}{n-batch} \gets 0$
+\li $\attrib{F}{n-up} \gets 0$
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{BSP}(F, r, f, \epsilon, t_{\max}, \delta, \Sig_{\min})$}
+\li $\proc{Initialize}(F)$
+\li $\proc{Unit-Propagation}(F)$
+\li $\attrib{F}{n-up} \gets 0$
+\li \While $\const{true}$
+\li     \Do
+            $\proc{SP-Converge}(F, \epsilon, t_{\max}, \delta)$
+\li         $\proc{Compute-Weights}(F)$
+\li         $\Sig \gets \proc{Complexity}(F)$
+\li         \If $\proc{Paramagnetic}(F)$
+\li             \Then $\Sig \gets 0$
+                \End
+\li         \If $\attrib{F}{n-back} / \attrib{F}{n-dec} < r$
+\li             \Then
+                    $\attrib{F}{n-back} \gets \attrib{F}{n-back}+1$
+\li                 $\id{back} \gets \const{true}$
+\li             \Else
+                    $\attrib{F}{n-dec} \gets \attrib{F}{n-dec}+1$
+\li                 $\id{back} \gets \const{false}$
+                \End
+\li         \If $\id{back} \isequal \const{false}$
+\li             \Then
+                    \If $\Sig \isequal 0$
+\li                     \Then \Return $\proc{Complete}(F)$
+                        \End
+\li                 \If $\Sig < \Sig_{\min}$
+\li                     \Then \Error ``negative complexity''
+                        \End
+\li                 $\proc{Decimate}(F, f)$
+\li             \Else $\proc{Backtrack}(F)$
+                \End
+        \End
+\end{codebox}
+
+L'assegnazione $\attrib{F}{n-up}\gets 0$ che segue la prima propagazione delle unità lascia forzate quelle variabili, ma non le conta nel primo rilascio.
+Lo stop con $\Sig=0$ e lo stop con $\Sig<\Sig_{\min}$ valgono solo se la mossa scelta è una decimazione.
+Se la mossa scelta è un rilascio, la procedura rilascia e risolve di nuovo le equazioni.
+$\proc{SP-Converge}$ fallisce se in $t_{\max}$ iterazioni nessuna survey si muove di più di $\epsilon$, oppure se una clausola residua diventa vuota.
+Un'iterazione legge le survey dell'inizio dell'iterazione e scrive i valori nuovi solo alla fine.
+Se una survey nuova vale $1$, la variabile avvertita viene fissata, l'iterazione viene abbandonata e la convergenza riparte da capo.
+
+\begin{codebox}
+\Procname{$\proc{SP-Converge}(F, \epsilon, t_{\max}, \delta)$}
+\li \Repeat
+\li     $\proc{Unit-Propagation}(F)$
+\li     $\id{forced} \gets \const{false}$
+\li     $t \gets 1$
+\li     \While $t \leq t_{\max}$ and $\id{forced} \isequal \const{false}$
+\li         \Do
+                $(\id{done}, \id{forced}) \gets \proc{SP-Sweep}(F, \epsilon, \delta)$
+\li             \If $\id{done}$
+\li                 \Then \Return
+                    \End
+\li             $t \gets t + 1$
+            \End
+\li     \If $\id{forced} \isequal \const{false}$
+\li         \Then \Error ``SP does not converge''
+            \End
+\li \Until $\const{false}$
+\end{codebox}
+
+Se una survey nuova vale $1$, $\id{forced}$ diventa vero, il ciclo interno si chiude e $\proc{SP-Converge}$ ricomincia, azzerando il conteggio delle iterazioni.
+
+\begin{codebox}
+\Procname{$\proc{SP-Sweep}(F, \epsilon, \delta)$}
+\li $\id{changed} \gets \const{false}$
+\li \For each residual clause $a$
+\li     \Do
+            \For each variable $i \in \attrib{a}{V}$
+\li             \Do
+                    $\eta'_{a \to i} \gets \proc{Clause-Survey}(a, i, \delta)$
+\li                 \If $\eta'_{a \to i} \isequal 1$
+\li                     \Then
+                            $\proc{Assign}(F, i, s_{a,i}, \const{true})$
+\li                         $\attrib{F}{n-up} \gets \attrib{F}{n-up}+1$
+\li                         \Return $(\const{false}, \const{true})$
+                        \End
+\li                 \If $|\eta'_{a \to i} - \eta_{a \to i}| > \epsilon$
+\li                     \Then $\id{changed} \gets \const{true}$
+                        \End
+                \End
+        \End
+\li \For each residual clause $a$
+\li     \Do
+            \For each variable $i \in \attrib{a}{V}$
+\li             \Do $\eta_{a \to i} \gets \eta'_{a \to i}$
+                \End
+        \End
+\li \If $\id{changed}$
+\li     \Then \Return $(\const{false}, \const{false})$
+\li     \Else \Return $(\const{true}, \const{false})$
+        \End
+\end{codebox}
+
+$\proc{Clause-Survey}$ è la~\eqref{eq:sp-clause}.
+$\proc{Cavity}$ è la~\eqref{eq:sp-var}: il primo valore restituito è $\Pi^u_{j\to a}$ e il secondo è $\Pi^u_{j\to a}+\Pi^s_{j\to a}+\Pi^0_{j\to a}$.
+Il programma ottiene gli stessi due numeri dai prodotti $\prod(1-\eta)$ dei due lati, dopo aver tolto il fattore della clausola $a$.
+
+\begin{codebox}
+\Procname{$\proc{Clause-Survey}(a, i, \delta)$}
+\li $\id{num} \gets 1$
+\li $\id{den} \gets 1$
+\li \For each variable $j \in \attrib{a}{V} \setminus \{i\}$
+\li     \Do
+            $(\pi^u, z) \gets \proc{Cavity}(j, a)$
+\li         \If $z \isequal 0$
+\li             \Then \Error ``contradiction''
+                \End
+\li         $\id{num} \gets \id{num} \cdot \pi^u$
+\li         $\id{den} \gets \id{den} \cdot z$
+        \End
+\li \If $\id{den} \isequal 0$
+\li     \Then \Error ``contradiction''
+        \End
+\li $\eta \gets \id{num} / \id{den}$
+\li \If $\eta < \delta$
+\li     \Then $\eta \gets 0$
+        \End
+\li \Return $\eta$
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Cavity}(j, a)$}
+\li $P^s \gets 1$
+\li $P^u \gets 1$
+\li \For each residual clause $b \neq a$ with $j \in \attrib{b}{V}$
+\li     \Do
+            \If $s_{b,j} \isequal s_{a,j}$
+\li             \Then $P^s \gets P^s \cdot (1 - \eta_{b \to j})$
+\li             \Else $P^u \gets P^u \cdot (1 - \eta_{b \to j})$
+                \End
+        \End
+\li $\pi^u \gets (1 - P^u) \, P^s$
+\li $z \gets P^s + P^u - P^s P^u$
+\li \Return $(\pi^u, z)$
+\end{codebox}
+
+Dopo la convergenza, $\proc{Compute-Weights}$ calcola le grandezze di sito~\eqref{eq:w} delle sole variabili libere.
+Il denominatore è $1-\pi_i^+\pi_i^-$.
+$\proc{Complexity}$ calcola la~\eqref{eq:sigma-bsp} sulle variabili libere e sulle clausole residue.
+$\proc{Paramagnetic}$ è il test del programma per il punto fisso banale: nessuna variabile libera di grado almeno $2$ riceve warning da entrambi i lati.
+
+\begin{codebox}
+\Procname{$\proc{Compute-Weights}(F)$}
+\li \For each free variable $i$
+\li     \Do
+            $P^+ \gets 1$
+\li         $P^- \gets 1$
+\li         \For each residual clause $a$ with $i \in \attrib{a}{V}$
+\li             \Do
+                    \If $s_{a,i} \isequal +1$
+\li                     \Then $P^+ \gets P^+ \cdot (1 - \eta_{a \to i})$
+\li                     \Else $P^- \gets P^- \cdot (1 - \eta_{a \to i})$
+                        \End
+                \End
+\li         $\pi_i^+ \gets 1 - P^+$
+\li         $\pi_i^- \gets 1 - P^-$
+\li         $Z \gets 1 - \pi_i^+ \pi_i^-$
+\li         \If $Z \isequal 0$
+\li             \Then \Error ``contradiction''
+                \End
+\li         $w_i^+ \gets \pi_i^+ (1 - \pi_i^-) / Z$
+\li         $w_i^- \gets \pi_i^- (1 - \pi_i^+) / Z$
+\li         $w_i^0 \gets 1 - w_i^+ - w_i^-$
+\li         $b_i \gets 1 - \min(w_i^+, w_i^-)$
+        \End
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Complexity}(F)$}
+\li $\Sig \gets 0$
+\li \For each free variable $i$
+\li     \Do $\Sig \gets \Sig + \log(1 - \pi_i^+ \pi_i^-)$
+        \End
+\li \For each residual clause $a$
+\li     \Do
+            $p \gets 1$
+\li         \For each variable $j \in \attrib{a}{V}$
+\li             \Do
+                    $(\pi^u, z) \gets \proc{Cavity}(j, a)$
+\li                 \If $z \isequal 0$
+\li                     \Then \Error ``contradiction''
+                        \End
+\li                 $p \gets p \cdot (\pi^u / z)$
+                \End
+\li         \If $1 - p \leq 0$
+\li             \Then \Error ``contradiction''
+                \End
+\li         $\Sig \gets \Sig + (1 - |\attrib{a}{V}|) \log(1 - p)$
+        \End
+\li \Return $\Sig$
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Paramagnetic}(F)$}
+\li \For each free variable $i$
+\li     \Do
+            \If $\attrib{i}{degree} \geq 2$ and $\pi_i^+ \pi_i^- \neq 0$
+\li             \Then \Return $\const{false}$
+                \End
+        \End
+\li \Return $\const{true}$
+\end{codebox}
+
+$\proc{Decimate}$ assegna le $B=\max(1,\lfloor f n\rfloor)$ variabili libere di bias $b_i$ più grande, dove $n$ è il numero di variabili libere.
+A parità di bias l'ordine è arbitrario.
+Il segno è $+1$ se $w_i^+>w_i^-$, e $-1$ altrimenti, quindi anche nel caso di uguaglianza.
+Il bias memorizzato è il $b_i$ di questo punto fisso.
+La decimazione azzera $\attrib{F}{n-up}$ prima delle assegnazioni: le unità propagate nell'iterazione precedente non aumentano il rilascio successivo.
+$\attrib{F}{n-batch}$ resta uguale all'ampiezza di questa decimazione anche attraverso i rilasci successivi.
+
+\begin{codebox}
+\Procname{$\proc{Decimate}(F, f)$}
+\li $\attrib{F}{n-up} \gets 0$
+\li let $L[1 \twodots n]$ be the free variables,
+\zi     in decreasing order of $b_i$
+\li $B \gets \max(1, \lfloor f \cdot n \rfloor)$
+\li $\attrib{F}{n-batch} \gets B$
+\li \For $k \gets 1$ \To $B$
+\li     \Do
+            $i \gets L[k]$
+\li         \If $w_i^+ > w_i^-$
+\li             \Then $v \gets +1$
+\li             \Else $v \gets -1$
+                \End
+\li         $\proc{Assign}(F, i, v, \const{false})$
+        \End
+\end{codebox}
+
+$\proc{Backtrack}$ libera le variabili assegnate non forzate che hanno il $\attrib{i}{bias}$ più piccolo.
+Il numero di rilasci è $q=\min(\attrib{F}{n-batch}+\attrib{F}{n-up}, m)$, dove $m$ è il numero di variabili assegnate non forzate.
+Le variabili fissate dalla propagazione delle unità hanno $\attrib{i}{forced}$ vero e non vengono liberate.
+Dopo il conteggio, $\attrib{F}{n-up}$ viene azzerato.
+Un rilascio che segue un altro rilascio usa ancora l'ampiezza dell'ultima decimazione.
+
+\begin{codebox}
+\Procname{$\proc{Backtrack}(F)$}
+\li $q \gets \attrib{F}{n-batch} + \attrib{F}{n-up}$
+\li $\attrib{F}{n-up} \gets 0$
+\li let $L[1 \twodots m]$ be the assigned variables
+\zi     with $\attrib{i}{forced} \isequal \const{false}$,
+\zi     in increasing order of $\attrib{i}{bias}$
+\li $q \gets \min(q, m)$
+\li \For $k \gets 1$ \To $q$
+\li     \Do $\proc{Release}(F, L[k])$
+        \End
+\end{codebox}
+
+$\proc{Assign}$ fissa $i$ al valore $v$ e semplifica la formula.
+Per ogni clausola originale che contiene $i$ accade uno di tre casi.
+Se la clausola è già soddisfatta, il letterale di $i$ viene tolto e la survey memorizzata viene sostituita dalla survey corrente.
+Se $v$ soddisfa la clausola, la clausola esce dalla formula residua: la survey di ogni lato ancora presente viene memorizzata e poi annullata, e il grado delle altre variabili diminuisce di uno.
+Se $v$ non soddisfa la clausola, solo il letterale di $i$ viene tolto.
+Una clausola residua senza letterali è una contraddizione.
+All'uscita, $\attrib{i}{degree}=0$.
+Se l'assegnazione è forzata, il bias memorizzato è $1$.
+Altrimenti è il $b_i$ appena calcolato.
+
+\begin{codebox}
+\Procname{$\proc{Assign}(F, i, v, \id{forced})$}
+\li $\attrib{i}{free} \gets \const{false}$
+\li $\attrib{i}{value} \gets v$
+\li $\attrib{i}{forced} \gets \id{forced}$
+\li \If $\id{forced}$
+\li     \Then $\attrib{i}{bias} \gets 1$
+\li     \Else $\attrib{i}{bias} \gets b_i$
+        \End
+\li \For each clause $a$ such that $i \in \partial a$
+\li     \Do
+            \If $\attrib{a}{sat}$
+\li             \Then $\proc{Drop-Literal}(a, i)$
+\li         \ElseIf $s_{a,i} \isequal v$
+\li             \Then $\proc{Satisfy-Clause}(a, i)$
+\li         \ElseNoIf
+                $\proc{Shorten-Clause}(a, i)$
+            \End
+        \End
+\li $\attrib{i}{degree} \gets 0$
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Drop-Literal}(a, i)$}
+\li $\eta^{\mathrm{s}}_{a \to i} \gets \eta_{a \to i}$
+\li \If $s_{a,i} \isequal \attrib{i}{value}$
+\li     \Then $\eta_{a \to i} \gets 0$
+\li     \Else $\eta_{a \to i} \gets 1$
+        \End
+\li $\attrib{a}{V} \gets \attrib{a}{V} \setminus \{i\}$
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Satisfy-Clause}(a, i)$}
+\li $\eta^{\mathrm{s}}_{a \to i} \gets \eta_{a \to i}$
+\li $\eta_{a \to i} \gets 0$
+\li $\attrib{a}{V} \gets \attrib{a}{V} \setminus \{i\}$
+\li \For each variable $j \in \attrib{a}{V}$
+\li     \Do
+            \If $\eta^{\mathrm{s}}_{a \to j} \isequal \const{nil}$
+\li             \Then $\eta^{\mathrm{s}}_{a \to j} \gets \eta_{a \to j}$
+                \End
+\li         $\eta_{a \to j} \gets 0$
+\li         $\attrib{j}{degree} \gets \attrib{j}{degree} - 1$
+        \End
+\li $\attrib{a}{sat} \gets \const{true}$
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Shorten-Clause}(a, i)$}
+\li $\eta^{\mathrm{s}}_{a \to i} \gets \eta_{a \to i}$
+\li $\eta_{a \to i} \gets 1$
+\li $\attrib{a}{V} \gets \attrib{a}{V} \setminus \{i\}$
+\li \If $\attrib{a}{V} \isequal \emptyset$
+\li     \Then \Error ``contradiction''
+        \End
+\end{codebox}
+
+$\proc{Release}$ è l'inverso di $\proc{Assign}$ per una variabile non forzata.
+Per ogni clausola originale che contiene $i$, $\proc{Restore-Literal}$ rimette il letterale.
+Se un'altra variabile ancora assegnata soddisfa la clausola, la clausola resta fuori dalla formula residua e il lato rientra con survey nulla, conservando la survey memorizzata.
+Se la clausola era soddisfatta solo grazie a $i$, torna residua: ogni variabile ancora presente riprende la survey memorizzata e aumenta il grado di uno.
+Se la clausola era già residua, rientra solo il letterale di $i$, con la survey che aveva quando è stato tolto.
+
+\begin{codebox}
+\Procname{$\proc{Release}(F, i)$}
+\li $\attrib{i}{free} \gets \const{true}$
+\li $\attrib{i}{forced} \gets \const{false}$
+\li \For each clause $a$ such that $i \in \partial a$
+\li     \Do $\proc{Restore-Literal}(a, i)$
+        \End
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Restore-Literal}(a, i)$}
+\li $\id{still} \gets \const{false}$
+\li \For each variable $j \in \partial a \setminus \{i\}$
+\li     \Do
+            \If $\attrib{j}{free} \isequal \const{false}$ and $s_{a,j} \isequal \attrib{j}{value}$
+\li             \Then $\id{still} \gets \const{true}$
+                \End
+        \End
+\li $\attrib{a}{V} \gets \attrib{a}{V} \cup \{i\}$
+\li \If $\id{still}$
+\li     \Then $\eta_{a \to i} \gets 0$
+\li     \Else
+            \If $\attrib{a}{sat}$
+\li             \Then
+                    $\attrib{a}{sat} \gets \const{false}$
+\li                 \For each variable $j \in \attrib{a}{V}$
+\li                     \Do
+                            \If $\eta^{\mathrm{s}}_{a \to j} \neq \const{nil}$
+\li                             \Then
+                                    $\eta_{a \to j} \gets \eta^{\mathrm{s}}_{a \to j}$
+\li                                 $\eta^{\mathrm{s}}_{a \to j} \gets \const{nil}$
+                                \End
+\li                         $\attrib{j}{degree} \gets \attrib{j}{degree} + 1$
+                        \End
+\li             \Else
+                    $\eta_{a \to i} \gets \eta^{\mathrm{s}}_{a \to i}$
+\li                 $\eta^{\mathrm{s}}_{a \to i} \gets \const{nil}$
+\li                 $\attrib{i}{degree} \gets \attrib{i}{degree} + 1$
+                \End
+        \End
+\end{codebox}
+
+$\proc{Unit-Propagation}$ assegna l'unico letterale di una clausola residua di lunghezza $1$ al valore che soddisfa la clausola, e marca la variabile come forzata.
+Il passo si ripete, perché una assegnazione può creare nuove clausole di lunghezza $1$.
+Ogni variabile fissata in questo modo aumenta $\attrib{F}{n-up}$.
+
+\begin{codebox}
+\Procname{$\proc{Unit-Propagation}(F)$}
+\li \While some residual clause has length at most $1$
+\li     \Do
+            \If some residual clause is empty
+\li             \Then \Error ``contradiction''
+                \End
+\li         let $a$ be a residual clause with $\attrib{a}{V} \isequal \{i\}$
+\li         $\proc{Assign}(F, i, s_{a,i}, \const{true})$
+\li         $\attrib{F}{n-up} \gets \attrib{F}{n-up}+1$
+        \End
+\end{codebox}
+
+Quando $\proc{BSP}$ raggiunge il punto fisso banale in una mossa di decimazione, la formula residua viene passata a WalkSAT.
+Il programma usa l'euristica best, rumore $50/100$, al più $10^{8}$ flip per tentativo e al più $10$ tentativi.
+Qualsiasi procedura che restituisce un assegnamento che soddisfa tutte le clausole residue soddisfa il contratto di $\proc{Local-Search}$.
+$\proc{Complete}$ copia quei valori solo sulle variabili libere e controlla ogni clausola originale.
+
+\begin{codebox}
+\Procname{$\proc{Local-Search}(F)$}
+\li run WalkSAT on the residual formula of $F$
+\li \If WalkSAT returns a satisfying assignment $x$
+\li     \Then \Return $x$
+\li     \Else \Return $\const{nil}$
+        \End
+\end{codebox}
+
+\begin{codebox}
+\Procname{$\proc{Complete}(F)$}
+\li $x \gets \proc{Local-Search}(F)$
+\li \If $x \isequal \const{nil}$
+\li     \Then \Error ``local search failed''
+        \End
+\li \For each free variable $i$
+\li     \Do
+            $\attrib{i}{value} \gets x_i$
+\li         $\attrib{i}{free} \gets \const{false}$
+        \End
+\li \For each clause $a$
+\li     \Do
+            $\id{ok} \gets \const{false}$
+\li         \For each variable $i \in \partial a$
+\li             \Do
+                    \If $\attrib{i}{value} \isequal s_{a,i}$
+\li                     \Then $\id{ok} \gets \const{true}$
+                        \End
+                \End
+\li         \If $\id{ok} \isequal \const{false}$
+\li             \Then \Error ``not a solution''
+                \End
+        \End
+\li \Return $(\attrib{1}{value}, \ldots, \attrib{N}{value})$
+\end{codebox}
