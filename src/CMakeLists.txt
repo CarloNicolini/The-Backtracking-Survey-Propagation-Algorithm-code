@@ -6,6 +6,8 @@ add_library(bsp_core STATIC
   rsb2_graph.cpp
   rsb2_obs.cpp
   rsb2_pop.cpp
+  rsb2_thermo.cpp
+  sp2.cpp
   Vertex.cpp
   thermo_sp.cpp
   thermo_policy.cpp

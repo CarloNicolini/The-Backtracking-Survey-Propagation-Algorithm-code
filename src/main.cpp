@@ -20,18 +20,7 @@
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-//
-//  Created by Raffaele Marino on 2018-08-25.
-//  Copyright © 2018 Raffaele Marino. All rights reserved.
-//
-
-
-/*******************************************/
-/*******************************************/
-/*IL PERDER TEMPO A CHI PIU' SA PIU' SPIACE*/
-/*******************************************/
-/*******************************************/
-
+// IL PERDER TEMPO A CHI PIU' SA PIU' SPIACE
 
 #define MAIN
 #define VERSION "BSP_SAT_VERSION_2018"
@@ -43,6 +32,7 @@
 #include <bsp/tsallis.hpp>
 #include <bsp/outdir.hpp>
 #include <bsp/rsb2.hpp>
+#include <bsp/sp2.hpp>
 #include <cxxopts.hpp>
 #define UNIX 1
 #if UNIX
@@ -50,21 +40,17 @@
 #define srandom(seed) srand(seed)
 #endif
 
-/*This code describes message passing algorithms for solving random SAT problems.
+/*
+This code describes message passing algorithms for solving random SAT problems.
 
+At this moment the code is able to solve:
 
+1) Random K-SAT problems with Survey Propagation, with backtracking strategy if needed, for any K.
 
- ******************************************************************************************************************
- At this moment the code is able to solve:
-
-    1) Random K-SAT problems with Survey Propagation, with backtracking strategy if needed, for any K.
-
- ******************************************************************************************************************
-
-
- This code is an open source code, it can be modified and improved with new strategies.
- For any question about this code (and if you will find bugs), please, contact me at:
- raffaele.marino@epfl.ch or marino.raffaele@mail.huji.ac.il or marinoraffaele.nunziatella@gmail.com */
+This code is an open source code, it can be modified and improved with new strategies.
+For any question about this code (and if you will find bugs), please, contact me at:
+raffaele.marino@epfl.ch or marino.raffaele@mail.huji.ac.il or marinoraffaele.nunziatella@gmail.com 
+ */
 
 
 
@@ -140,12 +126,23 @@ int main(int argc, char* argv[]) {
             cxxopts::value<double>())
         ("frac", "Decimation batch fraction in (0, 1]",
             cxxopts::value<double>())
-        ("rsb2-stab", "2RSB linear stability test: lambda in PREFIX_rsb2.csv")
+        ("rsb2-stab", "2RSB linear stability test: lambda in PREFIX_rsb2.csv"
+            " (at mu1 = 1/cav-temp with --cav-temp)")
         ("rsb2-x", "2RSB population solver at x=mu1/mu2 in (0, 1] (default off)",
             cxxopts::value<double>())
         ("rsb2-pop", "2RSB population size per edge (default 64)",
             cxxopts::value<unsigned>())
         ("rsb2-every", "Run the 2RSB tools every K SP fixed points (default 1)",
+            cxxopts::value<unsigned>())
+        ("sp2-mu2", "Finite-mu 2RSB update at this mu2 (0 = off)",
+            cxxopts::value<double>())
+        ("sp2-x", "x = mu1/mu2 of --sp2-mu2 (default 0.5)",
+            cxxopts::value<double>())
+        ("sp2-pop", "Atoms per edge for --sp2-mu2 (default 32)",
+            cxxopts::value<unsigned>())
+        ("sp2-sweeps", "Sweeps of the finite-mu 2RSB update (default 4)",
+            cxxopts::value<unsigned>())
+        ("sp2-every", "Run --sp2-mu2 every K SP fixed points (0 = once)",
             cxxopts::value<unsigned>())
         ("outdir", "Directory for all file outputs (default: bsp_runs/<slug>)",
             cxxopts::value<string>())
@@ -340,6 +337,38 @@ int main(int argc, char* argv[]) {
         g_rsb2_every = result["rsb2-every"].as<unsigned>();
         if (g_rsb2_every == 0) g_rsb2_every = 1;
     }
+    if (result.count("sp2-mu2")) {
+        g_sp2_mu2 = result["sp2-mu2"].as<double>();
+        if (!(g_sp2_mu2 > 0.0)) {
+            BSP_ERROR << "sp2-mu2 must be > 0, got " << g_sp2_mu2 << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("sp2-x")) {
+        g_sp2_x = result["sp2-x"].as<double>();
+        if (!(g_sp2_x > 0.0 && g_sp2_x <= 1.0)) {
+            BSP_ERROR << "sp2-x must be in (0, 1], got " << g_sp2_x << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("sp2-pop")) {
+        g_sp2_pop = result["sp2-pop"].as<unsigned>();
+        if (g_sp2_pop < 2) {
+            BSP_ERROR << "sp2-pop must be >= 2, got " << g_sp2_pop << endl;
+            print_cli_help(options, prog);
+            return 1;
+        }
+    }
+    if (result.count("sp2-sweeps"))
+        g_sp2_sweeps = result["sp2-sweeps"].as<unsigned>();
+    if (result.count("sp2-every"))
+        g_sp2_every = result["sp2-every"].as<unsigned>();
+    if (g_sp2_mu2 > 0. && g_rsb2_x > 0.) {
+        BSP_ERROR << "--sp2-mu2 does not combine with --rsb2-x" << endl;
+        return 1;
+    }
 
     const bool do_write = result.count("write") > 0;
     const bool do_load = result.count("load") > 0;
@@ -379,9 +408,13 @@ int main(int argc, char* argv[]) {
                   << " (the release order runs on the free energies)" << endl;
         return 1;
     }
-    if ((g_rsb2_stab || g_rsb2_x > 0.) && (g_T_cav > 0. || g_gamma_eff != 0.)) {
-        BSP_ERROR << "--rsb2-stab and --rsb2-x need plain SP"
-                  << " (no --cav-temp, --rsb-m or --rsb-gamma)" << endl;
+    if ((g_rsb2_stab || g_rsb2_x > 0.) && g_gamma_eff != 0.) {
+        BSP_ERROR << "--rsb2-stab and --rsb2-x need SP or SP-y"
+                  << " (no --rsb-m or --rsb-gamma)" << endl;
+        return 1;
+    }
+    if (g_rsb2_x > 0. && g_T_cav > 0.) {
+        BSP_ERROR << "--rsb2-x needs plain SP (no --cav-temp)" << endl;
         return 1;
     }
     if (g_oracle_pick > 0) {
@@ -578,6 +611,8 @@ SP:
     G.diag_step();/*log SP fixed point (no-op unless --diag)*/
     if (g_rsb2_stab || g_rsb2_x>0.)
         rsb2_step(G);/*2RSB stability and populations at this fixed point*/
+    if (g_sp2_mu2>0.)
+        sp2_step(G);/*finite-mu 2RSB update of the paper*/
     if (g_tsallis_kappa!=0.)
         tsallis_update(G.energy, G.N_t());/*y_eff for the next SP solve*/
 

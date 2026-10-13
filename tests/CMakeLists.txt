@@ -2,6 +2,10 @@ add_executable(bsp-test test_thermo_sp.cpp)
 target_link_libraries(bsp-test PRIVATE bsp_core)
 add_test(NAME thermo-sp COMMAND bsp-test)
 
+add_executable(bsp-sp2-test test_sp2.cpp)
+target_link_libraries(bsp-sp2-test PRIVATE bsp_core)
+add_test(NAME sp2-update COMMAND bsp-sp2-test)
+
 add_executable(bsp-rsb2-test test_rsb2.cpp)
 target_link_libraries(bsp-rsb2-test PRIVATE bsp_core)
 add_test(NAME rsb2-kernels COMMAND bsp-rsb2-test)
