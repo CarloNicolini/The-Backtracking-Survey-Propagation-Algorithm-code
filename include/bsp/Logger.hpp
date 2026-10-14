@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <string>
+#include <bsp/run.hpp>
 
 namespace bsp {
 
@@ -69,7 +70,7 @@ inline void set_log_prefix(bool on)
 
 inline std::ostream &log_ostream(LogLevel level)
 {
-    return (level <= LogLevel::Warn) ? std::cerr : std::cout;
+    return output_stream(level <= LogLevel::Warn);
 }
 
 /* Stream sink that discards when the level is disabled. */
@@ -79,6 +80,11 @@ public:
         : level_(level), active_(active), os_(os), prefix_done_(false)
     {}
 
+    LogSink(LogSink &&) = default;
+    ~LogSink() {
+        if (active_ && run_context()) record_log(log_level_name(level_), level_ <= LogLevel::Warn ? "stderr" : "stdout", message_.str());
+    }
+
     /* Non-const: Graph/Clause operator<< take mutable references. */
     template <typename T>
     LogSink &operator<<(T &value)
@@ -87,6 +93,7 @@ public:
             return *this;
         write_prefix_once();
         os_ << value;
+        if (run_context()) message_ << value;
         return *this;
     }
 
@@ -97,6 +104,7 @@ public:
             return *this;
         write_prefix_once();
         os_ << value;
+        if (run_context()) message_ << value;
         return *this;
     }
 
@@ -106,6 +114,7 @@ public:
             return *this;
         write_prefix_once();
         os_ << manip;
+        if (run_context()) message_ << manip;
         return *this;
     }
 
@@ -118,6 +127,7 @@ private:
         prefix_done_ = true;
     }
 
+    std::ostringstream message_;
     LogLevel level_;
     bool active_;
     std::ostream &os_;

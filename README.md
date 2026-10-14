@@ -10,7 +10,7 @@ For any problem, email: marinoraffaele.nunziatella@gmail.com
 
 ## Build (CMake)
 
-Requires CMake ≥ 3.16 and a C++14 compiler (g++ on Linux, or AppleClang/Clang on
+Requires CMake ≥ 3.19 and a C++14 compiler (g++ on Linux, or AppleClang/Clang on
 macOS). Network access is needed on the first configure so
 CMake can FetchContent the cxxopts header library.
 
@@ -179,3 +179,116 @@ docker run --rm -v "$PWD":/src -w /src ubuntu:24.04 bash -lc '
     ./build/debug/bsp -w 3 3.0 30
 '
 ```
+
+## Native Python interface
+
+`pybsp` calls the C++ `bsp_core` library through nanobind and returns NumPy
+assignments, pandas diagnostic tables, and captured logs in memory.
+
+```bash
+uv sync --locked
+uv run ipython
+```
+
+Python 3.12+ and GCC/Clang on macOS/Linux are required for source builds.
+scikit-learn is included, with `KSATSolver` parameter inspection and cloning.
+To use an existing environment, install with `uv pip install .` or
+`python -m pip install .`.
+
+```python
+import pybsp
+
+formula = pybsp.Formula([[1, -2, 3], [-1, 2, 3]], n=3)
+result = pybsp.solve(formula, pybsp.SolverOptions(seed=1))
+print(result.status, result.assignment)
+print(result.steps.head())
+```
+
+A 2D integer array `(clauses, K)` represents one formula; a 3D array represents
+a uniformly sized batch. Iterables of `Formula` objects or dataset records
+support varying sizes. A failed heuristic run never proves UNSAT.
+
+### Dataset pipelines and batch solving
+
+```python
+DATASET_ROOT = "~/workspace/RandSatBench/datasets/3SAT"
+dataset = (
+    pybsp.Dataset.from_randsatbench(DATASET_ROOT, split="train")
+    .select(n=[16, 32], alpha=(4.0, 4.3))
+    .sample(num_instances=10, by=["N", "alpha"], seed=123)
+)
+dataset.head().to_frame()
+
+solver = pybsp.KSATSolver(r=0.9, random_state=42, n_jobs=2)
+assignments = solver.fit_predict(dataset)
+print(solver.run_table_.head())
+print(solver.report_.metrics())
+```
+
+Operations return new datasets; formulas remain lazy. `sample(frac=0.1)` samples
+a fraction, while `num_instances` selects a fixed count (per group with `by`).
+Filtering, querying, sorting, shuffling, slicing, splitting and sharding are
+supported. Reference and BSP assignments are independently verified; different
+satisfying assignments are equally correct.
+
+`solve_batch()` offers the functional interface and `iter_solve()` streams
+results. Spawned workers use bounded dispatch; the parent displays progress and
+coordinates cooperative cancellation. Use `fit_predict()` to solve once:
+`fit(X).predict(X)` performs two searches without learning a transferable model.
+
+### Random datasets and explicit persistence
+
+```python
+generated = pybsp.Dataset.from_random_ksat(
+    n=32, alpha=4.0, k=3, num_instances=20, seed=123,
+    solver=pybsp.SolverOptions(seed=99), show_progress=False,
+)
+# generated.save_to_disk("experiments/labelled-ksat")
+# restored = pybsp.Dataset.load_from_disk("experiments/labelled-ksat")
+```
+
+`m` can specify the clause count instead of `alpha`. Omitting `solver` defers
+reference solving. Portable snapshots preserve formulas, labels and generation
+metadata independently of original CNF paths. Ordinary runs create no solver
+files; explicit Minisat use may require cleaned temporary inputs.
+
+### Notebooks, documentation, and building
+
+```bash
+uv sync --locked --group notebooks
+uv run --group notebooks jupyter lab
+
+uv sync --locked --group docs
+uv run --group docs sphinx-build -W --keep-going -b html docs docs/_build/html
+```
+
+Open the [experiment notebook](notebooks/native_bsp_experiments.ipynb), which
+runs a small generated-data experiment by default and supports RandSATBench as
+an alternative. It demonstrates validation/held-out splits, parameter sweeps,
+recovery curves, runtime plots, paired comparisons and explicit persistence.
+
+The [PyData Sphinx documentation](docs/index.md) includes installation,
+the [mathematical background](docs/sat-and-bsp.md), quickstarts, dataset
+tutorials, experiments and a generated
+[API reference](docs/api/index.rst). Open `docs/_build/html/index.html` after
+building. The [detailed native guide](docs/python-native.md) retains option
+mapping, diagnostic controls, logging and cancellation details.
+The experiment tutorial includes interactive Plotly figures using the `seaborn`
+template, including verified solve fraction versus clause density.
+
+Packaging uses the PEP 517 `scikit_build_core.build` backend. uv lets
+scikit-build-core provision build tools and compile the PIC `bsp_core` target,
+then link/install `pybsp._native` into the wheel. Native Python builds use
+Release settings with CPU-specific optimization and OpenMP disabled by default;
+temporary CMake builds do not create source-tree IDE links.
+
+```bash
+uv build                              # sdist and compiled wheel in dist/
+uv sync --reinstall-package pybsp     # Rebuild after C++/binding changes
+# With an OpenMP runtime available:
+# uv sync --reinstall-package pybsp -Ccmake.define.BSP_ENABLE_OPENMP=ON
+```
+
+The initial API supports complete native runs and batch experiments. General
+effort budgets, interactive stepping and wrappers for the PRE paper's sparse
+ensemble/dense Gaussian calculations remain separate work.

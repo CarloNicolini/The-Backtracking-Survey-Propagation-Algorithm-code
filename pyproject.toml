@@ -1,14 +1,17 @@
 [project]
 name = "pybsp"
 version = "0.1.0"
-description = "Support code for analysing BSP data"
+description = "Native notebook interface and experiment tools for Backtracking Survey Propagation"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.0",
     "pandas>=3.0.5",
     "scienceplots>=2.2.2",
     "seaborn>=0.13.2",
     "typer>=0.27.2",
+    "tqdm>=4.66",
+    "scikit-learn>=1.9.1",
 ]
 
 [project.scripts]
@@ -16,16 +19,45 @@ bsp-grid = "pybsp.cli:grid_app"
 bsp-plot = "pybsp.cli:plot_app"
 bsp-label = "pybsp.cli:label_app"
 
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
+[project.optional-dependencies]
+sklearn = ["scikit-learn>=1.6"]
 
-[tool.setuptools.packages.find]
-where = ["python"]
-include = ["pybsp*"]
+[build-system]
+requires = ["scikit-build-core>=1.0", "nanobind>=2.9"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+wheel.packages = ["python/pybsp"]
+cmake.build-type = "Release"
+sdist.inclusion-mode = "explicit"
+sdist.include = ["CMakeLists.txt", "pyproject.toml", "README.md", "include/bsp/**", "src/**", "python/bindings/**", "python/pybsp/**", "tests/**", "docs/**", "notebooks/native_bsp_experiments.ipynb"]
+sdist.exclude = ["**/__pycache__/**", "**/*.pyc", "docs/_build/**", "docs/.jupyter_cache/**", "notebooks/.ipynb_checkpoints/**"]
+
+[tool.scikit-build.cmake.define]
+BSP_BUILD_PYTHON = "ON"
+BSP_BUILD_CLI = "OFF"
+BSP_BUILD_TESTS = "OFF"
+BSP_NATIVE_ARCH = "OFF"
+BSP_ENABLE_OPENMP = "OFF"
+BSP_IDE_LINK = "OFF"
 
 [dependency-groups]
+docs = [
+    "sphinx>=8,<10",
+    "pydata-sphinx-theme>=0.16,<0.24",
+    "myst-parser>=4,<6",
+    "plotly>=6,<7",
+]
+notebooks = [
+    "jupyterlab>=4",
+    "nbclient>=0.10",
+    "ipykernel>=6",
+    "ipywidgets>=8",
+    "plotly>=6,<7",
+]
+test = ["pytest>=8"]
 dev = [
+    "ipython>=9.17.1",
     "scipy>=1.18.1",
     "sympy>=1.14.0",
 ]

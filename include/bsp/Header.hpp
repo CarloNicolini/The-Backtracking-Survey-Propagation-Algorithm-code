@@ -89,6 +89,7 @@ const double epsilon=0.01;/*convergence epsilon value*/
 const double _R_BSP=0.9;/*r values for BSP, it goes from [0, 1).  When it is equal to 0, one gets a SID algorithms, while when it is different to 0 one gets the BSP. */
 
 #ifdef WALKSAT
+int WalkSatMemory(vector<vector<bool>> &sol, unsigned n, const vector<vector<int>> &clauses);
 int WalkSat(vector <vector<bool> > & sol,int argc, char * argv[]); // WalkSat function
 #endif
 

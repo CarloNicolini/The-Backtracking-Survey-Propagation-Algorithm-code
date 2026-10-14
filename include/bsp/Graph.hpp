@@ -29,6 +29,7 @@
 #define Graph_hpp
 #define MAX_CLEN 1000
 #include <bsp/Header.hpp>
+#include <bsp/run.hpp>
 #include <bsp/Vertex.hpp>
 
 /*
@@ -302,6 +303,12 @@ public:
 
   unsigned int K() { return _K; /*public values of K*/ }
 
+  unsigned seed() const { return _seed; }
+  bsp::Formula formula() const;
+  void load_formula(const bsp::Formula &);
+  void consume_generation(unsigned k, double alpha);
+  bsp::Formula residual_formula() const;
+
   void print(); /*print on file*/
 
   void read_from_file_graph(); /*read an instance given as INPUT*/
@@ -469,8 +476,10 @@ private:
   unsigned int GetRandom() { /*inizialzation seed*/
     unsigned int ris;        /*definition seed*/
     FILE *devran = fopen("/dev/urandom", "r");
-    fread(&ris, 4, 1, devran);
+    if (!devran) throw std::runtime_error("cannot open /dev/urandom");
+    size_t count=fread(&ris, 4, 1, devran);
     fclose(devran);
+    if(count!=1) throw std::runtime_error("cannot read a random seed");
     return ris; /*obtain a random seed*/
   }
 
@@ -480,7 +489,7 @@ private:
     else
       _seed = GetRandom(); /*call and store seed*/
     if (_seed < 1)
-      exit(-1);                 /*check if seed is ok*/
+      throw std::runtime_error("invalid Graph operation");                 /*check if seed is ok*/
     srandom(_seed);             /*initialize default random number generator*/
     unsigned int init[INITLEN]; /*store first 32 random number*/
     for (int i = 0; i < INITLEN; ++i) {
@@ -577,7 +586,7 @@ inline double Graph::_p_I(double &PU,
 inline void Graph::_update_message(unsigned int &c,
                                    list<double *>::iterator &s_i,
                                    list<Vertex *>::iterator &it_cl) {
-  exit(-1);
+  throw std::runtime_error("invalid Graph operation");
   double a = **s_i;
   list<double *>::iterator
       s_j; /*complex pointer iterator for literals j into a clause*/

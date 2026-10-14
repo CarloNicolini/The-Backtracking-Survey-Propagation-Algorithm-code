@@ -33,6 +33,10 @@
 #include <fcntl.h>
 #include <csignal>
 #include <cerrno>
+#include <chrono>
+#include <thread>
+#include <spawn.h>
+extern char **environ;
 #endif
 
 /*Phase 1 diagnostic options (see Header.h).*/
@@ -113,7 +117,7 @@ void Clause::clean(Vertex * &p_V, unsigned int &j) { /*clean the clasue*/
             if((*__it)->_degree_i<0) {
                 BSP_ERROR<<"Error degree node j less than 0"<<endl;
                 BSP_ERROR<<"Il grado e':"<<(*__it)->_degree_i<<" "<<(*__it)->_vertex<<endl;
-                exit(-1);
+                throw std::runtime_error("Graph operation failed");
             }
         }
 
@@ -200,8 +204,8 @@ void Clause::build(Vertex * &p_V, unsigned int &j) { /*build the clasue*/
 void Graph::unit_propagation(unsigned int  &c) { /*fix the variable into clause c to true and clean the graph*/
     //cout<<"unit propagation"<<endl;
     _unit_prop++;/*update counter unit propagation*/
-    if(_cl[c].size()>1 and _new!=1)exit(-1);/*check that we have the right clause*/
-    if(_cl[c].empty())exit(-1);/*check that we have the right clause*/
+    if(_cl[c].size()>1 and _new!=1)throw std::runtime_error("Graph operation failed");/*check that we have the right clause*/
+    if(_cl[c].empty())throw bsp::HeuristicFailure("contradiction in unit propagation");/*check that we have the right clause*/
     if (*_cl[c]._lit.begin()) {
         (*_cl[c].V.begin())->_who_I_am=true; /*set the variable to the value that satisfied the literal into the clause*/
         (*_cl[c].V.begin())->_sT=1.;/*set the associated survey to one*/
@@ -321,7 +325,7 @@ int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) 
                                MAP_SHARED|MAP_ANONYMOUS, -1, 0);
     if (tout==MAP_FAILED) {
         BSP_ERROR<<"mmap failed for complexity probe"<<endl;
-        exit(-1);
+        throw std::runtime_error("Graph operation failed");
     }
     tout[0]=0.; tout[1]=0.; tout[2]=0.;
     _diag_step_out<<flush;
@@ -332,13 +336,15 @@ int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) 
     fflush(NULL);
     pid_t pid=fork();
     if (pid<0) {
+        munmap(tout,3*sizeof(double));
         BSP_ERROR<<"fork failed for complexity probe"<<endl;
-        exit(-1);
+        throw std::runtime_error("Graph operation failed");
     }
     if (pid==0) {
         close(STDOUT_FILENO);
         close(STDERR_FILENO);
         _in_trial=true;
+        try {
         for (unsigned i=0; i<vars.size(); ++i) {
             Vertex* v=vars[i];
             _list_fixed_element.push_back(v);
@@ -356,9 +362,23 @@ int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) 
         tout[1]=complexity;
         tout[2]=(double)_time_conv_print;
         _exit(0);
+        } catch (...) { _exit(1); }
     }
+    struct Probe {
+        pid_t pid; double *memory;
+        ~Probe() {
+            if(pid>0) { kill(pid,SIGKILL); int status; while(waitpid(pid,&status,0)<0 && errno==EINTR) {} }
+            munmap(memory,3*sizeof(double));
+        }
+    } probe{pid,tout};
     int status=0;
-    while (waitpid(pid, &status, 0)<0 && errno==EINTR) { /*retry*/ }
+    while (true) {
+        bsp::check_cancelled();
+        pid_t waited=waitpid(pid,&status,WNOHANG);
+        if(waited==pid) { probe.pid=-1; break; }
+        if(waited<0 && errno!=EINTR) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     int conv=(WIFEXITED(status) && WEXITSTATUS(status)==0) ? 1 : 0;
     if (conv) {
         sigma=tout[1];
@@ -367,7 +387,6 @@ int Graph::probe_fixes(const vector<Vertex*>& vars, double& sigma, int& sweeps) 
         sweeps=t_max;
     }
     _sp_sweeps+=(unsigned long)sweeps;
-    munmap(tout, 3*sizeof(double));
     return conv;
 #endif
 }
@@ -593,6 +612,27 @@ void Graph::surveys() { /*compute surveys for each variable node*/
  already holds this step's decimation-vs-backtracking decision. Fixed
  variables are logged with their stale surveys plus fixed=1.*/
 void Graph::diag_step() {
+    if (auto *ctx=bsp::run_context()) {
+        const unsigned step=_diag_step_idx++;
+        auto &table=ctx->result->tables["steps"];
+        table.columns={"step","move","Nt","Mt","Sigma","Sigma_per_N","eta","unit_prop","last_cert","n_fixed","sp_sweeps","y","E_per_Nt"};
+        table.rows.push_back({double(step),fl_bsp ? "back" : "dec",double(_N_t),double(_M_t),complexity,complexity/double(_N),double(_time_conv_print),double(_unit_prop),_last_certitude,double(_list_fixed_element.size()),double(_sp_sweeps),g_T_cav>0.?1./g_T_cav:0.,_N_t>0?energy/double(_N_t):0.});
+        if (step % ctx->options->diag_every == 0) {
+            if (ctx->options->variable_history) {
+                auto &vars=ctx->result->tables["variables"];
+                vars.columns={"step","vertex","fixed","who","sT","sF","sI","score","abspol","degree"};
+                if(ctx->options->cav_temp>0.) {vars.columns.push_back("e_mean"); vars.columns.push_back("log_z");}
+                for (auto *v:ptrV) {
+                    std::vector<bsp::Cell> row={double(step),double(v->_vertex),double(v->_I_am_a_fixed_variable),double(v->_who_I_am),v->_sT,v->_sF,v->_sI,v->_sC,fabs(v->_sT-v->_sF),double(v->_degree_i)};
+                    if(ctx->options->cav_temp>0.) {auto st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_gamma_eff); row.emplace_back(st.e_mean); row.emplace_back(log(st.z));}
+                    vars.rows.push_back(std::move(row));
+                }
+            }
+            if(ctx->options->residual_history) ctx->result->residuals.emplace(step,residual_formula());
+        }
+        _diag_header_done=true;
+        return;
+    }
     if (g_diag_prefix.empty()) return;
     if (!_diag_header_done) {
         if (_N > 20000 && g_diag_every < 10)
@@ -603,7 +643,7 @@ void Graph::diag_step() {
         _diag_move_out.open((g_diag_prefix + "_moves.csv").c_str());
         if (!_diag_step_out || !_diag_var_out || !_diag_move_out) {
             BSP_ERROR<<"Cannot open diagnostic output with prefix "<<g_diag_prefix<<endl;
-            exit(-1);
+            throw std::runtime_error("Graph operation failed");
         }
         _diag_step_out<<"# scorer="<<bsp_scorer_name()<<" K="<<_K<<" N="<<_N
                       <<" M="<<_M<<" seed="<<_seed<<" r="<<g_r_bsp
@@ -666,6 +706,18 @@ void Graph::diag_step() {
  Pre-SP unit propagations are skipped (headers not written yet).*/
 void Graph::diag_move(const char* action, Vertex* v, int dir) {
     if (_in_trial) return;/*trial children must not touch shared file offsets*/
+    if (auto *ctx=bsp::run_context()) {
+        if(_in_trial) return;
+        auto &table=ctx->result->tables["moves"];
+        table.columns={"step","action","vertex","dir"};
+        std::vector<bsp::Cell> row={_diag_header_done?double(_diag_step_idx-1):-1.,action,double(v->_vertex),double(dir)};
+        if(ctx->options->cav_temp>0.) {
+            table.columns.push_back("e_mean"); table.columns.push_back("log_z");
+            auto st=v->cavity_star(true,NULL,v->prod_V_plus,v->prod_V_minus,g_T_cav,g_gamma_eff);
+            row.emplace_back(st.e_mean); row.emplace_back(log(st.z));
+        }
+        table.rows.push_back(std::move(row)); return;
+    }
     if (g_diag_prefix.empty() || !_diag_header_done) return;
     _diag_move_out<<(_diag_step_idx-1)<<","<<action<<","<<v->_vertex<<","<<dir;
     if(g_T_cav>0.) {/*ThermoSP cavity statistics of the last free state*/
@@ -675,63 +727,37 @@ void Graph::diag_move(const char* action, Vertex* v, int dir) {
     _diag_move_out<<endl;
 }
 
-#ifndef _WIN32
-/*SIGALRM plumbing for bounding minisat (minisat_check callers).*/
-static volatile sig_atomic_t s_oracle_alarm = 0;
-static void oracle_alarm_handler(int) {
-    s_oracle_alarm = 1;
-}
-#endif
-
-/*public member class Graph. Runs minisat on a residual CNF file, bounded by
- g_oracle_timeout seconds. Returns 1 SAT, 0 UNSAT, -2 timeout, -3 fork
- failure/crash, -4 minisat binary missing. POSIX only.*/
+/*Bounded oracle check without process-global signal handlers.*/
 int Graph::minisat_check(const string& path) {
 #ifdef _WIN32
-    (void)path;
-    return -3;
+    (void)path; return -3;
 #else
-    pid_t gpid=fork();
-    if (gpid < 0) return -3;
-    if (gpid==0) {
-        int dn=open("/dev/null", O_WRONLY);
-        if (dn>=0) { dup2(dn, STDOUT_FILENO); dup2(dn, STDERR_FILENO); }
-        execlp(g_minisat_path.c_str(), "minisat",
-               path.c_str(), "/dev/null", (char*)NULL);
-        _exit(127);/*exec failed: minisat missing*/
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_addopen(&actions,STDOUT_FILENO,"/dev/null",O_WRONLY,0);
+    posix_spawn_file_actions_addopen(&actions,STDERR_FILENO,"/dev/null",O_WRONLY,0);
+    std::vector<std::string> args={"minisat",path,"/dev/null"};
+    std::vector<char*> argv; for(auto &arg:args) argv.push_back(&arg[0]); argv.push_back(nullptr);
+    pid_t pid;
+    int error=posix_spawnp(&pid,g_minisat_path.c_str(),&actions,nullptr,argv.data(),environ);
+    posix_spawn_file_actions_destroy(&actions);
+    if(error) return error==ENOENT ? -4 : -3;
+    struct Child {
+        pid_t pid;
+        ~Child() { if(pid>0) { kill(pid,SIGKILL); int status; while(waitpid(pid,&status,0)<0 && errno==EINTR) {} } }
+    } child{pid};
+    auto start=std::chrono::steady_clock::now();
+    int status=0;
+    while(true) {
+        bsp::check_cancelled();
+        pid_t waited=waitpid(pid,&status,WNOHANG);
+        if(waited==pid) { child.pid=-1; break; }
+        if(waited<0 && errno!=EINTR) return -3;
+        if(g_oracle_timeout>0 && std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()>=g_oracle_timeout) return -2;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    int gst=0;
-    bool have_status=false;
-    struct sigaction sa_new, sa_old;
-    bool sa_saved=false;
-    if (g_oracle_timeout > 0) {
-        s_oracle_alarm=0;
-        sa_new.sa_handler=oracle_alarm_handler;
-        sigemptyset(&sa_new.sa_mask);
-        sa_new.sa_flags=0;/*no SA_RESTART: waitpid must EINTR*/
-        sigaction(SIGALRM, &sa_new, &sa_old);
-        sa_saved=true;
-        alarm(g_oracle_timeout);
-    }
-    while (true) {
-        pid_t w=waitpid(gpid, &gst, 0);
-        if (w==gpid) { have_status=true; break; }
-        if (errno==EINTR && !s_oracle_alarm) continue;/*stray signal*/
-        break;/*timeout (alarm) or hard error*/
-    }
-    if (g_oracle_timeout > 0) {
-        alarm(0);
-        if (sa_saved) sigaction(SIGALRM, &sa_old, NULL);
-    }
-    if (!have_status) {
-        kill(gpid, SIGKILL);
-        int dummy=0;
-        while (waitpid(gpid, &dummy, 0) < 0 && errno==EINTR) { /*retry*/ }
-        return -2;
-    }
-    if (WIFEXITED(gst) && WEXITSTATUS(gst)==127) return -4;
-    if (WIFEXITED(gst) && (WEXITSTATUS(gst)==10 || WEXITSTATUS(gst)==20))
-        return (WEXITSTATUS(gst)==10) ? 1 : 0;
+    if(WIFEXITED(status) && WEXITSTATUS(status)==127) return -4;
+    if(WIFEXITED(status) && (WEXITSTATUS(status)==10 || WEXITSTATUS(status)==20)) return WEXITSTATUS(status)==10 ? 1 : 0;
     return -3;
 #endif
 }
@@ -750,9 +776,18 @@ int Graph::oracle_try(Vertex* v, bool dir) {
     _M_t=static_cast<unsigned>(_cl_list.size());
     ostringstream tmp;
     tmp<<"oracle_try_"<<(int)getpid()<<"_"<<(_oracle_tmp_ctr++)<<".cnf";
-    print_residual_to(tmp.str());
-    int r=minisat_check(tmp.str());
-    unlink(tmp.str().c_str());
+    std::string path=tmp.str();
+    if (bsp::run_context()) {
+        const char *base=getenv("TMPDIR");
+        path=std::string(base ? base : "/tmp")+"/pybsp-oracle-XXXXXX";
+        std::vector<char> name(path.begin(),path.end()); name.push_back(0);
+        int fd=mkstemp(name.data());
+        if(fd<0) throw std::runtime_error("cannot create Minisat temporary input");
+        close(fd); path=name.data();
+    }
+    struct Temp { std::string path; ~Temp() { unlink(path.c_str()); } } temp{path};
+    print_residual_to(path);
+    int r=minisat_check(path);
     _M_t=mt_save;
     _list_fixed_element.erase(v->_it_list_fixed_elem);
     v->_it_list_fixed_elem=_list_fixed_element.end();
@@ -769,13 +804,13 @@ int Graph::oracle_dir(Vertex* v) {
     int r_sp=oracle_try(v, sp);
     if (r_sp==-4) {
         BSP_ERROR<<"minisat not found at '"<<g_minisat_path<<"'"<<endl;
-        exit(-1);
+        throw std::runtime_error("Graph operation failed");
     }
     note_oracle_result(r_sp);
     int r_flip=oracle_try(v, !sp);
     if (r_flip==-4) {
         BSP_ERROR<<"minisat not found at '"<<g_minisat_path<<"'"<<endl;
-        exit(-1);
+        throw std::runtime_error("Graph operation failed");
     }
     note_oracle_result(r_flip);
     bool sp_sat=(r_sp==1), flip_sat=(r_flip==1);
@@ -808,7 +843,7 @@ void Graph::unit_propagation() {
         if(_cl[C]._I_am_in_list_unsat and _cl[C].empty()) { /*check if it is empty*/
             BSP_ERROR<<"Contradiction found"<<endl; /*contradiction found*/
             BSP_ERROR<<"I quit from convergence_messages function"<<endl;
-            exit(-1);/*exit failure*/
+            throw bsp::HeuristicFailure("contradiction during propagation");/*exit failure*/
         }
         if(_cl[C].size()==1) {
             /*set the variable to 1 otherwise you will have contradiction*/
@@ -838,13 +873,14 @@ void Graph::convergence_messages() { /*compute convergence messages for message 
     unsigned long i,l, __k;
     unsigned int C;
 START:
+    if (!_in_trial) bsp::check_cancelled();
     /*unit propagation*/
     for(__k=_m; __k<_M; __k++) {
         C=(vec_list_cl[__k])->_c;
         if(_cl[C]._I_am_in_list_unsat and _cl[C].empty()) { /*check if it is empty*/
             BSP_ERROR<<"Contradiction found"<<endl; /*contradiction found*/
             BSP_ERROR<<"I quit from convergence_messages function"<<endl;
-            exit(-1);/*exit failure*/
+            throw bsp::HeuristicFailure("contradiction during propagation");/*exit failure*/
         }
         if(_cl[C]._I_am_in_list_unsat and _cl[C].size()==1) {
             /*set the variable to 1 otherwise you will have contradiction*/
@@ -859,6 +895,7 @@ START:
     vector<double> star_pu, star_z;/*pi_u and z of the cavity star of each literal*/
     /*convergence*/
     for (unsigned int t=0; t<t_max; ++t) {
+        if (!_in_trial) bsp::check_cancelled();
         conv_f=false;
         _counter_conv=0;/*set counter convergence to zero*/
         complexity_clauses=0.;/*set clauses complexity to zero*/
@@ -947,7 +984,7 @@ START:
         BSP_ERROR<<"SP does not find any fixed points -> SP does not converge."<<endl;
         BSP_ERROR<<"sp_sweeps="<<_sp_sweeps<<endl;
         BSP_ERROR<<"I am sorry I quit :("<<endl;
-        exit(-1);
+        throw bsp::HeuristicFailure("SP did not converge");
     }
 }
 
@@ -1241,7 +1278,7 @@ void Graph::print_residual_to(const string& path) {
     ofstream outfile(path.c_str());
     if (!outfile) {
         BSP_ERROR<<"Error file output does not exist"<<endl;
-        exit(-1);
+        throw std::runtime_error("Graph operation failed");
     } else {
         outfile << "c seed=1234567"<<endl;
         outfile << "p cnf";
@@ -1282,23 +1319,16 @@ bool Graph::WalkSAT() {
     rf+=s;
     rf+=txt;
     int argc=10;
-    char * argv[10];
-    for (int i=0; i<argc; i++) argv[i]=(char *)malloc(1000);
-    strcpy (argv[0],"test" );
-    strcpy (argv[1],"-solcnf" );
-    strcpy (argv[2],"-cutoff");
-    strcpy (argv[3],"100000000" );
-    strcpy (argv[4],"-best" );
-    strcpy (argv[5],"-seed" );
-    strcpy (argv[6],"1234567");
-    strcpy (argv[7],"-numsol" );
-    strcpy (argv[8],"10" );
-    strcpy (argv[9],rf.c_str());
+    std::vector<std::string> args={"test","-solcnf","-cutoff","100000000","-best","-seed","1234567","-numsol","10",rf};
+    char *argv[10];
+    for (int i=0;i<argc;++i) argv[i]=&args[i][0];
     bool flag=false;
     for (int i=1; i<argc; i++) BSP_DEBUG<<"Input "<<argv[i]<<endl;
 
-    WalkSat(sol,argc,argv);/*call WalkSAT*/
-    for (int i=0; i<argc; i++) free(argv[i]);
+    if (bsp::run_context()) {
+        const auto residual=residual_formula();
+        WalkSatMemory(sol, residual.n, residual.clauses);
+    } else WalkSat(sol,argc,argv);/*call WalkSAT*/
     vector<long int> mysol;
     BSP_INFO<<"Check and white a solution"<<endl;
     BSP_INFO<<"time of whitening    freezing probability"<<endl;
@@ -1338,10 +1368,13 @@ bool Graph::WalkSAT() {
             if (!_cl[c]._check()) {
                 BSP_ERROR<<_cl[c];
                 BSP_ERROR<<"NO SOLUTION ERROR"<<endl;/*NO SOLUTION FOUND*/
-                exit(-1);
+                throw std::runtime_error("Graph operation failed");
             }
         }
-        if(i==0)print_only_one_sol();
+        if (auto *ctx=bsp::run_context()) {
+            ctx->result->solutions.emplace_back(mysol.begin()+1,mysol.end());
+        }
+        if(i==0 && !bsp::run_context())print_only_one_sol();
         if(!flag)flag=true;
         ostringstream alpha_str; //printing solution on file
         ostringstream var_str;
@@ -1368,7 +1401,8 @@ bool Graph::WalkSAT() {
         mystring+=seed;
         mystring+=seed_str.str();
         mystring+=dat;
-        ofstream outfile5(mystring.c_str());
+        ofstream outfile5;
+        if (!bsp::run_context()) outfile5.open(mystring.c_str());
         for (int i=1; i<mysol.size(); ++i) {
             outfile5<<mysol[i]<<endl;
         }
@@ -1415,11 +1449,13 @@ void Graph::Whitening_Solution() { /*whitening procedure*/
     mystring+=var_str.str();
     mystring+=alpha_str.str();
     mystring+=dat;
-    ofstream outfilew(mystring.c_str(), ios_base::app );
+    ofstream outfilew;
+    if (!bsp::run_context()) outfilew.open(mystring.c_str(), ios_base::app);
     bool flag_white=true;/*Boolean flag for white*/
     double counter_white_var=0.;/*counter for white variables*/
     unsigned int time_white=0;/*time for whitening a solution*/
-    for (unsigned int t=0; t<1024; ++t) {/*time loop*/
+    for (unsigned int t=0; t<1024; ++t) {
+        bsp::check_cancelled();/*time loop*/
         time_white=t;
         for (unsigned int i=0; i<_N; ++i) {/*loop on all variable nodes*/
             if(!ptrV[i]->_I_am_white) {
@@ -1448,6 +1484,11 @@ void Graph::Whitening_Solution() { /*whitening procedure*/
             }
         }
         outfilew<<_seed<<" "<<_N<<" "<<_alpha<<" "<<time_white<<" "<<counter_white_var<<endl;/*print on file*/
+    }
+    if (auto *ctx=bsp::run_context()) {
+        auto &table=ctx->result->tables["whitening"];
+        table.columns={"solution", "time", "white_fraction"};
+        table.rows.push_back({double(ctx->result->solutions.size()-1), double(time_white), counter_white_var/double(_N)});
     }
     BSP_INFO<<time_white<<"\t \t \t \t"<<counter_white_var/(double)(_N)<<endl;/*print on terminal*/
 }
@@ -1610,7 +1651,8 @@ void Graph::write_on_file_graph() { /*build a graph and write a CNF formula*/
     /*I am modifing how to write the output file*/
 #ifdef PRINT_FORMULA_CNF
     /*output file*/
-    ofstream outfilewff(str.c_str(), ios_base::app);
+    ofstream outfilewff;
+    if (!bsp::run_context()) outfilewff.open(str.c_str(), ios_base::app);
     outfilewff << "c seed="<<_seed<<endl;
     outfilewff << "p cnf";
     outfilewff << ' ' << _N << ' ' << _M << endl;
@@ -1632,6 +1674,7 @@ void Graph::write_on_file_graph() { /*build a graph and write a CNF formula*/
 
     /*build the CNF instance*/
     for (i=0; i<_M; i++) {
+        if ((i & 1023)==0) bsp::check_cancelled();
 
         for (j=0; j<_K; j++) {
 
@@ -1687,7 +1730,7 @@ void Graph::read_from_file_graph() { /*read an instance given as INPUT*/
         BSP_ERROR<<_argv[_argc-1]<<endl;
         BSP_ERROR<<"File not found"<<endl;
         BSP_ERROR<<"Please check if the name is correct or if the file exists."<<endl;
-        exit(-1);
+        throw std::runtime_error("Graph operation failed");
     } else {
         string ogg1;
         int ogg2, ogg3;
@@ -1740,3 +1783,37 @@ void Graph::read_from_file_graph() { /*read an instance given as INPUT*/
 /***********************************************************************************/
 
 
+
+// Native formula ingestion uses the same graph initialization as the CLI.
+bsp::Formula Graph::formula() const {
+    bsp::Formula f; f.n=_N; f.seed=_seed;
+    std::vector<int> clause;
+    for(long lit:_ivec) {
+        if(lit==0) { f.clauses.push_back(std::move(clause)); clause.clear(); }
+        else clause.push_back(static_cast<int>(lit));
+    }
+    return f;
+}
+void Graph::load_formula(const bsp::Formula &f) {
+    _N=f.n; _N_t=_N; _M=f.clauses.size(); _M_t=_M; _K=0;
+    _alpha=double(_M)/double(_N); _ivec.clear();
+    for(const auto &cl:f.clauses) {
+        _K=std::max(_K,static_cast<unsigned>(cl.size()));
+        _ivec.insert(_ivec.end(),cl.begin(),cl.end()); _ivec.push_back(0);
+    }
+}
+void Graph::consume_generation(unsigned k,double alpha) {
+    std::ostringstream density; density<<std::setprecision(17)<<alpha;
+    _argv={"bsp","-w",std::to_string(k),density.str(),std::to_string(bsp::run_context()->result->formula.n)};
+    _argc=_argv.size(); write_on_file_graph();
+}
+bsp::Formula Graph::residual_formula() const {
+    bsp::Formula f; f.n=_N; f.seed=_seed;
+    for(auto *cl:_cl_list) {
+        std::vector<int> lits;
+        auto b=cl->_lit.begin();
+        for(auto *v:cl->V) { lits.push_back(*b ? int(v->_vertex) : -int(v->_vertex)); ++b; }
+        f.clauses.push_back(std::move(lits));
+    }
+    return f;
+}

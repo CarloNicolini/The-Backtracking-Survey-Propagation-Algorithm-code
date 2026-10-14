@@ -1,5 +1,8 @@
 add_library(bsp_core STATIC
   Graph.cpp
+  run.cpp
+  run_algorithm.cpp
+  random_state.cpp
   release_score.cpp
   rsb2.cpp
   rsb2_draw.cpp
@@ -15,13 +18,22 @@ add_library(bsp_core STATIC
   walksat.cpp
 )
 
+set_target_properties(bsp_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Validate public inputs without fast-math assumptions.
+set_source_files_properties(run.cpp PROPERTIES COMPILE_OPTIONS "-fno-fast-math")
+
 target_include_directories(bsp_core
   PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
 )
 target_compile_features(bsp_core PUBLIC cxx_std_14)
 
-find_package(OpenMP)
-if(OpenMP_CXX_FOUND)
+find_package(Threads REQUIRED)
+target_link_libraries(bsp_core PUBLIC Threads::Threads)
+
+if(BSP_ENABLE_OPENMP)
+  find_package(OpenMP)
+endif()
+if(BSP_ENABLE_OPENMP AND OpenMP_CXX_FOUND)
   target_link_libraries(bsp_core PUBLIC OpenMP::OpenMP_CXX)
   message(STATUS "BSP OpenMP: ON")
 else()
@@ -59,6 +71,8 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(bsp_core PUBLIC m)
 endif()
 
+if(BSP_BUILD_CLI)
 add_executable(bsp main.cpp outdir.cpp)
 target_link_libraries(bsp PRIVATE bsp_core cxxopts::cxxopts)
 install(TARGETS bsp RUNTIME DESTINATION bin)
+endif()
